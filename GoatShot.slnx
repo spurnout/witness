@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GoatShot.App/GoatShot.App.csproj" />
+    <Project Path="src/GoatShot.Cli/GoatShot.Cli.csproj" />
+    <Project Path="src/GoatShot.Tests/GoatShot.Tests.csproj" />
+  </Folder>
+</Solution>

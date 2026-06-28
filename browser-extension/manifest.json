@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "GoatShot Page Capture Prototype",
+  "version": "0.1.0",
+  "description": "Prototype content script for GoatShot page geometry and consented telemetry handoff.",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "nativeMessaging",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "GoatShot Capture"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  }
+}

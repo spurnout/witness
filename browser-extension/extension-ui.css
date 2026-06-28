@@ -1,0 +1,107 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #101418;
+  color: #f2f6f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  padding: 14px;
+  background: #101418;
+}
+
+main {
+  display: grid;
+  gap: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+section {
+  display: grid;
+  gap: 8px;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #b7c7cf;
+}
+
+select,
+input[type="number"] {
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid #38535d;
+  border-radius: 6px;
+  background: #172027;
+  color: #f2f6f8;
+}
+
+.check {
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+  gap: 8px;
+  color: #f2f6f8;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #48e6c3;
+  border-radius: 6px;
+  background: #16382f;
+  color: #f2f6f8;
+  font-weight: 600;
+}
+
+button.secondary {
+  border-color: #50636b;
+  background: #182229;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #48e6c3;
+  outline-offset: 2px;
+}
+
+.status {
+  min-height: 34px;
+  padding: 8px;
+  border: 1px solid #314149;
+  border-radius: 6px;
+  background: #141c22;
+  color: #d7e5ea;
+  white-space: pre-wrap;
+}
+
+.muted {
+  color: #8ea4ae;
+  font-size: 12px;
+}

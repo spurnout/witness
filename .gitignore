@@ -1,0 +1,38 @@
+# Build outputs
+bin/
+obj/
+TestResults/
+artifacts/*
+!artifacts/*.md
+
+# IDE/local state
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local app/proof state
+*.log
+*.tmp
+*.sqlite
+*.db
+*.zip
+*.7z
+*.nupkg
+*.msi
+*.exe
+*.pdb
+*.etl
+*.dmp
+
+# Secrets and credentials
+.env
+.env.*
+*.pfx
+*.pem
+*.key
+*.secret
+secrets/
+
+# Scratch files outside the app projects
+/Program.cs

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoatShot Options</title>
+  <link rel="stylesheet" href="extension-ui.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>GoatShot Options</h1>
+      <div class="muted">Local extension defaults.</div>
+    </header>
+
+    <section>
+      <label class="check">
+        <input id="nativeHost" type="checkbox" checked>
+        Send captures to native host by default
+      </label>
+      <label class="check">
+        <input id="telemetry" type="checkbox">
+        Include telemetry summaries by default
+      </label>
+      <label class="check">
+        <input id="horizontal" type="checkbox">
+        Include horizontal scroll by default
+      </label>
+      <label class="check">
+        <input id="exportPackage" type="checkbox">
+        Export stitch package by default
+      </label>
+    </section>
+
+    <section class="grid">
+      <label>
+        Tiles
+        <input id="maxTiles" type="number" min="1" max="500" value="80">
+      </label>
+      <label>
+        Overlap
+        <input id="overlap" type="number" min="0" max="2000" value="64">
+      </label>
+      <label>
+        Sticky
+        <input id="sticky" type="number" min="0" max="2000" value="0">
+      </label>
+    </section>
+
+    <section class="actions">
+      <button id="save">Save</button>
+      <button id="status" class="secondary">Host Status</button>
+    </section>
+
+    <section>
+      <div id="result" class="status" role="status" aria-live="polite">Ready.</div>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

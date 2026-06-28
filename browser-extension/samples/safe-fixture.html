@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoatShot Safe Browser Capture Fixture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+
+    body {
+      margin: 0;
+      min-width: 1800px;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 72px;
+      padding: 0 32px;
+      background: #0f766e;
+      color: #ffffff;
+      box-shadow: 0 2px 12px rgba(15, 23, 42, 0.18);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 320px 1fr 360px;
+      gap: 24px;
+      padding: 32px;
+    }
+
+    section,
+    aside {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 20px;
+    }
+
+    .target {
+      outline: 4px solid #f59e0b;
+      outline-offset: 4px;
+    }
+
+    .spacer {
+      height: 420px;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #475569;
+      background: repeating-linear-gradient(
+        45deg,
+        #ffffff,
+        #ffffff 20px,
+        #f1f5f9 20px,
+        #f1f5f9 40px
+      );
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>GoatShot Fixture</strong>
+    <span>Safe local content for full-page, horizontal, sticky-header, and selected-element capture.</span>
+  </header>
+  <main>
+    <aside>
+      <h1>Left Rail</h1>
+      <p>No private data, credentials, account names, cookies, or form values are present on this fixture.</p>
+      <button class="target" id="selected-element-target" aria-label="Safe selected element target">Selected Element Target</button>
+    </aside>
+    <section>
+      <h2>Tall Capture Area</h2>
+      <div class="spacer">Tile band 1</div>
+      <div class="spacer">Tile band 2</div>
+      <div class="spacer">Tile band 3</div>
+      <div class="spacer">Tile band 4</div>
+      <div class="spacer">Tile band 5</div>
+    </section>
+    <aside>
+      <h2>Wide Rail</h2>
+      <p>This right rail forces horizontal scroll so the extension can plan and export wide-page tiles.</p>
+      <div class="spacer">Wide content rail</div>
+    </aside>
+  </main>
+</body>
+</html>

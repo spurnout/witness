@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "goatshot.admin-policy.v1",
+  "name": "Locked Support Workstation",
+  "description": "Sample local admin/team policy bundle. Secrets and DPAPI credentials are intentionally not part of this format.",
+  "managedPolicy": {
+    "disableAi": true,
+    "disableUploads": true,
+    "disableCustomScripts": true,
+    "disableCustomWebhooks": true,
+    "disableLocalPlugins": true,
+    "disableBrowserExtension": true,
+    "disableAndroidCapture": true,
+    "disableVirtualPrinterImport": true,
+    "requirePrivateCaptureMode": true,
+    "disableDiagnosticsLogCapture": true,
+    "retentionDays": 30,
+    "allowedShareDestinations": [
+      "Local folder",
+      "Clipboard image"
+    ],
+    "allowedPluginIds": [
+      "sample.redaction-note"
+    ],
+    "allowedPluginActionIds": [
+      "sample.redaction-note:write-note"
+    ]
+  }
+}

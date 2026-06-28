@@ -1,0 +1,55 @@
+<Window x:Class="GoatShot.App.Windows.PixelRulerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GoatShot Pixel Ruler"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="#22030A0E"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Focusable="True"
+        Cursor="Cross"
+        Loaded="Window_Loaded"
+        KeyDown="Window_KeyDown"
+        MouseDown="Window_MouseDown"
+        MouseMove="Window_MouseMove">
+    <Canvas x:Name="RulerCanvas" Background="Transparent">
+        <Line x:Name="MeasureLine"
+              Stroke="#37F4E1"
+              StrokeThickness="2"
+              StrokeDashArray="4 2"
+              Visibility="Collapsed" />
+        <Ellipse x:Name="StartMarker"
+                 Width="11"
+                 Height="11"
+                 Fill="#37F4E1"
+                 Stroke="#061116"
+                 StrokeThickness="2"
+                 Visibility="Collapsed" />
+        <Ellipse x:Name="EndMarker"
+                 Width="11"
+                 Height="11"
+                 Fill="#FFDD66"
+                 Stroke="#061116"
+                 StrokeThickness="2"
+                 Visibility="Collapsed" />
+        <Border x:Name="InfoBubble"
+                Background="#F2071118"
+                BorderBrush="#37F4E1"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10,8"
+                Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="DistanceText"
+                           Foreground="#F4FAFF"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <TextBlock x:Name="DeltaText"
+                           Foreground="#A8C2CE"
+                           FontSize="12" />
+            </StackPanel>
+        </Border>
+    </Canvas>
+</Window>

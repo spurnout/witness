@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "goatshot.plugin.v1",
+  "id": "sample.redaction-note",
+  "name": "Sample Redaction Note",
+  "version": "0.1.0",
+  "description": "Local-only sample plugin for manifest validation and dry-run proof. It has no network side effects.",
+  "actions": [
+    {
+      "id": "write-note",
+      "name": "Write local note",
+      "description": "Sample local action intended for local execution proof.",
+      "execution": {
+        "command": "cmd.exe",
+        "arguments": ["/c", "echo GoatShot sample plugin executed"],
+        "timeoutSeconds": 5
+      }
+    }
+  ],
+  "shareDestinations": [
+    {
+      "id": "local-drop",
+      "name": "Local drop folder",
+      "description": "Sample local share destination intended for dry-run inspection only."
+    }
+  ],
+  "workflowActions": [
+    {
+      "id": "inspect-capture",
+      "name": "Inspect capture",
+      "description": "Sample workflow action intended for dry-run inspection only."
+    }
+  ],
+  "diagnostics": [
+    {
+      "id": "health-note",
+      "name": "Health note",
+      "description": "Sample diagnostics contribution intended for dry-run inspection only."
+    }
+  ]
+}

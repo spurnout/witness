@@ -1,0 +1,69 @@
+namespace GoatShot.App.Services;
+
+public enum TrayMenuActionKind
+{
+    CaptureRegion,
+    CaptureWindow,
+    CaptureScrollingWindow,
+    CaptureHorizontalScrollingWindow,
+    CaptureFullscreen,
+    CaptureAllMonitors,
+    CaptureActiveMonitor,
+    CaptureFixedRegion1280x720,
+    ToggleRecording,
+    ToggleRecordingPause,
+    RecordShortMp4,
+    ToggleStepRecorder,
+    ImportClipboard,
+    PickColor,
+    OpenPixelRuler,
+    OpenWorkspace,
+    OpenSettings,
+    Exit
+}
+
+public sealed record TrayMenuActionDefinition(
+    string Label,
+    TrayMenuActionKind? ActionKind,
+    string Group,
+    bool IsSeparator)
+{
+    public static TrayMenuActionDefinition Action(string label, TrayMenuActionKind actionKind, string group)
+    {
+        return new TrayMenuActionDefinition(label, actionKind, group, IsSeparator: false);
+    }
+
+    public static TrayMenuActionDefinition Separator()
+    {
+        return new TrayMenuActionDefinition(string.Empty, null, string.Empty, IsSeparator: true);
+    }
+}
+
+public static class TrayMenuActionCatalog
+{
+    public static IReadOnlyList<TrayMenuActionDefinition> All { get; } =
+    [
+        TrayMenuActionDefinition.Action("Capture region", TrayMenuActionKind.CaptureRegion, "Capture"),
+        TrayMenuActionDefinition.Action("Capture window", TrayMenuActionKind.CaptureWindow, "Capture"),
+        TrayMenuActionDefinition.Action("Capture scrolling window", TrayMenuActionKind.CaptureScrollingWindow, "Capture"),
+        TrayMenuActionDefinition.Action("Capture horizontal scrolling window", TrayMenuActionKind.CaptureHorizontalScrollingWindow, "Capture"),
+        TrayMenuActionDefinition.Action("Capture fullscreen", TrayMenuActionKind.CaptureFullscreen, "Capture"),
+        TrayMenuActionDefinition.Action("Capture all monitors", TrayMenuActionKind.CaptureAllMonitors, "Capture"),
+        TrayMenuActionDefinition.Action("Capture active monitor", TrayMenuActionKind.CaptureActiveMonitor, "Capture"),
+        TrayMenuActionDefinition.Action("Capture 1280 x 720 at cursor", TrayMenuActionKind.CaptureFixedRegion1280x720, "Capture"),
+        TrayMenuActionDefinition.Action("Start recording", TrayMenuActionKind.ToggleRecording, "Recording"),
+        TrayMenuActionDefinition.Action("Pause / resume recording", TrayMenuActionKind.ToggleRecordingPause, "Recording"),
+        TrayMenuActionDefinition.Action("Record 5s MP4", TrayMenuActionKind.RecordShortMp4, "Recording"),
+        TrayMenuActionDefinition.Action("Start / stop step recorder", TrayMenuActionKind.ToggleStepRecorder, "Recording"),
+        TrayMenuActionDefinition.Action("Import clipboard", TrayMenuActionKind.ImportClipboard, "Tools"),
+        TrayMenuActionDefinition.Action("Color picker", TrayMenuActionKind.PickColor, "Tools"),
+        TrayMenuActionDefinition.Action("Pixel ruler", TrayMenuActionKind.OpenPixelRuler, "Tools"),
+        TrayMenuActionDefinition.Separator(),
+        TrayMenuActionDefinition.Action("Open workspace", TrayMenuActionKind.OpenWorkspace, "Workspace"),
+        TrayMenuActionDefinition.Action("Settings", TrayMenuActionKind.OpenSettings, "Workspace"),
+        TrayMenuActionDefinition.Separator(),
+        TrayMenuActionDefinition.Action("Exit", TrayMenuActionKind.Exit, "System")
+    ];
+
+    public static IEnumerable<TrayMenuActionDefinition> Actions => All.Where(item => !item.IsSeparator);
+}

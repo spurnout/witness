@@ -1,0 +1,135 @@
+<Window x:Class="GoatShot.App.Windows.UploadResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Share Result"
+        Width="620"
+        Height="520"
+        MinWidth="480"
+        MinHeight="380"
+        Background="#081016"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18"
+          Background="#081016">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Margin="0,0,0,14">
+            <TextBlock x:Name="TitleText"
+                       FontSize="22"
+                       FontWeight="Bold" />
+            <TextBlock x:Name="DestinationText"
+                       Foreground="{StaticResource AccentBrush}"
+                       FontWeight="SemiBold"
+                       Margin="0,6,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="180" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Margin="0,0,16,0">
+                    <TextBlock x:Name="FileNameText"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10" />
+                    <Border Background="{StaticResource PanelAltBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12"
+                            Margin="0,0,0,12">
+                        <TextBlock x:Name="MessageText"
+                                   TextWrapping="Wrap" />
+                    </Border>
+
+                    <TextBlock Text="Link"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontWeight="SemiBold"
+                               Margin="0,4,0,6" />
+                    <TextBox x:Name="UrlBox"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             MinHeight="58"
+                             AutomationProperties.Name="Share result link" />
+
+                    <TextBlock Text="Markdown"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontWeight="SemiBold"
+                               Margin="0,12,0,6" />
+                    <TextBox x:Name="MarkdownBox"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             MinHeight="58"
+                             AutomationProperties.Name="Share result markdown link" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <Border x:Name="QrBorder"
+                            Background="#FFFFFF"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8"
+                            Width="180"
+                            Height="180"
+                            Margin="0,0,0,10">
+                        <Image x:Name="QrImage"
+                               Stretch="Uniform" />
+                    </Border>
+                    <TextBlock x:Name="QrStatusText"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               TextWrapping="Wrap"
+                               FontSize="12" />
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <WrapPanel Grid.Row="2"
+                   HorizontalAlignment="Right"
+                   Margin="0,18,0,0">
+            <Button x:Name="CopyLinkButton"
+                    Content="Copy link"
+                    Click="CopyLink_Click"
+                    AutomationProperties.Name="Copy share link" />
+            <Button x:Name="OpenLinkButton"
+                    Content="Open link"
+                    Click="OpenLink_Click"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Open share link" />
+            <Button x:Name="CopyMarkdownButton"
+                    Content="Copy Markdown"
+                    Click="CopyMarkdown_Click"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Copy Markdown share link" />
+            <Button x:Name="CopyQrPathButton"
+                    Content="Copy QR path"
+                    Click="CopyQrPath_Click"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Copy QR code path" />
+            <Button x:Name="RetryButton"
+                    Content="Retry"
+                    Click="Retry_Click"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Retry share" />
+            <Button x:Name="DeleteRemoteButton"
+                    Content="Delete remote"
+                    IsEnabled="False"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Delete remote share unavailable" />
+            <Button Content="Close"
+                    Click="Close_Click"
+                    Style="{StaticResource SecondaryButton}"
+                    AutomationProperties.Name="Close share result" />
+        </WrapPanel>
+    </Grid>
+</Window>

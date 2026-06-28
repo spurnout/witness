@@ -1,0 +1,1337 @@
+<Window x:Class="GoatShot.App.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GoatShot Settings"
+        Width="860"
+        Height="700"
+        MinWidth="760"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+    <Grid Background="#081016">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#0B151C"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="18,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="260" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="GoatShot Settings"
+                               FontSize="20"
+                               FontWeight="Bold" />
+                    <TextBlock Text="Grouped controls for capture, recording, sharing, automation, plugins, AI, and local privacy posture."
+                               Foreground="{StaticResource MutedInkBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,20,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Jump to section"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontSize="12"
+                               Margin="0,0,0,4" />
+                    <ComboBox x:Name="SettingsSectionBox"
+                              Background="#0B151C"
+                              Foreground="#F4FAFF"
+                              AutomationProperties.Name="Settings section"
+                              SelectionChanged="SettingsSection_SelectionChanged" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer x:Name="SettingsScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="18,14,18,0">
+            <StackPanel>
+                <TextBlock x:Name="GeneralSettingsSection"
+                           Text="General"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <TextBlock Text="Library root" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LibraryRootBox" Margin="0,6,0,14" />
+                <TextBlock Text="Filename template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FileNameTemplateBox" Margin="0,6,0,6" />
+                <TextBlock Text="{}{date}, {time}, {datetime}, {capture_type}, {app}, {process}, {window_title}, {monitor}, {width}, {height}, {counter}, {project}"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+                <CheckBox x:Name="CopyAfterCaptureBox" Content="Copy image to clipboard after capture" />
+                <CheckBox x:Name="IncludeCursorBox" Content="Include cursor in captures" />
+                <TextBlock Text="Region capture context padding" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBox x:Name="CaptureContextPaddingBox"
+                         Margin="0,6,0,6"
+                         AutomationProperties.Name="Region capture context padding" />
+                <TextBlock Text="Adds pixels around region selections after snapping. Use 0-200."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="PrivateModeBox" Content="Private capture mode: save temporary files but do not index workspace history" />
+                <CheckBox x:Name="RunAtStartupBox" Content="Run GoatShot when I sign in to Windows" />
+                <TextBlock Text="Effective managed policy" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBlock x:Name="ManagedPolicyStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,10"
+                           AutomationProperties.Name="Effective managed policy status" />
+                <TextBlock Text="OCR language tag" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBox x:Name="OcrLanguageBox" Margin="0,6,0,6" />
+                <TextBlock Text="Leave blank to use Windows profile languages, or enter a tag such as en-US."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="RecordingSettingsSection"
+                           Text="Recording"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <CheckBox x:Name="PreferProductionRecorderBox" Content="Prefer production recorder when available" />
+                <CheckBox x:Name="PreferHevcRecorderBox"
+                          Content="Prefer HEVC when Media Foundation support is available"
+                          Margin="0,6,0,0" />
+                <TextBlock Text="H.264 remains the default. HEVC is used only when explicitly enabled and a local Media Foundation HEVC encoder is reported."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,10" />
+                <TextBlock Text="MP4 quality profile" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <ComboBox x:Name="RecordingQualityBox"
+                          Margin="0,6,0,10"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="Small" />
+                    <ComboBoxItem Content="Balanced" />
+                    <ComboBoxItem Content="High quality" />
+                    <ComboBoxItem Content="Archive" />
+                </ComboBox>
+                <TextBlock Text="Frames per second" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingFpsBox" Margin="0,6,0,10" />
+                <TextBlock Text="Target size" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingSizeBox" Margin="0,6,0,6" />
+                <TextBlock Text="Use WIDTHxHEIGHT, WIDTHxauto, or leave blank for source/max fallback size."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Bitrate" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingBitrateBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. Examples: 6000k, 8M. Blank uses the selected quality profile CRF."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="RecordingMicBox" Content="Request microphone recording" />
+                <TextBlock Text="Microphone device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
+                <ComboBox x:Name="RecordingMicDeviceBox"
+                          Margin="0,6,0,10"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF" />
+                <TextBlock Text="Microphone gain" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingMicGainBox" Margin="0,6,0,6" />
+                <CheckBox x:Name="RecordingMicMutedBox"
+                          Content="Mute microphone track"
+                          Margin="0,0,0,10" />
+                <CheckBox x:Name="RecordingSystemAudioBox" Content="Request system audio recording" />
+                <TextBlock Text="System audio device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
+                <ComboBox x:Name="RecordingSystemAudioDeviceBox"
+                          Margin="0,6,0,10"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF" />
+                <TextBlock Text="System audio gain" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingSystemAudioGainBox" Margin="0,6,0,6" />
+                <CheckBox x:Name="RecordingSystemAudioMutedBox"
+                          Content="Mute system audio track"
+                          Margin="0,0,0,10" />
+                <TextBlock Text="Noise gate threshold dB" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingNoiseGateBox" Margin="0,6,0,6" />
+                <TextBlock Text="Use -96 to disable, or values like -55 for light room-noise gating."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="RecordingWebcamBox" Content="Request webcam overlay" />
+                <TextBlock Text="Webcam device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
+                <ComboBox x:Name="RecordingWebcamDeviceBox"
+                          Margin="0,6,0,10"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF" />
+                <Button Content="Refresh recording devices"
+                        Click="RefreshRecordingDevices_Click"
+                        Style="{StaticResource SecondaryButton}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,8" />
+                <TextBlock x:Name="RecordingDeviceStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="RecordingCountdownBox" Content="Show countdown before recording" />
+                <CheckBox x:Name="RecordingBorderBox" Content="Show recording border" />
+                <CheckBox x:Name="RecordingTimerBox" Content="Show recording timer" />
+                <CheckBox x:Name="RecordingKeystrokeBox" Content="Show keystroke overlay" />
+                <TextBlock Text="Timer position" Foreground="{StaticResource MutedInkBrush}" Margin="0,8,0,0" />
+                <ComboBox x:Name="RecordingTimerPositionBox"
+                          Margin="0,6,0,8"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="TopLeft" />
+                    <ComboBoxItem Content="TopCenter" />
+                    <ComboBoxItem Content="TopRight" />
+                    <ComboBoxItem Content="BottomLeft" />
+                    <ComboBoxItem Content="BottomCenter" />
+                    <ComboBoxItem Content="BottomRight" />
+                </ComboBox>
+                <TextBlock Text="Keystroke position" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="RecordingKeystrokePositionBox"
+                          Margin="0,6,0,8"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="TopLeft" />
+                    <ComboBoxItem Content="TopCenter" />
+                    <ComboBoxItem Content="TopRight" />
+                    <ComboBoxItem Content="BottomLeft" />
+                    <ComboBoxItem Content="BottomCenter" />
+                    <ComboBoxItem Content="BottomRight" />
+                </ComboBox>
+                <TextBlock Text="Overlay badge size" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="RecordingOverlayBadgeSizeBox" Margin="0,6,0,8" />
+                <TextBlock Text="Overlay badge style" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="RecordingOverlayStyleBox"
+                          Margin="0,6,0,8"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="Neon" />
+                    <ComboBoxItem Content="HighContrast" />
+                    <ComboBoxItem Content="Subtle" />
+                </ComboBox>
+                <TextBlock Text="MP4 can use native Media Foundation production encoding when WGC/D3D and H.264 encoder prerequisites are available. Captured mic/system-audio WAV payloads can be muxed as AAC; webcam overlay can precompose bounded, periodically refreshed native camera frames, with FFmpeg DirectShow fallback still available. The main recording panel includes live desktop webcam preview."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,14" />
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="SharingSettingsSection"
+                           Text="Sharing"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <TextBlock Text="Provider readiness"
+                           Foreground="{StaticResource MutedInkBrush}" />
+                <TextBlock x:Name="ProviderSetupHeadlineText"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,8"
+                           AutomationProperties.Name="Provider readiness summary" />
+                <UniformGrid x:Name="ProviderSetupSummaryGrid"
+                             Columns="3"
+                             Margin="0,0,0,8" />
+                <TextBlock x:Name="ProviderSetupDetailText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,6"
+                           AutomationProperties.Name="Provider readiness detail" />
+                <TextBlock Text="Detailed local diagnostics: goatshot providers --not-ready --json. OAuth consent, refresh behavior, and live account uploads remain separate parked proof lanes."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+                <TextBlock Text="Default share destination" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="DefaultShareBox"
+                          Margin="0,6,0,14"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="Clipboard image" />
+                    <ComboBoxItem Content="Clipboard file" />
+                    <ComboBoxItem Content="Clipboard path" />
+                    <ComboBoxItem Content="Markdown image link" />
+                    <ComboBoxItem Content="Local folder" />
+                    <ComboBoxItem Content="Email attachment" />
+                    <ComboBoxItem Content="S3-compatible" />
+                    <ComboBoxItem Content="Imgur" />
+                    <ComboBoxItem Content="SFTP" />
+                    <ComboBoxItem Content="Cloudinary" />
+                    <ComboBoxItem Content="Dropbox" />
+                    <ComboBoxItem Content="Google Drive" />
+                    <ComboBoxItem Content="Google Photos" />
+                    <ComboBoxItem Content="OneDrive" />
+                    <ComboBoxItem Content="YouTube" />
+                    <ComboBoxItem Content="OneNote" />
+                    <ComboBoxItem Content="Linear" />
+                    <ComboBoxItem Content="GitHub Issues" />
+                    <ComboBoxItem Content="Jira" />
+                    <ComboBoxItem Content="Azure DevOps" />
+                    <ComboBoxItem Content="Slack" />
+                    <ComboBoxItem Content="Discord" />
+                    <ComboBoxItem Content="Microsoft Teams" />
+                    <ComboBoxItem Content="WebDAV" />
+                    <ComboBoxItem Content="FTP/FTPS" />
+                    <ComboBoxItem Content="Custom script" />
+                    <ComboBoxItem Content="Custom webhook" />
+                </ComboBox>
+                <CheckBox x:Name="ConfirmUploadBox" Content="Ask before upload or external share" />
+                <CheckBox x:Name="QueueBackgroundProcessingBox" Content="Process queued uploads in the background while GoatShot is running" />
+                <TextBlock Text="Queue poll interval seconds" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="QueuePollSecondsBox" Margin="0,6,0,6" />
+                <TextBlock Text="Background processing only runs for items explicitly queued by the operator."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+                <TextBlock Text="Local export folder" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LocalExportFolderBox" Margin="0,6,0,14" />
+                <TextBlock Text="Custom script command" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CustomScriptBox"
+                         AcceptsReturn="True"
+                         Height="74"
+                         Margin="0,6,0,6" />
+                <TextBlock Text="Available placeholders: {file}, {metadata}, {ocr}, {id}, {capture_type}"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+                <TextBlock Text="Custom webhook URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CustomWebhookBox" Margin="0,6,0,14" />
+
+                <TextBlock Text="Slack incoming webhook URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SlackWebhookBox" Margin="0,6,0,6" />
+                <TextBlock Text="Slack message template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SlackMessageTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="Discord webhook URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DiscordWebhookBox" Margin="0,6,0,6" />
+                <TextBlock Text="Discord message template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DiscordMessageTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="Microsoft Teams incoming webhook URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="TeamsWebhookBox" Margin="0,6,0,6" />
+                <TextBlock Text="Microsoft Teams message template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="TeamsMessageTemplateBox" Margin="0,6,0,6" />
+                <TextBlock Text="Webhook message placeholders: {provider}, {file}, {id}, {capture_type}, {bytes}, {width}, {height}, {created_at}. Slack and Teams incoming webhooks send notifications only; Discord uploads the file."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="S3-compatible endpoint" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="S3EndpointBox" Margin="0,6,0,6" />
+                <TextBlock Text="Example: https://s3.amazonaws.com, https://accountid.r2.cloudflarestorage.com, or http://localhost:9000"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="S3 bucket" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="S3BucketBox" Margin="0,6,0,10" />
+                <TextBlock Text="S3 region" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="S3RegionBox" Margin="0,6,0,10" />
+                <TextBlock Text="S3 key prefix" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="S3PrefixBox" Margin="0,6,0,10" />
+                <TextBlock Text="S3 public base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="S3PublicBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. When set, successful S3 uploads copy a share URL. Without it, GoatShot only records the s3:// bucket/key."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="S3 access key ID" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="S3AccessKeyBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <TextBlock Text="S3 secret access key" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="S3SecretKeyBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save S3 keys" Click="SaveS3Keys_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear S3 keys" Click="ClearS3Keys_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="S3KeyStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Imgur API endpoint" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="ImgurEndpointBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://api.imgur.com/3/image. Use a custom endpoint only for compatible gateways or local testing."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Imgur Client ID" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="ImgurClientIdBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save Imgur Client ID" Click="SaveImgurClientId_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Imgur Client ID" Click="ClearImgurClientId_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="ImgurKeyStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="SFTP host" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpHostBox" Margin="0,6,0,10" />
+                <TextBlock Text="SFTP port" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpPortBox" Margin="0,6,0,10" />
+                <TextBlock Text="SFTP username" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpUsernameBox" Margin="0,6,0,10" />
+                <TextBlock Text="SFTP remote directory" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpRemoteDirectoryBox" Margin="0,6,0,6" />
+                <TextBlock Text="The remote directory should already exist unless the server allows creating it. Unknown host keys must be trusted through OpenSSH before non-interactive upload."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="SFTP private key path" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpPrivateKeyPathBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. Leave blank to use OpenSSH defaults, ssh-agent, or server-side account policy."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="SFTP public base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpPublicBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. When set, successful SFTP uploads copy a share URL by appending the uploaded file name."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="SFTP executable path" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpExecutablePathBox" Margin="0,6,0,6" />
+                <TextBlock Text="Advanced. Leave blank to use OpenSSH sftp.exe from PATH or C:\Windows\System32\OpenSSH."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="WebDAV base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="WebDavBaseUrlBox" Margin="0,6,0,10" />
+                <TextBlock Text="WebDAV remote directory" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="WebDavRemoteDirectoryBox" Margin="0,6,0,10" />
+                <TextBlock Text="WebDAV username" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="WebDavUsernameBox" Margin="0,6,0,10" />
+                <TextBlock Text="WebDAV public base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="WebDavPublicBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. When set, successful WebDAV uploads copy a share URL by appending the uploaded file name."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="WebDAV password" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="WebDavPasswordBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save WebDAV password" Click="SaveWebDavPassword_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear WebDAV password" Click="ClearWebDavPassword_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="WebDavPasswordStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="FTP/FTPS host" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FtpHostBox" Margin="0,6,0,10" />
+                <TextBlock Text="FTP/FTPS port" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FtpPortBox" Margin="0,6,0,10" />
+                <CheckBox x:Name="FtpUseFtpsBox" Content="Use FTPS explicit TLS" />
+                <TextBlock Text="FTP/FTPS username" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FtpUsernameBox" Margin="0,6,0,10" />
+                <TextBlock Text="FTP/FTPS remote directory" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FtpRemoteDirectoryBox" Margin="0,6,0,10" />
+                <TextBlock Text="FTP/FTPS public base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="FtpPublicBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. When set, successful FTP/FTPS uploads copy a share URL by appending the uploaded file name."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="FTP/FTPS password" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="FtpPasswordBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save FTP/FTPS password" Click="SaveFtpPassword_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear FTP/FTPS password" Click="ClearFtpPassword_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="FtpPasswordStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Cloudinary API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CloudinaryApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://api.cloudinary.com. Enterprise EU/AP accounts may use region-specific API hosts."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Cloudinary cloud name" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CloudinaryCloudNameBox" Margin="0,6,0,10" />
+                <TextBlock Text="Cloudinary resource type" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CloudinaryResourceTypeBox" Margin="0,6,0,6" />
+                <TextBlock Text="Use auto, image, video, or raw. Auto is safest for mixed screenshot and recording workflows."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Cloudinary upload preset" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CloudinaryUploadPresetBox" Margin="0,6,0,6" />
+                <TextBlock Text="Required for unsigned uploads. Optional when API key/secret credentials are saved."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Cloudinary folder" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CloudinaryFolderBox" Margin="0,6,0,10" />
+                <TextBlock Text="Cloudinary API key" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="CloudinaryApiKeyBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <TextBlock Text="Cloudinary API secret" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="CloudinaryApiSecretBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save Cloudinary keys" Click="SaveCloudinaryKeys_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Cloudinary keys" Click="ClearCloudinaryKeys_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="CloudinaryKeyStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Dropbox content API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DropboxContentApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://content.dropboxapi.com. Advanced override for local testing or compatible gateways."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Dropbox API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DropboxApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://api.dropboxapi.com. Used for temporary link creation after upload."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Dropbox remote folder" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DropboxRemoteFolderBox" Margin="0,6,0,6" />
+                <TextBlock Text="Example: /GoatShot or /Apps/GoatShot. GoatShot appends a unique file name."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Dropbox OAuth client ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="DropboxOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Dropbox OAuth access token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="DropboxAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect Dropbox" Click="ConnectDropboxOAuth_Click" />
+                    <Button Content="Save Dropbox token" Click="SaveDropboxToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Dropbox token" Click="ClearDropboxToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="DropboxTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Google Drive upload API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GoogleDriveUploadApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://www.googleapis.com/upload/drive/v3. Advanced override for local testing or compatible gateways."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Drive API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GoogleDriveApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://www.googleapis.com/drive/v3. Used for permission creation after upload."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Drive folder ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GoogleDriveFolderIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. Leave blank to upload into My Drive, or paste a folder ID from Drive."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="GoogleDriveAnyoneReaderBox" Content="After upload, create an anyone-with-link reader permission" />
+                <TextBlock Text="Google Drive OAuth client ID" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBox x:Name="GoogleDriveOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Drive OAuth access token" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <PasswordBox x:Name="GoogleDriveAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect Google Drive" Click="ConnectGoogleDriveOAuth_Click" />
+                    <Button Content="Save Google Drive token" Click="SaveGoogleDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Google Drive token" Click="ClearGoogleDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="GoogleDriveTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Google Photos upload API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GooglePhotosUploadApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://photoslibrary.googleapis.com/v1/uploads. Used for raw media upload-token creation."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Photos API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GooglePhotosApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://photoslibrary.googleapis.com/v1. Used for mediaItems:batchCreate after upload."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Photos album ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GooglePhotosAlbumIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. Leave blank to create the media item in the account library."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Photos description template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GooglePhotosDescriptionTemplateBox" Margin="0,6,0,6" />
+                <TextBlock Text="Google Photos OAuth client ID" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBox x:Name="GooglePhotosOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Google Photos OAuth access token" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <PasswordBox x:Name="GooglePhotosAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect Google Photos" Click="ConnectGooglePhotosOAuth_Click" />
+                    <Button Content="Save Google Photos token" Click="SaveGooglePhotosToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Google Photos token" Click="ClearGooglePhotosToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="GooglePhotosTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="OneDrive Graph API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneDriveGraphApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://graph.microsoft.com/v1.0. Advanced override for national clouds, local testing, or compatible gateways."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="OneDrive remote folder" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneDriveRemoteFolderBox" Margin="0,6,0,6" />
+                <TextBlock Text="Example: /GoatShot or /Screenshots. The folder must already exist for small-file upload."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="OneDriveAnonymousViewLinkBox" Content="After upload, create an anonymous view link" />
+                <TextBlock Text="OneDrive OAuth client ID" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <TextBox x:Name="OneDriveOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="OneDrive OAuth access token" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <PasswordBox x:Name="OneDriveAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect OneDrive" Click="ConnectOneDriveOAuth_Click" />
+                    <Button Content="Save OneDrive token" Click="SaveOneDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear OneDrive token" Click="ClearOneDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="OneDriveTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="YouTube upload API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="YouTubeUploadApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://www.googleapis.com/upload/youtube/v3. Used for OAuth bearer-token video uploads."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="YouTube title template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="YouTubeTitleTemplateBox" Margin="0,6,0,6" />
+                <TextBlock Text="YouTube description template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="YouTubeDescriptionTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="YouTube privacy status" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="YouTubePrivacyStatusBox"
+                          Margin="0,6,0,10"
+                          Background="#0B151C"
+                          Foreground="#F4FAFF">
+                    <ComboBoxItem Content="unlisted" />
+                    <ComboBoxItem Content="private" />
+                    <ComboBoxItem Content="public" />
+                </ComboBox>
+                <TextBlock Text="YouTube category ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="YouTubeCategoryIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default 22 is People &amp; Blogs. Live consent, quota, processing, and account proof remain manual provider proof."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="YouTube OAuth client ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="YouTubeOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="YouTube OAuth access token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="YouTubeAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect YouTube" Click="ConnectYouTubeOAuth_Click" />
+                    <Button Content="Save YouTube token" Click="SaveYouTubeToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear YouTube token" Click="ClearYouTubeToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="YouTubeTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="OneNote Graph API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneNoteGraphApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://graph.microsoft.com/v1.0. Used for Microsoft Graph OneNote page creation."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="OneNote section ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneNoteSectionIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. Leave blank to create the page through the default OneNote pages endpoint."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="OneNote page title template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneNotePageTitleTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="OneNote OAuth client ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="OneNoteOAuthClientIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Used for browser authorization-code setup with a local callback and PKCE."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="OneNote OAuth access token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="OneNoteAccessTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Connect OneNote" Click="ConnectOneNoteOAuth_Click" />
+                    <Button Content="Save OneNote token" Click="SaveOneNoteToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear OneNote token" Click="ClearOneNoteToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="OneNoteTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Linear GraphQL endpoint" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LinearGraphqlEndpointBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://api.linear.app/graphql. Advanced override for local testing."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Linear team ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LinearTeamIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Required when GoatShot creates a new issue."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Existing Linear issue ID" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LinearIssueIdBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional. When set, GoatShot uploads the file and links it to this issue instead of creating a new one."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Linear issue title template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="LinearIssueTitleTemplateBox" Margin="0,6,0,6" />
+                <TextBlock Text="Available placeholders: {file}, {id}, {capture_type}, {source_app}, {width}, {height}, {date}, {time}"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="LinearCreateAttachmentBox" Content="After upload, create a Linear attachment link on the issue" />
+                <CheckBox x:Name="LinearUseOAuthBearerTokenBox" Content="Use OAuth Bearer authorization header instead of personal API key header" />
+                <TextBlock Text="Linear API key or OAuth access token" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                <PasswordBox x:Name="LinearCredentialBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save Linear credential" Click="SaveLinearCredential_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Linear credential" Click="ClearLinearCredential_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="LinearCredentialStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="GitHub API base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GitHubApiBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://api.github.com. Advanced override for GitHub Enterprise or local testing."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="GitHub repository" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GitHubRepositoryBox" Margin="0,6,0,6" />
+                <TextBlock Text="Use owner/repo. GoatShot creates an issue and copies the issue URL; GitHub Issues API does not upload the capture file."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="GitHub issue title template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GitHubIssueTitleTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="GitHub labels" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GitHubLabelsBox" Margin="0,6,0,10" />
+                <TextBlock Text="GitHub assignees" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GitHubAssigneesBox" Margin="0,6,0,10" />
+                <TextBlock Text="GitHub personal access token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="GitHubTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save GitHub token" Click="SaveGitHubToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear GitHub token" Click="ClearGitHubToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="GitHubTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Jira base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Example: https://example.atlassian.net. GoatShot creates Jira Cloud REST API v3 issues and copies the issue URL."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Jira project key" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraProjectKeyBox" Margin="0,6,0,10" />
+                <TextBlock Text="Jira issue type" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraIssueTypeBox" Margin="0,6,0,10" />
+                <TextBlock Text="Jira summary template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraSummaryTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="Jira labels" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraLabelsBox" Margin="0,6,0,10" />
+                <TextBlock Text="Jira account email" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="JiraAccountEmailBox" Margin="0,6,0,10" />
+                <TextBlock Text="Jira API token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="JiraApiTokenBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save Jira token" Click="SaveJiraApiToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Jira token" Click="ClearJiraApiToken_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="JiraApiTokenStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Azure DevOps base URL" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsBaseUrlBox" Margin="0,6,0,6" />
+                <TextBlock Text="Default: https://dev.azure.com. Advanced override supports Azure DevOps Server-compatible endpoints."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Azure DevOps organization" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsOrganizationBox" Margin="0,6,0,10" />
+                <TextBlock Text="Azure DevOps project" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsProjectBox" Margin="0,6,0,10" />
+                <TextBlock Text="Azure DevOps work item type" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsWorkItemTypeBox" Margin="0,6,0,10" />
+                <TextBlock Text="Azure DevOps title template" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsTitleTemplateBox" Margin="0,6,0,10" />
+                <TextBlock Text="Azure DevOps tags" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsTagsBox" Margin="0,6,0,10" />
+                <TextBlock Text="Azure DevOps assigned to" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AzureDevOpsAssignedToBox" Margin="0,6,0,6" />
+                <TextBlock Text="Optional identity value accepted by the Azure DevOps project, such as an email address or display name."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="Azure DevOps personal access token" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="AzureDevOpsPatBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save Azure DevOps PAT" Click="SaveAzureDevOpsPat_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Azure DevOps PAT" Click="ClearAzureDevOpsPat_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock x:Name="AzureDevOpsPatStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+
+                <TextBlock Text="Upload denylist processes, one per line" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="UploadDenylistBox"
+                         AcceptsReturn="True"
+                         Height="70"
+                         Margin="0,6,0,14" />
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="AutomationSettingsSection"
+                           Text="Automation / Watch Folders"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <CheckBox x:Name="EnableWatchFoldersBox" Content="Enable watch folders while GoatShot is running" />
+                <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
+                <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
+                <CheckBox x:Name="WatchCopyAfterImportBox" Content="Copy imported image to clipboard" />
+                <CheckBox x:Name="WatchStripMetadataBox" Content="Create metadata-stripped PNG copy for imported images" />
+                <CheckBox x:Name="WatchShareAfterImportBox" Content="Run quick share after importing watched files" />
+                <TextBlock Text="Watch folders, one per line" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="WatchFoldersBox"
+                         AcceptsReturn="True"
+                         Height="82"
+                         AutomationProperties.Name="Watch folders"
+                         Margin="0,6,0,14" />
+                <Border Background="#101B23"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,6,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Workflow rules"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="WorkflowTemplateBox"
+                                      Background="#0B151C"
+                                      Foreground="#F4FAFF"
+                                      AutomationProperties.Name="Starter workflow template" />
+                            <Button Grid.Column="1"
+                                    Content="Add template"
+                                    Margin="10,0,0,0"
+                                    Click="AddAutomationTemplate_Click"
+                                    Style="{StaticResource SecondaryButton}" />
+                        </Grid>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="210" />
+                            </Grid.ColumnDefinitions>
+                            <ListBox x:Name="AutomationRuleListBox"
+                                     Height="128"
+                                     Background="#0B151C"
+                                     Foreground="#F4FAFF"
+                                     BorderBrush="{StaticResource BorderBrush}"
+                                     SelectionChanged="AutomationRuleList_SelectionChanged"
+                                     AutomationProperties.Name="Saved workflow rules" />
+                            <UniformGrid Grid.Column="1"
+                                         Columns="2"
+                                         Rows="2"
+                                         Margin="10,0,0,0">
+                                <Button Content="New rule"
+                                        Click="NewAutomationRule_Click"
+                                        Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Duplicate rule"
+                                        Click="DuplicateAutomationRule_Click"
+                                        Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Delete rule"
+                                        Click="DeleteAutomationRule_Click"
+                                        Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Update rule"
+                                        Click="ApplyAutomationRuleEditor_Click"
+                                        Style="{StaticResource SecondaryButton}" />
+                            </UniformGrid>
+                        </Grid>
+                        <TextBlock x:Name="RuleManagerStatusText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Workflow rule manager status"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Margin="0,0,0,10" />
+                        <Separator Margin="0,0,0,10" Background="{StaticResource BorderBrush}" />
+                        <TextBlock Text="Rule editor"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,8" />
+                        <CheckBox x:Name="RuleEnabledBox" Content="Enable this rule" />
+                        <TextBlock Text="Rule name" Foreground="{StaticResource MutedInkBrush}" Margin="0,8,0,0" />
+                        <TextBox x:Name="RuleNameBox"
+                                 AutomationProperties.Name="Rule name"
+                                 Margin="0,6,0,8" />
+                        <TextBlock Text="Trigger" Foreground="{StaticResource MutedInkBrush}" />
+                        <ComboBox x:Name="RuleTriggerBox"
+                                  Margin="0,6,0,8"
+                                  Background="#0B151C"
+                                  AutomationProperties.Name="Rule trigger"
+                                  Foreground="#F4FAFF">
+                            <ComboBoxItem Content="CaptureCreated" />
+                            <ComboBoxItem Content="CaptureEdited" />
+                            <ComboBoxItem Content="FileAddedToWatchFolder" />
+                            <ComboBoxItem Content="RecordingCompleted" />
+                            <ComboBoxItem Content="OcrCompleted" />
+                            <ComboBoxItem Content="UploadCompleted" />
+                            <ComboBoxItem Content="AiActionCompleted" />
+                        </ComboBox>
+                        <TextBlock Text="Conditions" Foreground="{StaticResource MutedInkBrush}" />
+                        <UniformGrid Columns="2" Margin="0,6,0,8">
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Source app contains" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleSourceAppBox"
+                                         AutomationProperties.Name="Source app condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,8">
+                                <TextBlock Text="Window title contains" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleWindowTitleBox"
+                                         AutomationProperties.Name="Window title condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Capture kind" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <ComboBox x:Name="RuleCaptureKindBox"
+                                          Margin="0,4,0,0"
+                                          Background="#0B151C"
+                                          AutomationProperties.Name="Capture kind condition"
+                                          Foreground="#F4FAFF">
+                                    <ComboBoxItem Content="Any" />
+                                    <ComboBoxItem Content="Region" />
+                                    <ComboBoxItem Content="Fullscreen" />
+                                    <ComboBoxItem Content="AllMonitors" />
+                                    <ComboBoxItem Content="ActiveWindow" />
+                                    <ComboBoxItem Content="ScrollingWindow" />
+                                    <ComboBoxItem Content="ActiveMonitor" />
+                                    <ComboBoxItem Content="FixedRegion" />
+                                    <ComboBoxItem Content="RecordingGif" />
+                                    <ComboBoxItem Content="RecordingMp4" />
+                                    <ComboBoxItem Content="Imported" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,8">
+                                <TextBlock Text="Monitor contains" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleMonitorContainsBox"
+                                         AutomationProperties.Name="Monitor condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Hotkey/profile name" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleHotkeyProfileBox"
+                                         AutomationProperties.Name="Hotkey or workflow profile condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,8">
+                                <TextBlock Text="File extension" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleFileExtensionBox"
+                                         AutomationProperties.Name="File extension condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Min bytes" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleMinFileSizeBox"
+                                         AutomationProperties.Name="Minimum file size condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,8">
+                                <TextBlock Text="Max bytes" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleMaxFileSizeBox"
+                                         AutomationProperties.Name="Maximum file size condition"
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                        </UniformGrid>
+                        <TextBlock Text="OCR text contains" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="RuleOcrContainsBox"
+                                 AutomationProperties.Name="OCR text condition"
+                                 Margin="0,6,0,8" />
+                        <TextBlock Text="Sensitive-data condition" Foreground="{StaticResource MutedInkBrush}" />
+                        <ComboBox x:Name="RuleSensitiveConditionBox"
+                                  Margin="0,6,0,10"
+                                  Background="#0B151C"
+                                  AutomationProperties.Name="Sensitive-data condition"
+                                  Foreground="#F4FAFF">
+                            <ComboBoxItem Content="Any" />
+                            <ComboBoxItem Content="Requires sensitive data" />
+                            <ComboBoxItem Content="Excludes sensitive data" />
+                        </ComboBox>
+                        <TextBlock Text="Actions" Foreground="{StaticResource MutedInkBrush}" />
+                        <UniformGrid Columns="2" Margin="0,6,0,4">
+                            <CheckBox x:Name="RuleCopyCaptureBox" Content="Copy image" />
+                            <CheckBox x:Name="RuleCopyFileBox" Content="Copy file" />
+                            <CheckBox x:Name="RuleCopyPathBox" Content="Copy path" />
+                            <CheckBox x:Name="RuleSaveFolderBox" Content="Save to folder" />
+                            <CheckBox x:Name="RuleRunOcrBox" Content="Run OCR" />
+                            <CheckBox x:Name="RuleRedactSensitiveBox" Content="Redact OCR secrets" />
+                            <CheckBox x:Name="RuleApplyImageEffectBox" Content="Apply image effect" />
+                            <CheckBox x:Name="RuleStripCaptureBox" Content="Strip metadata" />
+                            <CheckBox x:Name="RuleShareCaptureBox" Content="Quick share" />
+                            <CheckBox x:Name="RuleGenerateDocumentBox" Content="Generate bug report" />
+                            <CheckBox x:Name="RuleCustomScriptBox" Content="Custom script" />
+                            <CheckBox x:Name="RuleCustomWebhookBox" Content="Custom webhook" />
+                            <CheckBox x:Name="RuleNotifyBox" Content="Status notification" />
+                        </UniformGrid>
+                        <UniformGrid Columns="2" Margin="0,6,0,4">
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Image effect mode" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <ComboBox x:Name="RuleImageEffectModeBox"
+                                          Margin="0,4,0,0"
+                                          Background="#0B151C"
+                                          AutomationProperties.Name="Image effect mode"
+                                          Foreground="#F4FAFF">
+                                    <ComboBoxItem Content="Solid" />
+                                    <ComboBoxItem Content="Blur" />
+                                    <ComboBoxItem Content="Pixelate" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,8">
+                                <TextBlock Text="Image effect region" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
+                                <TextBox x:Name="RuleImageEffectRegionBox"
+                                         AutomationProperties.Name="Image effect region"
+                                         ToolTip="Use full or x,y,width,height percentages."
+                                         Margin="0,4,0,0" />
+                            </StackPanel>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Export profile" Click="ExportWorkflowProfile_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Import profile" Click="ImportWorkflowProfile_Click" Style="{StaticResource SecondaryButton}" />
+                </StackPanel>
+                <TextBlock Text="Workflow profile export omits custom script, webhook, and DPAPI credential values by default."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,4" />
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="PluginsSettingsSection"
+                           Text="Plugins"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <Border Background="#101B23"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Remote plugin update check"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,4" />
+                        <TextBlock Text="Passive registry summary only. GoatShot does not install, trust, enable, allowlist, or execute plugin code from this surface."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="Registry JSON path or URL" Foreground="{StaticResource MutedInkBrush}" />
+                        <Grid Margin="0,6,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="PluginUpdateRegistryBox"
+                                     AutomationProperties.Name="Plugin update registry path or URL"
+                                     Margin="0,0,10,0" />
+                            <Button Grid.Column="1"
+                                    Content="Refresh"
+                                    Click="RefreshPluginUpdates_Click"
+                                    Style="{StaticResource SecondaryButton}" />
+                            <Button Grid.Column="2"
+                                    Content="Copy CLI"
+                                    Click="CopyPluginUpdatesCli_Click"
+                                    Style="{StaticResource SecondaryButton}" />
+                            <Button Grid.Column="3"
+                                    Content="Open staging"
+                                    Click="OpenPluginStagingFolder_Click"
+                                    Style="{StaticResource SecondaryButton}" />
+                        </Grid>
+                        <TextBlock x:Name="PluginUpdateStatusText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Plugin update status"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Margin="0,0,0,6" />
+                        <TextBlock x:Name="PluginUpdateCountsText"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Plugin update counts"
+                                   Margin="0,0,0,8" />
+                        <ListBox x:Name="PluginUpdateSummaryList"
+                                 Height="180"
+                                 Background="#0B151C"
+                                 Foreground="#F4FAFF"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 AutomationProperties.Name="Plugin update summary list"
+                                 Margin="0,0,0,8" />
+                        <TextBlock x:Name="PluginUpdateNextActionsText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Plugin update next actions"
+                                   Margin="0,0,0,6" />
+                    </StackPanel>
+                </Border>
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="AiSettingsSection"
+                           Text="AI / Gemini"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12" />
+                <CheckBox x:Name="AiEnabledBox" Content="Enable AI features after provider configuration" />
+                <CheckBox x:Name="ConfirmAiBox" Content="Ask before sending a screenshot to AI" />
+                <TextBlock Text="Gemini API endpoint" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GeminiEndpointBox" Margin="0,6,0,14" />
+                <TextBlock Text="Default Gemini image model" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GeminiDefaultModelBox" Margin="0,6,0,14" />
+                <TextBlock Text="Default Gemini speech-to-text model" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GeminiSpeechModelBox" Margin="0,6,0,14" />
+                <TextBlock Text="Gemini API key" Foreground="{StaticResource MutedInkBrush}" />
+                <PasswordBox x:Name="GeminiApiKeyBox"
+                             Background="#0B151C"
+                             Foreground="#F4FAFF"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Padding="8"
+                             Margin="0,6,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Save key" Click="SaveGeminiKey_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear key" Click="ClearGeminiKey_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Validate" Click="ValidateGemini_Click" />
+                </StackPanel>
+                <TextBlock x:Name="GeminiKeyStatusText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14" />
+                <TextBlock Text="Gemini model manifest path" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="GeminiManifestBox" Margin="0,6,0,14" />
+                <TextBlock Text="AI denylist processes, one per line" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="AiDenylistBox"
+                         AcceptsReturn="True"
+                         Height="70"
+                         Margin="0,6,0,14" />
+
+                <Border Background="#101B23"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,8,0,0">
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               Text="Gemini keys are saved with Windows DPAPI for the current user and are not written to settings JSON. Screenshots leave the machine only when AI is enabled and you run an image AI action. Video-intel AI sends redacted transcript text, not the video file." />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="18,14,18,18">
+            <Button Content="Cancel" Click="Cancel_Click" Style="{StaticResource SecondaryButton}" />
+            <Button Content="Save" Click="Save_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoatShot Capture</title>
+  <link rel="stylesheet" href="extension-ui.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>GoatShot Capture</h1>
+      <div class="muted">Local page handoff with explicit consent.</div>
+    </header>
+
+    <section>
+      <label>
+        Capture mode
+        <select id="captureMode">
+          <option value="full-page">Full page</option>
+          <option value="visible-viewport">Visible viewport</option>
+          <option value="selected-element">Selected element</option>
+        </select>
+      </label>
+      <label class="check">
+        <input id="telemetry" type="checkbox">
+        Console/network summaries
+      </label>
+      <label class="check">
+        <input id="horizontal" type="checkbox">
+        Include horizontal scroll
+      </label>
+      <label class="check">
+        <input id="captureTiles" type="checkbox">
+        Attempt tile capture
+      </label>
+      <label class="check">
+        <input id="exportPackage" type="checkbox">
+        Export stitch package
+      </label>
+      <label class="check">
+        <input id="nativeHost" type="checkbox" checked>
+        Send to GoatShot native host
+      </label>
+    </section>
+
+    <section class="grid">
+      <label>
+        Tiles
+        <input id="maxTiles" type="number" min="1" max="500" value="80">
+      </label>
+      <label>
+        Overlap
+        <input id="overlap" type="number" min="0" max="2000" value="64">
+      </label>
+      <label>
+        Sticky
+        <input id="sticky" type="number" min="0" max="2000" value="0">
+      </label>
+    </section>
+
+    <section class="actions">
+      <button id="collect">Collect</button>
+      <button id="send">Collect + Send</button>
+      <button id="status" class="secondary">Host Status</button>
+      <button id="options" class="secondary">Options</button>
+    </section>
+
+    <section>
+      <div id="result" class="status" role="status" aria-live="polite">Ready.</div>
+    </section>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

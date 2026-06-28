@@ -1,0 +1,122 @@
+<Window x:Class="GoatShot.App.Windows.RegionCaptureWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Cursor="Cross"
+        KeyDown="Window_KeyDown">
+    <Grid x:Name="Root"
+          AutomationProperties.Name="Region capture overlay"
+          Focusable="True"
+          MouseLeftButtonDown="Root_MouseLeftButtonDown"
+          MouseMove="Root_MouseMove"
+          MouseLeftButtonUp="Root_MouseLeftButtonUp">
+        <Image x:Name="FrozenScreen" Stretch="Fill" />
+        <Rectangle Fill="#66071016" />
+        <Canvas x:Name="SelectionCanvas">
+            <Rectangle x:Name="SelectionRectangle"
+                       Visibility="Collapsed"
+                       Stroke="#30E6C3"
+                       StrokeThickness="2"
+                       Fill="#2230E6C3" />
+            <Border x:Name="SizeBadge"
+                    Visibility="Collapsed"
+                    Background="#DD081016"
+                    BorderBrush="#30E6C3"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="8,4">
+                <StackPanel MaxWidth="320">
+                    <TextBlock x:Name="SizeText"
+                               Foreground="#F4FAFF"
+                               FontSize="12"
+                               FontWeight="SemiBold" />
+                    <TextBlock x:Name="SelectionHintText"
+                               Foreground="#A8BCCA"
+                               FontSize="11"
+                               Margin="0,2,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+            <Border x:Name="LensBorder"
+                    Visibility="Collapsed"
+                    Width="164"
+                    Height="188"
+                    Background="#EE081016"
+                    BorderBrush="#30E6C3"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="9"
+                    IsHitTestVisible="False">
+                <StackPanel>
+                    <Border Width="136"
+                            Height="136"
+                            BorderBrush="#274252"
+                            BorderThickness="1"
+                            HorizontalAlignment="Center"
+                            ClipToBounds="True">
+                        <Image x:Name="LensImage"
+                               Width="136"
+                               Height="136"
+                               Stretch="Fill"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                    </Border>
+                    <TextBlock x:Name="LensText"
+                               Foreground="#F4FAFF"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center"
+                               Margin="0,7,0,0" />
+                    <TextBlock Text="Pixel lens"
+                               Foreground="#A8BCCA"
+                               FontSize="10"
+                               TextAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Canvas>
+        <Border HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="28,28,0,0"
+                Background="#DD081016"
+                BorderBrush="#274252"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="14,9">
+            <TextBlock Foreground="#F4FAFF"
+                       FontSize="13"
+                       MaxWidth="560"
+                       TextWrapping="Wrap"
+                       Text="Drag to capture a region. Use Shift to ignore snapping. Press Esc to cancel." />
+        </Border>
+        <Border HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,28,28,0"
+                Background="#DD081016"
+                BorderBrush="#274252"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <ComboBox x:Name="TargetChooserBox"
+                          Width="290"
+                          MinHeight="30"
+                          Background="#0B151C"
+                          Foreground="#081016"
+                          IsEditable="True"
+                          IsReadOnly="True"
+                          AutomationProperties.Name="Window or monitor chooser"
+                          SelectionChanged="TargetChooser_SelectionChanged" />
+                <Button Content="Capture target"
+                        Margin="8,0,0,0"
+                        Padding="10,5"
+                        MinHeight="30"
+                        AutomationProperties.Name="Capture selected window or monitor"
+                        Click="CaptureTarget_Click" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

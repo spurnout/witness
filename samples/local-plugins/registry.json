@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "goatshot.plugin-registry.v1",
+  "generatedAtUtc": "2026-06-15T00:00:00Z",
+  "source": "GoatShot local sample registry",
+  "plugins": [
+    {
+      "id": "sample.redaction-note",
+      "version": "0.2.0",
+      "name": "Sample Redaction Note",
+      "description": "Illustrative remote-staging registry entry for the local sample plugin. No plugin is trusted, enabled, allowlisted, or executed by registry validation.",
+      "capabilities": [
+        "action",
+        "workflow"
+      ],
+      "permissions": [
+        "filesystem:plugin-directory"
+      ],
+      "packageUri": "packages/sample.redaction-note-0.2.0.zip",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sizeBytes": 1024,
+      "signature": "",
+      "signatureAlgorithm": "",
+      "signaturePublicKeyPem": "",
+      "minGoatShotVersion": "0.0.1",
+      "maxGoatShotVersion": "99.0.0",
+      "releaseNotes": "Sample registry format only. Create a real package ZIP and update sha256/sizeBytes before staging."
+    }
+  ]
+}

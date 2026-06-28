@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "goatshot.browser-capture.v1",
+  "intent": {
+    "captureMode": "full-page",
+    "fullPageCaptureRequested": true,
+    "includeDomMetadata": true,
+    "includeTelemetry": true,
+    "correlationId": "sample-contract-fixture"
+  },
+  "page": {
+    "url": "https://app.example.test/orders?token=fake-token-1234567890&view=summary",
+    "title": "Orders for alex@example.test",
+    "referrer": "https://app.example.test/login?code=fake-code-1234567890",
+    "contentType": "text/html",
+    "language": "en-US",
+    "capturedAt": "2026-06-15T04:30:00Z"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "devicePixelRatio": 1.5,
+    "scrollX": 0,
+    "scrollY": 240
+  },
+  "fullPage": {
+    "width": 1440,
+    "height": 4200,
+    "scrollWidth": 1440,
+    "scrollHeight": 4200
+  },
+  "stitch": {
+    "requested": true,
+    "mode": "full-page",
+    "status": "planned",
+    "captureApi": "tabs.captureVisibleTab",
+    "tileCount": 5,
+    "maxTileCount": 80,
+    "overlapPixels": 64,
+    "stickyHeaderMitigationPixels": 0,
+    "horizontalScrollIncluded": false,
+    "tiles": [
+      {
+        "index": 0,
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "scrollX": 0,
+        "scrollY": 0,
+        "devicePixelRatio": 1.5,
+        "captureState": "planned",
+        "artifactName": "",
+        "error": ""
+      },
+      {
+        "index": 1,
+        "x": 0,
+        "y": 836,
+        "width": 1440,
+        "height": 900,
+        "scrollX": 0,
+        "scrollY": 836,
+        "devicePixelRatio": 1.5,
+        "captureState": "planned",
+        "artifactName": "",
+        "error": ""
+      },
+      {
+        "index": 2,
+        "x": 0,
+        "y": 1672,
+        "width": 1440,
+        "height": 900,
+        "scrollX": 0,
+        "scrollY": 1672,
+        "devicePixelRatio": 1.5,
+        "captureState": "planned",
+        "artifactName": "",
+        "error": ""
+      },
+      {
+        "index": 3,
+        "x": 0,
+        "y": 2508,
+        "width": 1440,
+        "height": 900,
+        "scrollX": 0,
+        "scrollY": 2508,
+        "devicePixelRatio": 1.5,
+        "captureState": "planned",
+        "artifactName": "",
+        "error": ""
+      },
+      {
+        "index": 4,
+        "x": 0,
+        "y": 3300,
+        "width": 1440,
+        "height": 900,
+        "scrollX": 0,
+        "scrollY": 3300,
+        "devicePixelRatio": 1.5,
+        "captureState": "planned",
+        "artifactName": "",
+        "error": ""
+      }
+    ],
+    "warnings": []
+  },
+  "consent": {
+    "screenshotConsented": true,
+    "telemetryConsented": true,
+    "consentText": "User consented to page screenshot metadata plus console/network summaries for GoatShot.",
+    "consentedAt": "2026-06-15T04:29:58Z"
+  },
+  "consoleEvents": [
+    {
+      "level": "error",
+      "message": "Checkout failed for alex@example.test with token=fake-secret-token",
+      "sourceUrl": "https://app.example.test/static/app.js?sig=fake-signature-123456",
+      "line": 42,
+      "column": 7
+    }
+  ],
+  "networkEvents": [
+    {
+      "method": "POST",
+      "url": "https://api.example.test/orders?access_token=fake-access-token-123456",
+      "statusCode": 500,
+      "resourceType": "fetch",
+      "initiator": "https://app.example.test/static/app.js?key=fake-key-123456",
+      "errorText": "Bearer fakebearertoken12345678901234567890"
+    }
+  ]
+}
