@@ -86,10 +86,19 @@
                         <Image x:Name="QrImage"
                                Stretch="Uniform" />
                     </Border>
-                    <TextBlock x:Name="QrStatusText"
-                               Foreground="{StaticResource MutedInkBrush}"
-                               TextWrapping="Wrap"
-                               FontSize="12" />
+                    <Expander Header="Details" IsExpanded="False">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock x:Name="QrStatusText"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       TextWrapping="Wrap"
+                                       FontSize="12" />
+                            <Button x:Name="CopyQrPathButton"
+                                    Content="Copy QR path"
+                                    Click="CopyQrPath_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    AutomationProperties.Name="Copy QR code path" />
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
@@ -111,11 +120,6 @@
                     Click="CopyMarkdown_Click"
                     Style="{StaticResource SecondaryButton}"
                     AutomationProperties.Name="Copy Markdown share link" />
-            <Button x:Name="CopyQrPathButton"
-                    Content="Copy QR path"
-                    Click="CopyQrPath_Click"
-                    Style="{StaticResource SecondaryButton}"
-                    AutomationProperties.Name="Copy QR code path" />
             <Button x:Name="RetryButton"
                     Content="Retry"
                     Click="Retry_Click"

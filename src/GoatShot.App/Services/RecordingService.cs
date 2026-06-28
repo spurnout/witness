@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using AnimatedGif;
 using GoatShot.App.Models;
@@ -10,8 +11,7 @@ namespace GoatShot.App.Services;
 
 public sealed class RecordingService : IDisposable
 {
-    private const int FrameDelayMs = 250;
-    private const int MaxFrames = 240;
+    private const int LegacyGifFrameDelayMs = 250;
     private const int MaxFrameWidth = 1280;
     private const int MaxMp4Frames = 1_800;
     private static readonly TimeSpan NativeWebcamRefreshInterval = TimeSpan.FromMilliseconds(750);
@@ -65,19 +65,32 @@ public sealed class RecordingService : IDisposable
 
     public Task<RecordingResult> ToggleGifRecordingAsync(CancellationToken cancellationToken = default)
     {
+        return ToggleGifRecordingAsync(
+            RecordingCaptureTarget.ActiveMonitor(),
+            _settings.Recording,
+            animationOptions: null,
+            cancellationToken);
+    }
+
+    public Task<RecordingResult> ToggleGifRecordingAsync(
+        RecordingCaptureTarget target,
+        RecordingSettings recordingSettings,
+        AnimationExportOptions? animationOptions = null,
+        CancellationToken cancellationToken = default)
+    {
         RecordingSession? sessionToStop = null;
         lock (_gate)
         {
             if (_session is null)
             {
-                _session = StartSession();
+                _session = StartSession(null, target, recordingSettings, animationOptions);
                 return Task.FromResult(new RecordingResult
                 {
                     IsRecording = true,
                     IsPaused = false,
                     Succeeded = true,
                     OutputPath = _session.OutputPath,
-                    Message = "Recording active monitor to GIF. Press Pause / resume to pause, or Start / stop recording again to finish."
+                    Message = $"Recording {_session.Target.DisplayName} to GIF. Press Pause / resume to pause, or Video again to finish."
                 });
             }
 
@@ -143,6 +156,7 @@ public sealed class RecordingService : IDisposable
             target,
             _settings.Recording,
             addToWorkspace,
+            null,
             cancellationToken);
     }
 
@@ -152,6 +166,7 @@ public sealed class RecordingService : IDisposable
         RecordingCaptureTarget target,
         RecordingSettings recordingSettings,
         bool addToWorkspace = false,
+        AnimationExportOptions? animationOptions = null,
         CancellationToken cancellationToken = default)
     {
         if (duration <= TimeSpan.Zero)
@@ -176,13 +191,18 @@ public sealed class RecordingService : IDisposable
                 };
             }
 
-            session = StartSession(outputPath, target, recordingSettings);
+            session = StartSession(outputPath, target, recordingSettings, animationOptions);
             _session = session;
         }
 
         try
         {
-            await Task.Delay(duration, cancellationToken);
+            var durationTask = Task.Delay(duration, cancellationToken);
+            var completed = await Task.WhenAny(durationTask, session.CaptureTask);
+            if (ReferenceEquals(completed, durationTask))
+            {
+                await durationTask;
+            }
         }
         finally
         {
@@ -1188,7 +1208,11 @@ public sealed class RecordingService : IDisposable
         return StartSession(outputPath, target, _settings.Recording);
     }
 
-    private RecordingSession StartSession(string? outputPath, RecordingCaptureTarget target, RecordingSettings recordingSettings)
+    private RecordingSession StartSession(
+        string? outputPath,
+        RecordingCaptureTarget target,
+        RecordingSettings recordingSettings,
+        AnimationExportOptions? animationOptions = null)
     {
         Directory.CreateDirectory(_paths.VideosRoot);
         outputPath = string.IsNullOrWhiteSpace(outputPath)
@@ -1196,34 +1220,51 @@ public sealed class RecordingService : IDisposable
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(outputPath));
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
+        var timingPlan = GifTimingPlanner.Plan(recordingSettings, animationOptions);
         var session = new RecordingSession(
             outputPath,
             RecordingSettingsNormalizer.Normalize(recordingSettings),
-            target.Normalize());
+            target.Normalize(),
+            timingPlan,
+            animationOptions ?? new AnimationExportOptions());
         session.CaptureTask = Task.Run(() => CaptureLoopAsync(session));
         return session;
     }
 
     private async Task CaptureLoopAsync(RecordingSession session)
     {
-        while (!session.StopRequested && session.FrameCount < MaxFrames)
+        var stopwatch = Stopwatch.StartNew();
+        var captureInterval = TimeSpan.FromSeconds(1d / Math.Max(1, session.TimingPlan.CaptureFrameRate));
+        var nextCaptureDue = TimeSpan.Zero;
+        while (!session.StopRequested && session.FrameCount < session.TimingPlan.MaxFrames)
         {
             if (session.IsPaused)
             {
                 try
                 {
-                    await Task.Delay(FrameDelayMs, session.StopToken);
+                    await Task.Delay(LegacyGifFrameDelayMs, session.StopToken);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
 
+                nextCaptureDue = stopwatch.Elapsed + captureInterval;
                 continue;
             }
 
             try
             {
+                var now = stopwatch.Elapsed;
+                if (now < nextCaptureDue)
+                {
+                    var delay = nextCaptureDue - now;
+                    if (delay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(delay, session.StopToken);
+                    }
+                }
+
                 using var captured = await _screenshots.CaptureRecordingTargetAsync(session.Target);
                 using var decorated = DecorateRecordingFrame(
                     captured,
@@ -1231,21 +1272,21 @@ public sealed class RecordingService : IDisposable
                     session.Settings,
                     DateTimeOffset.Now - session.StartedAt);
                 session.AddFrame(ResizeFrame(decorated));
+                DuplicateLastGifFrameUntilPaced(session, stopwatch.Elapsed);
+                nextCaptureDue = TimeSpan.FromSeconds(session.FrameCount / (double)Math.Max(1, session.TimingPlan.CaptureFrameRate));
             }
             catch
             {
                 // Keep recording resilient if a transient screen capture fails.
             }
-
-            try
-            {
-                await Task.Delay(FrameDelayMs, session.StopToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
         }
+    }
+
+    private static void DuplicateLastGifFrameUntilPaced(RecordingSession session, TimeSpan elapsed)
+    {
+        var desired = (int)Math.Ceiling(Math.Max(0d, elapsed.TotalSeconds) * session.TimingPlan.CaptureFrameRate);
+        desired = Math.Clamp(desired, session.FrameCount, session.TimingPlan.MaxFrames);
+        session.DuplicateLastFrameUntil(desired);
     }
 
     private async Task<RecordingResult> StopSessionAsync(
@@ -1273,7 +1314,7 @@ public sealed class RecordingService : IDisposable
                 item = await _workspaceStore.AddImageFileAsync(
                     session.OutputPath,
                     CaptureKind.RecordingGif,
-                    $"Short GIF recording captured locally from {session.Target.DisplayName} at {1000 / FrameDelayMs:0.#} fps with cursor/click visualization and configured fallback overlays. MP4 recording uses native Media Foundation video-only encoding when prerequisites are met, with FFmpeg fallback for requested audio/webcam.");
+                    $"GIF recording captured locally from {session.Target.DisplayName}. {session.TimingPlan.Message} Cursor/click visualization and configured fallback overlays were applied.");
         }
 
         var result = new RecordingResult
@@ -1283,21 +1324,198 @@ public sealed class RecordingService : IDisposable
             OutputPath = session.OutputPath,
             Item = item,
             Message = item is null
-                ? $"GIF recording saved: {session.OutputPath}. Target: {session.Target.DisplayName}."
-                : $"GIF recording saved and indexed: {item.FileName}. Target: {session.Target.DisplayName}."
+                ? $"GIF recording saved: {session.OutputPath}. Target: {session.Target.DisplayName}. {session.TimingPlan.Message}"
+                : $"GIF recording saved and indexed: {item.FileName}. Target: {session.Target.DisplayName}. {session.TimingPlan.Message}"
         };
+        var companionMessage = await TryWriteAnimationCompanionAsync(session, addToWorkspace, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(companionMessage))
+        {
+            result.Message += $" {companionMessage}";
+        }
+
         session.Dispose();
         return result;
     }
 
     private static async Task EncodeGifAsync(RecordingSession session, CancellationToken cancellationToken)
     {
-        using var gif = AnimatedGif.AnimatedGif.Create(session.OutputPath, FrameDelayMs, repeat: 0);
-        foreach (var frame in session.Frames)
+        using var gif = AnimatedGif.AnimatedGif.Create(session.OutputPath, session.TimingPlan.DelayForFrame(0), repeat: 0);
+        var frames = session.Frames;
+        for (var index = 0; index < frames.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await gif.AddFrameAsync(frame, FrameDelayMs, GifQuality.Bit8, cancellationToken);
+            await gif.AddFrameAsync(
+                frames[index],
+                session.TimingPlan.DelayForFrame(index),
+                GifQuality.Bit8,
+                cancellationToken);
         }
+    }
+
+    private async Task<string> TryWriteAnimationCompanionAsync(
+        RecordingSession session,
+        bool addToWorkspace,
+        CancellationToken cancellationToken)
+    {
+        var companionFormat = GifTimingPlanner.NormalizeCompanionFormat(session.AnimationOptions.CompanionFormat);
+        if (string.IsNullOrWhiteSpace(companionFormat))
+        {
+            return string.Empty;
+        }
+
+        var ffmpeg = FindFfmpeg();
+        if (string.IsNullOrWhiteSpace(ffmpeg))
+        {
+            return $"Companion {companionFormat.ToUpperInvariant()} was requested, but FFmpeg was not found.";
+        }
+
+        var companionPath = Path.ChangeExtension(session.OutputPath, companionFormat);
+        var tempRoot = Path.Combine(_paths.TempRoot, "gif-companion-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            var frames = session.Frames;
+            for (var index = 0; index < frames.Count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                frames[index].Save(Path.Combine(tempRoot, $"frame{index + 1:000000}.png"), ImageFormat.Png);
+            }
+
+            var arguments = BuildAnimationCompanionArguments(
+                tempRoot,
+                companionPath,
+                companionFormat,
+                session.TimingPlan.CaptureFrameRate);
+            var result = await RunFfmpegAsync(ffmpeg, arguments, cancellationToken);
+            if (!result.Succeeded || !File.Exists(companionPath))
+            {
+                return result.Succeeded
+                    ? $"Companion {companionFormat.ToUpperInvariant()} was requested, but FFmpeg did not create an output."
+                    : $"Companion {companionFormat.ToUpperInvariant()} was requested, but export failed: {result.Message}";
+            }
+
+            if (addToWorkspace)
+            {
+                await _workspaceStore.AddImageFileAsync(
+                    companionPath,
+                    CaptureKind.RecordingMp4,
+                    $"High-frame-rate {companionFormat.ToUpperInvariant()} companion exported from GIF capture at {session.TimingPlan.CaptureFrameRate} fps.");
+            }
+
+            return $"Companion {companionFormat.ToUpperInvariant()} saved: {companionPath}.";
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, recursive: true);
+                }
+            }
+            catch
+            {
+                // Temp cleanup must not hide a successful recording.
+            }
+        }
+    }
+
+    internal static IReadOnlyList<string> BuildAnimationCompanionArguments(
+        string frameDirectory,
+        string outputPath,
+        string companionFormat,
+        int frameRate)
+    {
+        var inputPattern = Path.Combine(frameDirectory, "frame%06d.png");
+        var fps = Math.Clamp(frameRate, GifTimingPlanner.MinimumFrameRate, GifTimingPlanner.MaximumSourceFrameRate);
+        if (companionFormat.Equals("webm", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "-y",
+                "-framerate",
+                fps.ToString(CultureInfo.InvariantCulture),
+                "-i",
+                inputPattern,
+                "-c:v",
+                "libvpx-vp9",
+                "-b:v",
+                "0",
+                "-crf",
+                "28",
+                "-pix_fmt",
+                "yuv420p",
+                outputPath
+            ];
+        }
+
+        return
+        [
+            "-y",
+            "-framerate",
+            fps.ToString(CultureInfo.InvariantCulture),
+            "-i",
+            inputPattern,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            outputPath
+        ];
+    }
+
+    private static async Task<RecordingResult> RunFfmpegAsync(
+        string ffmpeg,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = ffmpeg,
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true
+        };
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(start);
+        if (process is null)
+        {
+            return new RecordingResult
+            {
+                Succeeded = false,
+                Message = "FFmpeg could not be started."
+            };
+        }
+
+        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+        var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+
+        if (process.ExitCode != 0)
+        {
+            return new RecordingResult
+            {
+                Succeeded = false,
+                Message = $"FFmpeg failed with exit code {process.ExitCode}. {ShortFfmpegMessage(stderr, stdout)}"
+            };
+        }
+
+        return new RecordingResult
+        {
+            Succeeded = true,
+            Message = "FFmpeg completed."
+        };
     }
 
     private static async Task<RecordingResult> EncodeMp4Async(
@@ -1991,17 +2209,26 @@ public sealed class RecordingService : IDisposable
         private readonly List<Bitmap> _frames = new();
         private bool _isPaused;
 
-        public RecordingSession(string outputPath, NormalizedRecordingSettings settings, RecordingCaptureTarget target)
+        public RecordingSession(
+            string outputPath,
+            NormalizedRecordingSettings settings,
+            RecordingCaptureTarget target,
+            GifTimingPlan timingPlan,
+            AnimationExportOptions animationOptions)
         {
             OutputPath = outputPath;
             Settings = settings;
             Target = target;
+            TimingPlan = timingPlan;
+            AnimationOptions = animationOptions;
             StartedAt = DateTimeOffset.Now;
         }
 
         public string OutputPath { get; }
         public NormalizedRecordingSettings Settings { get; }
         public RecordingCaptureTarget Target { get; }
+        public GifTimingPlan TimingPlan { get; }
+        public AnimationExportOptions AnimationOptions { get; }
         public DateTimeOffset StartedAt { get; }
         public Task CaptureTask { get; set; } = Task.CompletedTask;
         public CancellationToken StopToken => _stop.Token;
@@ -2043,13 +2270,31 @@ public sealed class RecordingService : IDisposable
         {
             lock (_frameGate)
             {
-                if (_frames.Count >= MaxFrames)
+                if (_frames.Count >= TimingPlan.MaxFrames)
                 {
                     frame.Dispose();
                     return;
                 }
 
                 _frames.Add(frame);
+            }
+        }
+
+        public void DuplicateLastFrameUntil(int desiredFrameCount)
+        {
+            lock (_frameGate)
+            {
+                if (_frames.Count == 0)
+                {
+                    return;
+                }
+
+                desiredFrameCount = Math.Clamp(desiredFrameCount, _frames.Count, TimingPlan.MaxFrames);
+                var source = _frames[^1];
+                while (_frames.Count < desiredFrameCount)
+                {
+                    _frames.Add((Bitmap)source.Clone());
+                }
             }
         }
 

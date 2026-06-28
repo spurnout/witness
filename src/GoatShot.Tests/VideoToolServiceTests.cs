@@ -21,6 +21,35 @@ public sealed class VideoToolServiceTests
     }
 
     [TestMethod]
+    public void ConvertArguments_UsesPaletteGifAtRequestedFps()
+    {
+        var arguments = VideoToolService.ConvertArguments(
+            "input.mp4",
+            "gif",
+            "output.gif",
+            new AnimationExportOptions { FrameRate = 60, GifTimingMode = "smooth" });
+
+        CollectionAssert.Contains(arguments.ToArray(), "-filter_complex");
+        Assert.IsTrue(arguments.Any(argument => argument.Contains("fps=60", StringComparison.Ordinal)));
+        Assert.IsTrue(arguments.Any(argument => argument.Contains("palettegen", StringComparison.Ordinal)));
+        Assert.IsTrue(arguments.Any(argument => argument.Contains("paletteuse", StringComparison.Ordinal)));
+        CollectionAssert.Contains(arguments.ToArray(), "-an");
+    }
+
+    [TestMethod]
+    public void BuildConvertCompanionArguments_UsesRequestedHighFps()
+    {
+        var arguments = VideoToolService.BuildConvertCompanionArguments(
+            "input.mp4",
+            "webm",
+            "output.webm",
+            frameRate: 120);
+
+        CollectionAssert.Contains(arguments.ToArray(), "fps=120");
+        CollectionAssert.Contains(arguments.ToArray(), "libvpx-vp9");
+    }
+
+    [TestMethod]
     public async Task ResizeAsync_RejectsInvalidDimensionsBeforeFfmpeg()
     {
         await WithTempPathsAsync(async paths =>

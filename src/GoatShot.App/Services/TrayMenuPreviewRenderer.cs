@@ -81,14 +81,18 @@ public static class TrayMenuPreviewRenderer
             Margin = new Thickness(0, 5, 0, 18)
         });
 
-        foreach (var definition in TrayMenuActionCatalog.All)
+        foreach (var group in TrayMenuActionCatalog.Actions.GroupBy(action => action.Group))
         {
-            stack.Children.Add(definition.IsSeparator ? BuildSeparator() : BuildActionRow(definition));
+            stack.Children.Add(BuildGroupHeader(group.Key));
+            foreach (var definition in group)
+            {
+                stack.Children.Add(BuildActionRow(definition));
+            }
         }
 
         stack.Children.Add(new TextBlock
         {
-            Text = $"{TrayMenuActionCatalog.Actions.Count()} actions, {TrayMenuActionCatalog.All.Count(item => item.IsSeparator)} separators",
+            Text = $"{TrayMenuActionCatalog.Actions.Count()} actions across {TrayMenuActionCatalog.Actions.Select(action => action.Group).Distinct().Count()} groups",
             Foreground = Brush("#A9BAC8"),
             FontSize = 11,
             Margin = new Thickness(0, 16, 0, 0)
@@ -99,53 +103,34 @@ public static class TrayMenuPreviewRenderer
 
     private static UIElement BuildActionRow(TrayMenuActionDefinition definition)
     {
-        var grid = new Grid
-        {
-            MinHeight = 32,
-            Margin = new Thickness(0, 1, 0, 1)
-        };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        var label = new TextBlock
-        {
-            Text = definition.Label,
-            Foreground = Brush("#F5FAFF"),
-            FontSize = 13,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        Grid.SetColumn(label, 0);
-        grid.Children.Add(label);
-
-        var group = new Border
-        {
-            Background = Brush("#162836"),
-            BorderBrush = Brush("#36566D"),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(8, 3, 8, 3),
-            Margin = new Thickness(10, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = definition.Group,
-                Foreground = Brush("#AEE9F7"),
-                FontSize = 10
-            }
-        };
-        Grid.SetColumn(group, 1);
-        grid.Children.Add(group);
-
-        return grid;
-    }
-
-    private static UIElement BuildSeparator()
-    {
         return new Border
         {
-            Height = 1,
-            Background = Brush("#31475A"),
-            Margin = new Thickness(0, 8, 0, 8)
+            MinHeight = 32,
+            Margin = new Thickness(0, 1, 0, 1),
+            Padding = new Thickness(10, 0, 10, 0),
+            Background = Brush("#111F2A"),
+            BorderBrush = Brush("#24394A"),
+            BorderThickness = new Thickness(1),
+            Child = new TextBlock
+            {
+                Text = definition.Label,
+                Foreground = Brush("#F5FAFF"),
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            }
+        };
+    }
+
+    private static UIElement BuildGroupHeader(string group)
+    {
+        return new TextBlock
+        {
+            Text = group,
+            Foreground = Brush("#30E6C3"),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 10, 0, 5)
         };
     }
 

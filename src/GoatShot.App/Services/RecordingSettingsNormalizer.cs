@@ -76,7 +76,8 @@ public sealed record NormalizedRecordingSettings(
 
 public static class RecordingSettingsNormalizer
 {
-    public const int MaxFallbackFps = 60;
+    public const int MinFallbackFps = 1;
+    public const int MaxFallbackFps = 120;
     public const int MaxTargetWidth = 3840;
     public const int MaxTargetHeight = 2160;
 
@@ -84,7 +85,7 @@ public static class RecordingSettingsNormalizer
     {
         settings ??= new RecordingSettings();
         var quality = NormalizeQualityProfile(settings.QualityProfile);
-        var fps = Math.Clamp(fpsOverride ?? settings.FramesPerSecond, 1, MaxFallbackFps);
+        var fps = Math.Clamp(fpsOverride ?? settings.FramesPerSecond, MinFallbackFps, MaxFallbackFps);
         var width = ClampDimension(settings.TargetWidth, MaxTargetWidth);
         var height = ClampDimension(settings.TargetHeight, MaxTargetHeight);
         var bitrate = Math.Clamp(settings.BitrateKbps, 0, 120_000);

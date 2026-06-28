@@ -8,6 +8,110 @@
         MinHeight="620"
         Loaded="Window_Loaded"
         Closing="Window_Closing">
+    <Window.Resources>
+        <Style x:Key="CaptureModeComboBoxItem" TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Background" Value="#0B151C" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                        <Border x:Name="ItemChrome"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#18313B" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#143C3D" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CaptureModeComboBox" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Background" Value="#071016" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource CaptureModeComboBoxItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="False"
+                                          IsTabStop="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                        <Border x:Name="Chrome"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="4">
+                                            <Path Data="M 0 0 L 4 4 L 8 0 Z"
+                                                  Fill="{StaticResource MutedInkBrush}"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,10,0" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                              Margin="10,0,28,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="{TemplateBinding ActualWidth}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        Background="#0B151C"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1">
+                                    <ScrollViewer>
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="ToggleButton" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -74,31 +178,114 @@
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"
                                    Margin="0,0,0,10" />
-                        <Button Content="All-in-one region" Click="CaptureRegion_Click" />
-                        <Button Content="Active window" Click="CaptureWindow_Click" />
-                        <Button Content="Scrolling window" Click="CaptureScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Horizontal scrolling" Click="CaptureHorizontalScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Fullscreen" Click="CaptureFullscreen_Click" />
-                        <Button Content="All monitors" Click="CaptureAllMonitors_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Active monitor" Click="CaptureMonitor_Click" />
-                        <Button Content="Preset 1280 x 720" Click="CapturePreset1280x720_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Preset 1920 x 1080" Click="CapturePreset1920x1080_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Last region" Click="CaptureLastRegion_Click" />
-                        <Button Content="Delayed region" Click="CaptureDelayed_Click" Style="{StaticResource SecondaryButton}" />
+                        <Border Style="{StaticResource QuietCardBorder}"
+                                Padding="10"
+                                Margin="0,0,8,10">
+                            <StackPanel>
+                                <Button Click="ScreenAction_Click"
+                                        Style="{StaticResource IconActionButton}"
+                                        AutomationProperties.Name="Start screen capture"
+                                        ToolTip="Capture the selected screen target">
+                                    <DockPanel LastChildFill="True">
+                                        <TextBlock Text="&#xE722;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="16"
+                                                   Margin="0,0,8,0" />
+                                        <TextBlock Text="Screen"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold" />
+                                    </DockPanel>
+                                </Button>
+                                <ComboBox x:Name="ScreenCaptureTypeBox"
+                                          AutomationProperties.Name="Screen capture target"
+                                          Style="{StaticResource CaptureModeComboBox}"
+                                          SelectedIndex="0"
+                                          Margin="0,8,0,0"
+                                          ToolTip="Choose area, window, monitor, or scrolling capture before pressing Screen.">
+                                    <ComboBoxItem Content="Area / region" Tag="Region" />
+                                    <ComboBoxItem Content="Window" Tag="ActiveWindow" />
+                                    <ComboBoxItem Content="Scrolling window" Tag="ScrollingWindow" />
+                                    <ComboBoxItem Content="Horizontal scrolling" Tag="HorizontalScrolling" />
+                                    <ComboBoxItem Content="Fullscreen" Tag="Fullscreen" />
+                                    <ComboBoxItem Content="All monitors" Tag="AllMonitors" />
+                                    <ComboBoxItem Content="Active monitor" Tag="ActiveMonitor" />
+                                    <ComboBoxItem Content="Last region" Tag="LastRegion" />
+                                    <ComboBoxItem Content="Delayed area" Tag="DelayedRegion" />
+                                    <ComboBoxItem Content="Preset 1280 x 720" Tag="Preset1280" />
+                                    <ComboBoxItem Content="Preset 1920 x 1080" Tag="Preset1920" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="RecordingControlsAuditSection"
+                                AutomationProperties.Name="Recording controls"
+                                Style="{StaticResource QuietCardBorder}"
+                                Padding="10"
+                                Margin="0,0,8,10">
+                            <StackPanel>
+                                <Button Click="VideoAction_Click"
+                                        Style="{StaticResource IconActionButton}"
+                                        AutomationProperties.Name="Start or stop video recording"
+                                        ToolTip="Record the selected video target">
+                                    <DockPanel LastChildFill="True">
+                                        <TextBlock Text="&#xE714;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="16"
+                                                   Margin="0,0,8,0" />
+                                        <TextBlock Text="Video"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold" />
+                                    </DockPanel>
+                                </Button>
+                                <ComboBox x:Name="VideoCaptureTypeBox"
+                                          AutomationProperties.Name="Video recording target"
+                                          Style="{StaticResource CaptureModeComboBox}"
+                                          SelectedIndex="0"
+                                          Margin="0,8,0,8"
+                                          ToolTip="Choose smooth GIF or quick MP4 target before pressing Video.">
+                                    <ComboBoxItem Content="GIF monitor" Tag="GifMonitor" />
+                                    <ComboBoxItem Content="GIF area" Tag="GifRegion" />
+                                    <ComboBoxItem Content="GIF window" Tag="GifWindow" />
+                                    <ComboBoxItem Content="GIF all monitors" Tag="GifAllMonitors" />
+                                    <ComboBoxItem Content="MP4 monitor" Tag="Mp4Monitor" />
+                                    <ComboBoxItem Content="MP4 area" Tag="Mp4Region" />
+                                    <ComboBoxItem Content="MP4 window" Tag="Mp4Window" />
+                                    <ComboBoxItem Content="MP4 all monitors" Tag="Mp4AllMonitors" />
+                                </ComboBox>
+                                <Button Content="Pause / resume video"
+                                        Click="PauseRecording_Click"
+                                        Style="{StaticResource SecondaryButton}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Expander Header="Direct capture buttons"
+                                  IsExpanded="False"
+                                  Margin="0,0,8,10">
+                            <StackPanel Margin="0,8,0,0">
+                                <Button Content="All-in-one region" Click="CaptureRegion_Click" />
+                                <Button Content="Active window"
+                                        Click="CaptureWindow_Click"
+                                        ToolTip="Temporarily hides GoatShot, then captures the foreground app behind it." />
+                                <Button Content="Scrolling window" Click="CaptureScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Horizontal scrolling" Click="CaptureHorizontalScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Fullscreen" Click="CaptureFullscreen_Click" />
+                                <Button Content="All monitors" Click="CaptureAllMonitors_Click" Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Active monitor" Click="CaptureMonitor_Click" />
+                                <Button Content="Preset 1280 x 720" Click="CapturePreset1280x720_Click" Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Preset 1920 x 1080" Click="CapturePreset1920x1080_Click" Style="{StaticResource SecondaryButton}" />
+                                <Button Content="Last region" Click="CaptureLastRegion_Click" />
+                                <Button Content="Delayed region" Click="CaptureDelayed_Click" Style="{StaticResource SecondaryButton}" />
+                                <Separator Margin="0,8,0,12" Background="{StaticResource BorderBrush}" />
+                                <Button Content="Start / stop GIF" Click="Recording_Click" ToolTip="Record a local GIF using saved FPS settings. GIF timing is capped by the format." />
+                            <Button Content="Pause / resume recording" Click="PauseRecording_Click" Style="{StaticResource SecondaryButton}" />
+                            <Button Content="Quick MP4 5s" Click="RecordMp4_Click" Style="{StaticResource SecondaryButton}" />
+                            <Button Content="All monitors MP4 5s" Click="RecordAllMonitorsMp4_Click" Style="{StaticResource SecondaryButton}" />
+                            </StackPanel>
+                        </Expander>
 
                         <Separator Margin="0,10,8,16" Background="{StaticResource BorderBrush}" />
 
-                        <StackPanel x:Name="RecordingControlsAuditSection"
-                                    AutomationProperties.Name="Recording controls">
-                            <TextBlock Text="Recording"
-                                       FontSize="13"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Margin="0,0,0,10" />
-                            <Button Content="Start / stop recording" Click="Recording_Click" />
-                            <Button Content="Pause / resume recording" Click="PauseRecording_Click" Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Record 5s MP4" Click="RecordMp4_Click" Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Record all monitors 5s MP4" Click="RecordAllMonitorsMp4_Click" Style="{StaticResource SecondaryButton}" />
+                        <StackPanel>
                             <Border Background="#071016"
                                     BorderBrush="{StaticResource BorderBrush}"
                                     BorderThickness="1"
@@ -139,6 +326,8 @@
                                     </Border>
                                 </StackPanel>
                             </Border>
+                            <Expander Header="Recording details" IsExpanded="False" Margin="0,0,8,8">
+                                <StackPanel Margin="0,8,0,0">
                             <Border Background="#0D222B"
                                     BorderBrush="{StaticResource BorderBrush}"
                                     BorderThickness="1"
@@ -203,7 +392,7 @@
                                      AutomationProperties.Name="Recording frames per second"
                                      Margin="0,0,8,8"
                                      LostFocus="RecordingControl_Changed"
-                                     ToolTip="MP4 fallback FPS. Current fallback clamps to 30 fps." />
+                                     ToolTip="Source recording FPS for MP4/WebM and GIF capture. GIF playback is capped by 10 ms timing steps." />
                             <TextBlock Text="Target size"
                                        Foreground="{StaticResource MutedInkBrush}"
                                        FontSize="12"
@@ -235,15 +424,14 @@
                                        FontSize="12"
                                        Margin="0,0,8,14"
                                        Text="Captures active-window screenshots on workflow clicks and exports Markdown/HTML guides." />
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
 
                         <Separator Margin="0,10,8,16" Background="{StaticResource BorderBrush}" />
 
-                        <TextBlock Text="Tools"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,10" />
+                        <Expander Header="More tools" IsExpanded="False">
+                            <StackPanel Margin="0,8,0,0">
                         <Button Content="Quick actions" Click="CaptureTask_Click" />
                         <Button Content="Open editor" Click="OpenEditor_Click" />
                         <Button Content="Import clipboard" Click="ImportClipboard_Click" Style="{StaticResource SecondaryButton}" />
@@ -267,7 +455,7 @@
                         <Button Content="Crop center 75%" Click="CropVideo_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Resize 720p" Click="ResizeVideo_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Cut 2s middle" Click="CutVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Convert to GIF" Click="ConvertVideo_Click" Style="{StaticResource SecondaryButton}" />
+                        <Button Content="Smooth GIF 60" Click="ConvertVideo_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Strip metadata" Click="StripMetadata_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="File details" Click="FileDetails_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Run OCR" Click="RunOcr_Click" Style="{StaticResource SecondaryButton}" />
@@ -276,6 +464,8 @@
                         <Button Content="Decode QR/barcode" Click="DecodeBarcode_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Pick color" Click="ColorPicker_Click" Style="{StaticResource SecondaryButton}" />
                         <Button Content="Pixel ruler" Click="PixelRuler_Click" Style="{StaticResource SecondaryButton}" />
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -369,6 +559,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,12">
@@ -383,6 +574,67 @@
                                    HorizontalAlignment="Right" />
                     </DockPanel>
                     <Border Grid.Row="1"
+                            Style="{StaticResource QuietCardBorder}"
+                            Padding="10"
+                            Margin="0,0,0,12">
+                        <UniformGrid Columns="3">
+                            <Button Click="OpenEditor_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Edit selected capture"
+                                    ToolTip="Open the selected capture in the editor">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Edit" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="CopyImage_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Copy selected capture"
+                                    ToolTip="Copy the selected image to the clipboard">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Copy" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="QuickShare_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Share selected capture"
+                                    ToolTip="Upload or share using the configured destination">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE72D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Share" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="RedactOcrSecrets_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Create privacy-redacted copy"
+                                    ToolTip="Detect text and create a redacted copy">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Privacy" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="ExportBugReport_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Create capture document"
+                                    ToolTip="Create a Markdown/HTML handoff document">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Document" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="CaptureTask_Click"
+                                    Style="{StaticResource IconActionButton}"
+                                    AutomationProperties.Name="Open capture action palette"
+                                    ToolTip="Open the full action palette for this capture">
+                                <StackPanel>
+                                    <TextBlock Text="&#xE712;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
+                                    <TextBlock Text="More" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+                    </Border>
+                    <Border Grid.Row="2"
                             Background="#050B10"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
@@ -404,108 +656,6 @@
                     Padding="16">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="Capture truth"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,12" />
-                        <TextBlock x:Name="DetailsText"
-                                   AutomationProperties.Name="Selected capture details"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,18" />
-
-                        <TextBlock Text="Hotkeys"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,8" />
-                        <TextBlock x:Name="HotkeyText"
-                                   AutomationProperties.Name="Hotkey registration status"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,18" />
-
-                        <TextBlock Text="Runtime status"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,8" />
-                        <TextBlock x:Name="DiagnosticsText"
-                                   AutomationProperties.Name="Runtime diagnostics summary"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,10" />
-                        <Button Content="Copy diagnostic bundle"
-                                Click="DiagnosticBundle_Click"
-                                Style="{StaticResource SecondaryButton}"
-                                Margin="0,0,0,18" />
-
-                        <TextBlock Text="Upload queue"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,8" />
-                        <TextBlock x:Name="QueueStatusText"
-                                   AutomationProperties.Name="Upload queue status"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8" />
-                        <ListBox x:Name="QueueList"
-                                 AutomationProperties.Name="Upload queue list"
-                                 Background="#081016"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource InkBrush}"
-                                 MaxHeight="180"
-                                 Margin="0,0,0,8">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border BorderBrush="{StaticResource BorderBrush}"
-                                            BorderThickness="0,0,0,1"
-                                            Padding="4,6">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding FileName}"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12"
-                                                       TextTrimming="CharacterEllipsis">
-                                                <Run Text="{Binding StatusLabel, Mode=OneWay}" />
-                                                <Run Text=" via " />
-                                                <Run Text="{Binding Destination, Mode=OneWay}" />
-                                            </TextBlock>
-                                            <TextBlock Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12"
-                                                       TextTrimming="CharacterEllipsis">
-                                                <Run Text="{Binding AttemptLabel, Mode=OneWay}" />
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding NextAttemptLabel}"
-                                                       Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding LastMessage}"
-                                                       Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <UniformGrid Columns="2" Margin="0,0,0,18">
-                            <Button Content="Refresh queue"
-                                    Click="RefreshQueue_Click"
-                                    Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Process due"
-                                    Click="ProcessQueue_Click"
-                                    Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Cancel selected"
-                                    Click="CancelQueueItem_Click"
-                                    Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Retry selected"
-                                    Click="RetryQueueItem_Click"
-                                    Style="{StaticResource SecondaryButton}" />
-                        </UniformGrid>
-
                         <TextBlock Text="Privacy default"
                                    FontSize="13"
                                    FontWeight="Bold"
@@ -513,7 +663,116 @@
                                    Margin="0,0,0,8" />
                         <TextBlock Text="Captures stay local unless you copy, export, or configure a share action. AI is disabled until configured."
                                    Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap" />
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+
+                        <Expander Header="Health / Details" IsExpanded="False">
+                            <Border Style="{StaticResource QuietCardBorder}" Margin="0,8,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Capture truth"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Margin="0,0,0,12" />
+                                    <TextBlock x:Name="DetailsText"
+                                               AutomationProperties.Name="Selected capture details"
+                                               Foreground="{StaticResource MutedInkBrush}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,18" />
+
+                                    <TextBlock Text="Hotkeys"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Margin="0,0,0,8" />
+                                    <TextBlock x:Name="HotkeyText"
+                                               AutomationProperties.Name="Hotkey registration status"
+                                               Foreground="{StaticResource MutedInkBrush}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,18" />
+
+                                    <TextBlock Text="Runtime status"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Margin="0,0,0,8" />
+                                    <TextBlock x:Name="DiagnosticsText"
+                                               AutomationProperties.Name="Runtime diagnostics summary"
+                                               Foreground="{StaticResource MutedInkBrush}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10" />
+                                    <Button Content="Copy diagnostic bundle"
+                                            Click="DiagnosticBundle_Click"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Margin="0,0,0,18" />
+
+                                    <TextBlock Text="Upload queue"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Margin="0,0,0,8" />
+                                    <TextBlock x:Name="QueueStatusText"
+                                               AutomationProperties.Name="Upload queue status"
+                                               Foreground="{StaticResource MutedInkBrush}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,8" />
+                                    <ListBox x:Name="QueueList"
+                                             AutomationProperties.Name="Upload queue list"
+                                             Background="#081016"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             Foreground="{StaticResource InkBrush}"
+                                             MaxHeight="180"
+                                             Margin="0,0,0,8">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource BorderBrush}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Padding="4,6">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding FileName}"
+                                                                   FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Foreground="{StaticResource MutedInkBrush}"
+                                                                   FontSize="12"
+                                                                   TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{Binding StatusLabel, Mode=OneWay}" />
+                                                            <Run Text=" via " />
+                                                            <Run Text="{Binding Destination, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                        <TextBlock Foreground="{StaticResource MutedInkBrush}"
+                                                                   FontSize="12"
+                                                                   TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{Binding AttemptLabel, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding NextAttemptLabel}"
+                                                                   Foreground="{StaticResource MutedInkBrush}"
+                                                                   FontSize="12"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding LastMessage}"
+                                                                   Foreground="{StaticResource MutedInkBrush}"
+                                                                   FontSize="12"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <UniformGrid Columns="2">
+                                        <Button Content="Refresh queue"
+                                                Click="RefreshQueue_Click"
+                                                Style="{StaticResource SecondaryButton}" />
+                                        <Button Content="Process due"
+                                                Click="ProcessQueue_Click"
+                                                Style="{StaticResource SecondaryButton}" />
+                                        <Button Content="Cancel selected"
+                                                Click="CancelQueueItem_Click"
+                                                Style="{StaticResource SecondaryButton}" />
+                                        <Button Content="Retry selected"
+                                                Click="RetryQueueItem_Click"
+                                                Style="{StaticResource SecondaryButton}" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

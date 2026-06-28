@@ -821,7 +821,8 @@ internal static class Program
                 output,
                 target,
                 recordingSettings,
-                addToWorkspace);
+                addToWorkspace,
+                ParseAnimationExportOptions(args));
         }
         else
         {
@@ -1366,6 +1367,7 @@ internal static class Program
             item,
             Value(args, "--format"),
             Value(args, "--output") ?? Value(args, "-o"),
+            ParseAnimationExportOptions(args),
             addToWorkspace: Has(args, "--workspace"));
         return PrintVideoToolResult(result);
     }
@@ -10800,6 +10802,25 @@ internal static class Program
             ParseInt(args, "--fps", source.FramesPerSecond));
     }
 
+    private static AnimationExportOptions ParseAnimationExportOptions(IReadOnlyList<string> args)
+    {
+        return new AnimationExportOptions
+        {
+            FrameRate = ParseOptionalInt(args, "--fps") ?? ParseOptionalInt(args, "--frame-rate"),
+            GifTimingMode = Value(args, "--gif-timing") ??
+                Value(args, "--gif-timing-mode") ??
+                Value(args, "--gif-quality") ??
+                Value(args, "--animation-quality") ??
+                "Smooth",
+            Quality = Value(args, "--quality") ?? Value(args, "--gif-quality") ?? "High",
+            CompanionFormat = Value(args, "--companion") ??
+                Value(args, "--companion-format") ??
+                Value(args, "--source-companion") ??
+                string.Empty,
+            MaxFrames = ParseOptionalInt(args, "--max-frames") ?? ParseOptionalInt(args, "--gif-max-frames")
+        };
+    }
+
     private static RecordingWorkflowProfile? FindRecordingProfile(AppSettings settings, string name)
     {
         var normalized = NormalizeProfileLookup(name);
@@ -11478,7 +11499,8 @@ internal static class Program
               goatshot record monitor --duration 3 --output demo.gif [--workspace]
               goatshot record all-monitors --duration 3 --format gif --output all-monitors.gif [--workspace]
               goatshot record window --duration 3 --format gif --output window.gif [--workspace]
-              goatshot record region --bounds x,y,width,height --duration 3 --format gif --output region.gif [--workspace]
+              goatshot record region --bounds x,y,width,height --duration 3 --format gif --fps 60 --gif-quality smooth --output region.gif [--workspace]
+              goatshot record region --bounds x,y,width,height --duration 3 --format gif --fps 120 --companion mp4 --output region.gif [--workspace]
               goatshot record fixed --size 1280x720 --duration 3 --format gif --output fixed.gif [--workspace]
               goatshot record devices [--json]
               goatshot record profiles [--json]
@@ -11501,7 +11523,8 @@ internal static class Program
               goatshot video intro-outro demo.mp4 --intro intro.png --outro outro.png --size 1280x720 --output bookended.mp4 [--workspace]
               goatshot video subtitles demo.mp4 --srt captions.srt --output subtitled.mp4 [--workspace]
               goatshot video srt captions.srt --output captions-copy.srt [--workspace]
-              goatshot video convert demo.mp4 --format gif --output demo.gif [--workspace]
+              goatshot video convert demo.mp4 --format gif --fps 60 --gif-quality smooth --output demo.gif [--workspace]
+              goatshot video convert demo.mp4 --format gif --fps 120 --companion webm --output demo.gif [--workspace]
               goatshot video plan-silence demo.mp4 [--noise-db -35] [--min-silence 0.7] [--padding 0.15] [--output silence-plan.json] [--json]
               goatshot video plan-transcript --srt captions.srt|--transcript transcript.txt --terms "loading,failed" [--padding 0.25] [--output transcript-plan.json] [--json]
               goatshot video plan-filler --srt captions.srt|--transcript transcript.txt [--terms "um,uh,like"] [--output filler-plan.json] [--json]

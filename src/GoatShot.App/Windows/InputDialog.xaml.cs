@@ -7,6 +7,7 @@ public partial class InputDialog : Window
     public InputDialog(string prompt, string defaultValue = "")
     {
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this, cancelDialog: true);
         PromptText.Text = prompt;
         ResponseBox.Text = defaultValue;
         ResponseBox.Focus();

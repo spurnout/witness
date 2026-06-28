@@ -11,6 +11,7 @@ public partial class CaptureTaskWindow : Window
     {
         _model = model;
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this);
         Title = model.Title;
         TitleText.Text = model.Title;
         FileNameText.Text = model.FileName;

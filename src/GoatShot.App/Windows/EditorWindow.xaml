@@ -10,7 +10,9 @@
         PreviewKeyDown="EditorWindow_PreviewKeyDown">
     <Window.Resources>
         <Style x:Key="EditorToolButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="MinWidth" Value="76" />
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="AutomationProperties.HelpText" Value="Editor annotation tool" />
         </Style>
         <Style x:Key="PrivacyToolButton" TargetType="Button" BasedOn="{StaticResource EditorToolButton}">
@@ -51,17 +53,17 @@
                                            FontSize="12"
                                            Margin="2,0,0,6" />
                                 <WrapPanel>
-                                    <Button x:Name="RectangleToolButton" Content="Rectangle" Tag="Rectangle" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="EllipseToolButton" Content="Ellipse" Tag="Ellipse" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="LineToolButton" Content="Line" Tag="Line" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="ArrowToolButton" Content="Arrow" Tag="Arrow" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="FreehandToolButton" Content="Freehand" Tag="Freehand" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="TextToolButton" Content="Text" Tag="Text" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="CalloutToolButton" Content="Callout" Tag="Callout" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="StepToolButton" Content="Step" Tag="Step" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="HighlightToolButton" Content="Highlight" Tag="Highlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="SpotlightToolButton" Content="Spotlight" Tag="Spotlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="CropToolButton" Content="Crop" Tag="Crop" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="RectangleToolButton" Content="▭" ToolTip="Rectangle" Tag="Rectangle" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="EllipseToolButton" Content="○" ToolTip="Ellipse" Tag="Ellipse" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="LineToolButton" Content="/" ToolTip="Line" Tag="Line" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="ArrowToolButton" Content="→" ToolTip="Arrow" Tag="Arrow" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="FreehandToolButton" Content="✎" ToolTip="Freehand pen" Tag="Freehand" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="TextToolButton" Content="T" ToolTip="Text" Tag="Text" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="CalloutToolButton" Content="!" ToolTip="Callout note" Tag="Callout" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="StepToolButton" Content="#" ToolTip="Step marker" Tag="Step" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="HighlightToolButton" Content="H" ToolTip="Highlight" Tag="Highlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="SpotlightToolButton" Content="◉" ToolTip="Spotlight" Tag="Spotlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="CropToolButton" Content="⌗" ToolTip="Crop" Tag="Crop" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
@@ -80,11 +82,11 @@
                                            FontWeight="SemiBold"
                                            Margin="2,0,0,6" />
                                 <WrapPanel>
-                                    <Button x:Name="RedactToolButton" Content="Redact" Tag="Redact" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="BlurToolButton" Content="Blur" Tag="Blur" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="PixelateToolButton" Content="Pixelate" Tag="Pixelate" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="ReviewSensitiveRegionsButton" Content="Review OCR" Click="ReviewSensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="ApplySensitiveRegionsButton" Content="Apply OCR" Click="ApplySensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="RedactToolButton" Content="█" ToolTip="Solid redaction" Tag="Redact" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="BlurToolButton" Content="~" ToolTip="Blur selected area" Tag="Blur" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="PixelateToolButton" Content="▦" ToolTip="Pixelate selected area" Tag="Pixelate" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="ReviewSensitiveRegionsButton" Content="OCR" ToolTip="Review OCR-sensitive regions" Click="ReviewSensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="ApplySensitiveRegionsButton" Content="Apply" ToolTip="Apply OCR-sensitive redactions" Click="ApplySensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
                                 </WrapPanel>
                             </StackPanel>
                         </Border>

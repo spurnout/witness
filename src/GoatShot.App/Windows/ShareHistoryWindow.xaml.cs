@@ -16,6 +16,7 @@ public partial class ShareHistoryWindow : Window
     {
         _services = services;
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this);
         HistoryList.ItemsSource = _historyItems;
         QueueList.ItemsSource = _queueItems;
         RefreshAll();
@@ -36,8 +37,12 @@ public partial class ShareHistoryWindow : Window
             query: SearchBox.Text,
             limit: 100);
 
+        var models = ShareHistoryActions.BuildModels(entries)
+            .Where(MatchesStatusFilter)
+            .Where(MatchesDestinationFilter);
+
         _historyItems.Clear();
-        foreach (var model in ShareHistoryActions.BuildModels(entries))
+        foreach (var model in models)
         {
             _historyItems.Add(model);
         }
@@ -45,6 +50,29 @@ public partial class ShareHistoryWindow : Window
         HistoryCountText.Text = _historyItems.Count == 0
             ? "No matching share history"
             : $"{_historyItems.Count} share histor{(_historyItems.Count == 1 ? "y item" : "y items")}";
+    }
+
+    private bool MatchesStatusFilter(ShareHistoryActionModel model)
+    {
+        var value = (StatusFilterBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        return value switch
+        {
+            "Succeeded" => model.Entry.Succeeded,
+            "Failed" => !model.Entry.Succeeded,
+            _ => true
+        };
+    }
+
+    private bool MatchesDestinationFilter(ShareHistoryActionModel model)
+    {
+        var value = (DestinationFilterBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        return value switch
+        {
+            "External only" => model.Entry.ExternalDestination,
+            "Local only" => !model.Entry.ExternalDestination,
+            null or "All destinations" => true,
+            _ => model.Entry.Destination.ToString().Equals(value, StringComparison.OrdinalIgnoreCase)
+        };
     }
 
     private void RefreshQueue()
@@ -88,6 +116,17 @@ public partial class ShareHistoryWindow : Window
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (HistoryList is null)
+        {
+            return;
+        }
+
+        RefreshHistory();
+        UpdateActionState();
+    }
+
+    private void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (HistoryList is null)
         {

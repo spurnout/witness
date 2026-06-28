@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 using GoatShot.App.Windows;
@@ -19,6 +20,8 @@ public partial class MainWindow : Window
     private List<CaptureItem> _allCaptures = new();
     private bool _allowClose;
     private bool _recordingControlsReady;
+    private bool _settingsPrewarmQueued;
+    private SettingsWindow? _prewarmedSettingsWindow;
     private CancellationTokenSource? _webcamPreviewCts;
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
@@ -36,7 +39,7 @@ public partial class MainWindow : Window
     }
 
     public async void CaptureRegionCommand(string? hotkeyProfile = null) => await CaptureRegionAsync(hotkeyProfile);
-    public async void CaptureWindowCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureActiveWindowAsync(), hotkeyProfile);
+    public async void CaptureWindowCommand(string? hotkeyProfile = null) => await CaptureActiveWindowAsync(hotkeyProfile);
     public async void CaptureScrollingWindowCommand() => await CaptureScrollingWindowAsync();
     public async void CaptureHorizontalScrollingWindowCommand() => await CaptureScrollingWindowAsync(ScrollingCaptureAxis.Horizontal);
     public async void CaptureFullscreenCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureFullScreenAsync(), hotkeyProfile);
@@ -55,7 +58,24 @@ public partial class MainWindow : Window
 
     public async void ToggleRecordingCommand(string? hotkeyProfile = null)
     {
-        var result = await _services.Recording.ToggleGifRecordingAsync();
+        await ToggleRecordingAsync(RecordingCaptureTarget.ActiveMonitor(), hotkeyProfile);
+    }
+
+    private async Task ToggleRecordingAsync(
+        RecordingCaptureTarget target,
+        string? hotkeyProfile = null)
+    {
+        var recordingSettings = ReadRecordingSettingsFromControls();
+        _services.SaveSettings();
+        var result = await _services.Recording.ToggleGifRecordingAsync(
+            target,
+            recordingSettings,
+            new AnimationExportOptions
+            {
+                FrameRate = recordingSettings.FramesPerSecond,
+                GifTimingMode = "Smooth",
+                Quality = "High"
+            });
         if (result.Item is not null)
         {
             if (!string.IsNullOrWhiteSpace(hotkeyProfile))
@@ -125,6 +145,7 @@ public partial class MainWindow : Window
         _services.StepRecorder.StepCaptured += StepRecorder_StepCaptured;
 
         _services.AttachTray(this);
+        QueueSettingsPrewarm();
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -245,6 +266,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task<CaptureItem?> CaptureActiveWindowAsync(string? hotkeyProfile = null)
+    {
+        var wasVisible = IsVisible;
+        if (wasVisible)
+        {
+            SetStatus("Hiding GoatShot before active-window capture...");
+            Hide();
+            await Task.Delay(220);
+        }
+
+        try
+        {
+            return await CaptureAndStoreAsync(
+                async () => await _services.Screenshots.CaptureActiveWindowAsync(),
+                hotkeyProfile);
+        }
+        finally
+        {
+            if (wasVisible)
+            {
+                ShowWorkspaceCommand();
+            }
+        }
+    }
+
     private async Task<CaptureItem?> CaptureAndStoreAsync(
         Func<Task<CapturedBitmap?>> capture,
         string? hotkeyProfile = null)
@@ -283,6 +329,7 @@ public partial class MainWindow : Window
     }
 
     private void CaptureRegion_Click(object sender, RoutedEventArgs e) => CaptureRegionCommand();
+    private void ScreenAction_Click(object sender, RoutedEventArgs e) => RunSelectedScreenCapture();
     private void CaptureWindow_Click(object sender, RoutedEventArgs e) => CaptureWindowCommand();
     private async void CaptureScrollingWindow_Click(object sender, RoutedEventArgs e) => await CaptureScrollingWindowAsync();
     private async void CaptureHorizontalScrollingWindow_Click(object sender, RoutedEventArgs e) => await CaptureScrollingWindowAsync(ScrollingCaptureAxis.Horizontal);
@@ -329,11 +376,117 @@ public partial class MainWindow : Window
 
     private void Recording_Click(object sender, RoutedEventArgs e) => ToggleRecordingCommand();
 
+    private async void VideoAction_Click(object sender, RoutedEventArgs e) => await RunSelectedVideoCaptureAsync();
+
     private void PauseRecording_Click(object sender, RoutedEventArgs e) => ToggleRecordingPauseCommand();
 
     private async void RecordMp4_Click(object sender, RoutedEventArgs e) => await RecordShortMp4Async(RecordingCaptureTarget.ActiveMonitor());
 
     private async void RecordAllMonitorsMp4_Click(object sender, RoutedEventArgs e) => await RecordShortMp4Async(RecordingCaptureTarget.AllMonitors());
+
+    private void RunSelectedScreenCapture()
+    {
+        switch (SelectedComboTag(ScreenCaptureTypeBox, "Region"))
+        {
+            case "ActiveWindow":
+                CaptureWindowCommand();
+                break;
+            case "ScrollingWindow":
+                _ = CaptureScrollingWindowAsync();
+                break;
+            case "HorizontalScrolling":
+                _ = CaptureScrollingWindowAsync(ScrollingCaptureAxis.Horizontal);
+                break;
+            case "Fullscreen":
+                CaptureFullscreenCommand();
+                break;
+            case "AllMonitors":
+                CaptureAllMonitorsCommand();
+                break;
+            case "ActiveMonitor":
+                CaptureMonitorCommand();
+                break;
+            case "LastRegion":
+                CaptureLastRegionCommand();
+                break;
+            case "DelayedRegion":
+                CaptureDelayed_Click(this, new RoutedEventArgs());
+                break;
+            case "Preset1280":
+                CaptureFixedRegionCommand(1280, 720);
+                break;
+            case "Preset1920":
+                CaptureFixedRegionCommand(1920, 1080);
+                break;
+            default:
+                CaptureRegionCommand();
+                break;
+        }
+    }
+
+    private async Task RunSelectedVideoCaptureAsync()
+    {
+        if (_services.Recording.IsRecording)
+        {
+            await ToggleRecordingAsync(RecordingCaptureTarget.ActiveMonitor());
+            return;
+        }
+
+        var mode = SelectedComboTag(VideoCaptureTypeBox, "GifMonitor");
+        var target = await ResolveVideoTargetAsync(mode);
+        if (target is null)
+        {
+            SetStatus("Video target selection canceled.");
+            return;
+        }
+
+        if (mode.StartsWith("Mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            await RecordShortMp4Async(target);
+            return;
+        }
+
+        await ToggleRecordingAsync(target);
+    }
+
+    private async Task<RecordingCaptureTarget?> ResolveVideoTargetAsync(string mode)
+    {
+        return mode switch
+        {
+            "GifRegion" or "Mp4Region" => await SelectRecordingRegionTargetAsync(),
+            "GifWindow" or "Mp4Window" => RecordingCaptureTarget.ActiveWindow(),
+            "GifAllMonitors" or "Mp4AllMonitors" => RecordingCaptureTarget.AllMonitors(),
+            _ => RecordingCaptureTarget.ActiveMonitor()
+        };
+    }
+
+    private async Task<RecordingCaptureTarget?> SelectRecordingRegionTargetAsync()
+    {
+        var wasVisible = IsVisible;
+        if (wasVisible)
+        {
+            Hide();
+            await Task.Delay(120);
+        }
+
+        try
+        {
+            var bounds = await _services.Screenshots.SelectRegionBoundsAsync(this);
+            return bounds is null ? null : RecordingCaptureTarget.Region(bounds);
+        }
+        finally
+        {
+            if (wasVisible)
+            {
+                ShowWorkspaceCommand();
+            }
+        }
+    }
+
+    private static string SelectedComboTag(System.Windows.Controls.ComboBox comboBox, string fallback)
+    {
+        return (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? fallback;
+    }
 
     private void ApplyRecordingProfile_Click(object sender, RoutedEventArgs e)
     {
@@ -1298,10 +1451,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        SetStatus("Converting selected video to GIF...");
+        SetStatus("Converting selected video to smooth 60 fps GIF...");
         var result = await _services.VideoTools.ConvertAsync(
             item,
             "gif",
+            animationOptions: new AnimationExportOptions
+            {
+                FrameRate = 60,
+                GifTimingMode = "Smooth",
+                Quality = "High"
+            },
             addToWorkspace: true);
 
         HandleVideoToolResult(result);
@@ -1963,16 +2122,67 @@ public partial class MainWindow : Window
 
     private void OpenSettings(string? sectionKey = null)
     {
-        var settings = new SettingsWindow(_services)
-        {
-            Owner = this
-        };
+        SetStatus("Opening settings...");
+        var settings = TakeSettingsWindow();
+        settings.Owner = this;
         settings.SelectSection(sectionKey);
-        settings.ShowDialog();
-        _services.WatchFolders.Restart();
-        _services.UploadQueueWorker.Restart();
-        RefreshDiagnostics();
-        SetStatus("Settings updated.");
+        try
+        {
+            settings.ShowDialog();
+        }
+        finally
+        {
+            _services.WatchFolders.Restart();
+            _services.UploadQueueWorker.Restart();
+            RefreshDiagnostics();
+            QueueSettingsPrewarm();
+            SetStatus("Settings updated.");
+        }
+    }
+
+    private SettingsWindow TakeSettingsWindow()
+    {
+        if (_prewarmedSettingsWindow is { } settings)
+        {
+            _prewarmedSettingsWindow = null;
+            return settings;
+        }
+
+        return new SettingsWindow(_services);
+    }
+
+    private void QueueSettingsPrewarm()
+    {
+        if (_auditMode || _settingsPrewarmQueued || _prewarmedSettingsWindow is not null)
+        {
+            return;
+        }
+
+        _settingsPrewarmQueued = true;
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            _settingsPrewarmQueued = false;
+            if (_prewarmedSettingsWindow is not null)
+            {
+                return;
+            }
+
+            try
+            {
+                _prewarmedSettingsWindow = new SettingsWindow(_services)
+                {
+                    Owner = this
+                };
+                _prewarmedSettingsWindow.Closed += (_, _) =>
+                {
+                    _prewarmedSettingsWindow = null;
+                };
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Settings prewarm failed: {ex.Message}");
+            }
+        }, DispatcherPriority.ApplicationIdle);
     }
 
     private void RefreshDiagnostics()

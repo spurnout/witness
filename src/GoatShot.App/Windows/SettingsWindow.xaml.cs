@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 using MediaBrush = System.Windows.Media.Brush;
@@ -16,6 +17,7 @@ public partial class SettingsWindow : Window
     private readonly List<AutomationRule> _automationRuleDrafts = new();
     private bool _settingsSectionNavigationReady;
     private bool _automationRuleSelectionUpdating;
+    private bool _deferredStartupStarted;
     private string? _selectedAutomationRuleId;
     private string _lastPluginUpdateCliCommand = "goatshot plugins updates --registry \"<registry.json-or-url>\" --json";
 
@@ -23,15 +25,32 @@ public partial class SettingsWindow : Window
     {
         _services = services;
         InitializeComponent();
-        WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
+        EscapeKeyCloseBehavior.Attach(this);
         InitializeSettingsSectionNavigation();
         LoadSettings();
         _settingsSectionNavigationReady = true;
-        Loaded += async (_, _) =>
+        RecordingDeviceStatusText.Text = "Settings loaded. Recording devices refresh after the window opens.";
+        ContentRendered += SettingsWindow_ContentRendered;
+    }
+
+    private void SettingsWindow_ContentRendered(object? sender, EventArgs e)
+    {
+        if (_deferredStartupStarted)
         {
-            await RefreshRecordingDevicesAsync();
-            await RefreshPluginUpdatesForDefaultRegistryAsync();
-        };
+            return;
+        }
+
+        _deferredStartupStarted = true;
+        _ = Dispatcher.BeginInvoke(
+            async () => await RunDeferredStartupAsync(),
+            DispatcherPriority.ContextIdle);
+    }
+
+    private async Task RunDeferredStartupAsync()
+    {
+        WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
+        await RefreshRecordingDevicesAsync();
+        await RefreshPluginUpdatesForDefaultRegistryAsync();
     }
 
     public void SelectSection(string? key, bool alignSectionToTop = false)
@@ -1244,6 +1263,66 @@ public partial class SettingsWindow : Window
         SaveAutomationRules(settings);
     }
 
+    private void ApplyRecordingPreset_Click(object sender, RoutedEventArgs e)
+    {
+        var preset = (sender as FrameworkElement)?.Tag as string ?? string.Empty;
+        switch (preset)
+        {
+            case "QuickMp4":
+                ApplyRecordingPresetValues("Balanced", 30, "1280x720", includeMic: false, includeSystemAudio: false, includeWebcam: false, showTimer: false, showKeys: false);
+                RecordingDeviceStatusText.Text = "Quick MP4 preset applied: balanced 30 fps source recording.";
+                break;
+            case "SmoothGif60":
+                ApplyRecordingPresetValues("High quality", 60, "1280xauto", includeMic: false, includeSystemAudio: false, includeWebcam: false, showTimer: true, showKeys: false);
+                RecordingDeviceStatusText.Text = "Smooth GIF 60 preset applied: GIF export uses an approximate 10/20 ms delay pattern.";
+                break;
+            case "UltraSmooth120":
+                ApplyRecordingPresetValues("Archive", 120, "1280xauto", includeMic: false, includeSystemAudio: false, includeWebcam: false, showTimer: true, showKeys: false);
+                RecordingDeviceStatusText.Text = "Ultra Smooth 120 preset applied: use MP4/WebM companion output for true 120 fps playback; GIF output is capped by 10 ms timing.";
+                break;
+            case "TutorialMic":
+                ApplyRecordingPresetValues("High quality", 60, "1280x720", includeMic: true, includeSystemAudio: false, includeWebcam: false, showTimer: true, showKeys: true);
+                RecordingCountdownBox.IsChecked = true;
+                RecordingDeviceStatusText.Text = "Tutorial with mic preset applied: microphone, countdown, timer, and keystroke overlay enabled.";
+                break;
+            case "WebcamWalkthrough":
+                ApplyRecordingPresetValues("High quality", 60, "1280x720", includeMic: true, includeSystemAudio: false, includeWebcam: true, showTimer: true, showKeys: false);
+                RecordingCountdownBox.IsChecked = true;
+                RecordingDeviceStatusText.Text = "Webcam walkthrough preset applied: webcam overlay and microphone enabled.";
+                break;
+            default:
+                RecordingDeviceStatusText.Text = "Advanced custom selected. Tune the controls below, then save settings.";
+                RecordingQualityBox.BringIntoView();
+                break;
+        }
+    }
+
+    private void ApplyRecordingPresetValues(
+        string quality,
+        int fps,
+        string targetSize,
+        bool includeMic,
+        bool includeSystemAudio,
+        bool includeWebcam,
+        bool showTimer,
+        bool showKeys)
+    {
+        SelectComboBoxItem(RecordingQualityBox, quality);
+        RecordingFpsBox.Text = Math.Clamp(fps, RecordingSettingsNormalizer.MinFallbackFps, RecordingSettingsNormalizer.MaxFallbackFps)
+            .ToString(CultureInfo.InvariantCulture);
+        RecordingSizeBox.Text = targetSize;
+        RecordingBitrateBox.Text = string.Empty;
+        RecordingMicBox.IsChecked = includeMic;
+        RecordingMicMutedBox.IsChecked = false;
+        RecordingSystemAudioBox.IsChecked = includeSystemAudio;
+        RecordingSystemAudioMutedBox.IsChecked = false;
+        RecordingWebcamBox.IsChecked = includeWebcam;
+        RecordingCountdownBox.IsChecked = false;
+        RecordingBorderBox.IsChecked = true;
+        RecordingTimerBox.IsChecked = showTimer;
+        RecordingKeystrokeBox.IsChecked = showKeys;
+    }
+
     private void LoadRecordingSettings(RecordingSettings settings)
     {
         PreferProductionRecorderBox.IsChecked = settings.PreferProductionCaptureEngine;
@@ -1347,40 +1426,45 @@ public partial class SettingsWindow : Window
         try
         {
             var settings = _services.Settings.Recording ??= new RecordingSettings();
-            var microphones = await _services.AudioCapture.ListInputDevicesAsync(CancellationToken.None);
-            var systemAudio = await _services.AudioCapture.ListLoopbackDevicesAsync(CancellationToken.None);
-            var cameras = await _services.CameraOverlay.ListDevicesAsync(CancellationToken.None);
+            var result = await Task.Run(async () =>
+            {
+                var microphones = await _services.AudioCapture.ListInputDevicesAsync(CancellationToken.None);
+                var systemAudio = await _services.AudioCapture.ListLoopbackDevicesAsync(CancellationToken.None);
+                var cameras = await _services.CameraOverlay.ListDevicesAsync(CancellationToken.None);
+                var issues = DiagnosticsService.FindSelectionIssues(settings, microphones, systemAudio, cameras);
+                var confidence = RecordingConfidenceService.BuildDeviceReport(
+                    settings,
+                    microphones,
+                    systemAudio,
+                    cameras,
+                    issues);
+
+                return new RecordingDeviceDiscoveryResult(microphones, systemAudio, cameras, confidence);
+            });
 
             FillAudioDeviceCombo(
                 RecordingMicDeviceBox,
-                microphones,
+                result.Microphones,
                 settings.MicrophoneDeviceId,
                 "System default microphone",
                 "Saved microphone");
             FillAudioDeviceCombo(
                 RecordingSystemAudioDeviceBox,
-                systemAudio,
+                result.SystemAudio,
                 settings.SystemAudioDeviceId,
                 "System default system audio",
                 "Saved system-audio device");
             FillCameraDeviceCombo(
                 RecordingWebcamDeviceBox,
-                cameras,
+                result.Cameras,
                 settings.WebcamDeviceId,
                 "System default webcam",
                 "Saved webcam");
 
-            var issues = DiagnosticsService.FindSelectionIssues(settings, microphones, systemAudio, cameras);
-            var confidence = RecordingConfidenceService.BuildDeviceReport(
-                settings,
-                microphones,
-                systemAudio,
-                cameras,
-                issues);
             RecordingDeviceStatusText.Text =
-                $"Found {microphones.Count} microphone(s), {systemAudio.Count} system-audio device(s), and {cameras.Count} webcam(s)." +
+                $"Found {result.Microphones.Count} microphone(s), {result.SystemAudio.Count} system-audio device(s), and {result.Cameras.Count} webcam(s)." +
                 Environment.NewLine +
-                confidence.ToStatusText();
+                result.Confidence.ToStatusText();
         }
         catch (Exception ex)
         {
@@ -1925,6 +2009,35 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void AddAutomationRecipe_Click(object sender, RoutedEventArgs e)
+    {
+        StoreSelectedAutomationRuleDraft();
+        var templateId = (sender as FrameworkElement)?.Tag as string;
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            RuleManagerStatusText.Text = "Select a recipe before adding.";
+            return;
+        }
+
+        try
+        {
+            var rule = WorkflowRuleTemplateCatalog.CreateRule(
+                templateId,
+                _automationRuleDrafts,
+                enabled: false);
+            _automationRuleDrafts.Add(rule);
+            SelectWorkflowTemplate(templateId);
+            RefreshAutomationRuleList(rule.Id);
+            LoadAutomationRuleEditor(rule);
+            RuleManagerStatusText.Text = $"Added disabled recipe {rule.Name}; review it before saving.";
+            RuleNameBox.Focus();
+        }
+        catch (ArgumentException ex)
+        {
+            RuleManagerStatusText.Text = ex.Message;
+        }
+    }
+
     private void DuplicateAutomationRule_Click(object sender, RoutedEventArgs e)
     {
         StoreSelectedAutomationRuleDraft();
@@ -2083,4 +2196,22 @@ public partial class SettingsWindow : Window
 
         WorkflowTemplateBox.SelectedIndex = WorkflowTemplateBox.Items.Count > 0 ? 0 : -1;
     }
+
+    private void SelectWorkflowTemplate(string templateId)
+    {
+        foreach (var item in WorkflowTemplateBox.Items.OfType<ComboBoxItem>())
+        {
+            if ((item.Tag as string)?.Equals(templateId, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                WorkflowTemplateBox.SelectedItem = item;
+                return;
+            }
+        }
+    }
+
+    private sealed record RecordingDeviceDiscoveryResult(
+        IReadOnlyList<AudioCaptureDevice> Microphones,
+        IReadOnlyList<AudioCaptureDevice> SystemAudio,
+        IReadOnlyList<CameraOverlayDevice> Cameras,
+        RecordingConfidenceReport Confidence);
 }

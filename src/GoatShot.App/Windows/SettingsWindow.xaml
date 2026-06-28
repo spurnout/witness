@@ -40,7 +40,7 @@
                                Margin="0,0,0,4" />
                     <ComboBox x:Name="SettingsSectionBox"
                               Background="#0B151C"
-                              Foreground="#F4FAFF"
+                              Foreground="#081016"
                               AutomationProperties.Name="Settings section"
                               SelectionChanged="SettingsSection_SelectionChanged" />
                 </StackPanel>
@@ -110,11 +110,78 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,4,0,10" />
+                <TextBlock Text="Recording presets"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           Margin="0,10,0,6" />
+                <UniformGrid Columns="3" Margin="0,0,0,8">
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="QuickMp4"
+                            AutomationProperties.Name="Apply Quick MP4 recording preset"
+                            ToolTip="Balanced 30 fps MP4 with local-first defaults">
+                        <StackPanel>
+                            <TextBlock Text="Quick MP4" FontWeight="SemiBold" />
+                            <TextBlock Text="30 fps, balanced" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="SmoothGif60"
+                            AutomationProperties.Name="Apply Smooth GIF 60 recording preset"
+                            ToolTip="Sets source capture to 60 fps for smoother GIF export">
+                        <StackPanel>
+                            <TextBlock Text="Smooth GIF 60" FontWeight="SemiBold" />
+                            <TextBlock Text="10/20 ms GIF timing" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="UltraSmooth120"
+                            AutomationProperties.Name="Apply Ultra Smooth 120 recording preset"
+                            ToolTip="Sets source capture to 120 fps; use MP4/WebM companion for true 120 fps playback">
+                        <StackPanel>
+                            <TextBlock Text="Ultra Smooth 120" FontWeight="SemiBold" />
+                            <TextBlock Text="source + companion" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="TutorialMic"
+                            Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.Name="Apply tutorial with mic recording preset"
+                            ToolTip="Turns on mic, countdown, timer, and keystroke overlay">
+                        <StackPanel>
+                            <TextBlock Text="Tutorial with mic" FontWeight="SemiBold" />
+                            <TextBlock Text="voice + overlays" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="WebcamWalkthrough"
+                            Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.Name="Apply webcam walkthrough recording preset"
+                            ToolTip="Turns on webcam overlay and microphone">
+                        <StackPanel>
+                            <TextBlock Text="Webcam walkthrough" FontWeight="SemiBold" />
+                            <TextBlock Text="camera + voice" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ApplyRecordingPreset_Click"
+                            Tag="AdvancedCustom"
+                            Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.Name="Use advanced custom recording settings"
+                            ToolTip="Keep current values and tune the advanced controls below">
+                        <StackPanel>
+                            <TextBlock Text="Advanced custom" FontWeight="SemiBold" />
+                            <TextBlock Text="manual controls" FontSize="12" Foreground="{StaticResource MutedInkBrush}" />
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
+                <TextBlock Text="GIF playback is timing-step limited. 60 fps GIF uses an approximate 10/20 ms delay pattern; true 120 fps should be delivered as MP4/WebM companion output."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12" />
                 <TextBlock Text="MP4 quality profile" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
                 <ComboBox x:Name="RecordingQualityBox"
                           Margin="0,6,0,10"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="Small" />
                     <ComboBoxItem Content="Balanced" />
                     <ComboBoxItem Content="High quality" />
@@ -141,7 +208,7 @@
                 <ComboBox x:Name="RecordingMicDeviceBox"
                           Margin="0,6,0,10"
                           Background="#0B151C"
-                          Foreground="#F4FAFF" />
+                          Foreground="#081016" />
                 <TextBlock Text="Microphone gain" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="RecordingMicGainBox" Margin="0,6,0,6" />
                 <CheckBox x:Name="RecordingMicMutedBox"
@@ -152,7 +219,7 @@
                 <ComboBox x:Name="RecordingSystemAudioDeviceBox"
                           Margin="0,6,0,10"
                           Background="#0B151C"
-                          Foreground="#F4FAFF" />
+                          Foreground="#081016" />
                 <TextBlock Text="System audio gain" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="RecordingSystemAudioGainBox" Margin="0,6,0,6" />
                 <CheckBox x:Name="RecordingSystemAudioMutedBox"
@@ -170,7 +237,7 @@
                 <ComboBox x:Name="RecordingWebcamDeviceBox"
                           Margin="0,6,0,10"
                           Background="#0B151C"
-                          Foreground="#F4FAFF" />
+                          Foreground="#081016" />
                 <Button Content="Refresh recording devices"
                         Click="RefreshRecordingDevices_Click"
                         Style="{StaticResource SecondaryButton}"
@@ -189,7 +256,7 @@
                 <ComboBox x:Name="RecordingTimerPositionBox"
                           Margin="0,6,0,8"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -201,7 +268,7 @@
                 <ComboBox x:Name="RecordingKeystrokePositionBox"
                           Margin="0,6,0,8"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -215,7 +282,7 @@
                 <ComboBox x:Name="RecordingOverlayStyleBox"
                           Margin="0,6,0,8"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="Neon" />
                     <ComboBoxItem Content="HighContrast" />
                     <ComboBoxItem Content="Subtle" />
@@ -259,7 +326,7 @@
                 <ComboBox x:Name="DefaultShareBox"
                           Margin="0,6,0,14"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="Clipboard image" />
                     <ComboBoxItem Content="Clipboard file" />
                     <ComboBoxItem Content="Clipboard path" />
@@ -297,6 +364,8 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14" />
+                <Expander Header="Advanced provider configuration" IsExpanded="False" Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
                 <TextBlock Text="Local export folder" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="LocalExportFolderBox" Margin="0,6,0,14" />
                 <TextBlock Text="Custom script command" Foreground="{StaticResource MutedInkBrush}" />
@@ -732,7 +801,7 @@
                 <ComboBox x:Name="YouTubePrivacyStatusBox"
                           Margin="0,6,0,10"
                           Background="#0B151C"
-                          Foreground="#F4FAFF">
+                          Foreground="#081016">
                     <ComboBoxItem Content="unlisted" />
                     <ComboBoxItem Content="private" />
                     <ComboBoxItem Content="public" />
@@ -968,6 +1037,8 @@
                          AcceptsReturn="True"
                          Height="70"
                          Margin="0,6,0,14" />
+                    </StackPanel>
+                </Expander>
 
                 <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
 
@@ -998,6 +1069,40 @@
                         <TextBlock Text="Workflow rules"
                                    FontWeight="Bold"
                                    Margin="0,0,0,8" />
+                        <TextBlock Text="Recipe cards"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   Margin="0,0,0,6" />
+                        <UniformGrid Columns="3" Margin="0,0,0,10">
+                            <Button Content="Capture to document"
+                                    Tag="capture-doc"
+                                    Click="AddAutomationRecipe_Click"
+                                    ToolTip="Create a disabled OCR and documentation rule for new captures" />
+                            <Button Content="Privacy redaction"
+                                    Tag="ocr-redact"
+                                    Click="AddAutomationRecipe_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTip="Create a disabled OCR-sensitive-data redaction rule" />
+                            <Button Content="Upload notify"
+                                    Tag="upload-notify"
+                                    Click="AddAutomationRecipe_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTip="Create a disabled upload-complete notification rule" />
+                            <Button Content="Recording report"
+                                    Tag="recording-bug-report"
+                                    Click="AddAutomationRecipe_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTip="Create a disabled MP4 recording documentation rule" />
+                            <Button Content="AI follow-up"
+                                    Tag="ai-summary-followup"
+                                    Click="AddAutomationRecipe_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTip="Create a disabled AI-action report rule" />
+                            <Button Content="Blank rule"
+                                    Click="NewAutomationRule_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTip="Start from an empty workflow rule" />
+                        </UniformGrid>
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -1005,7 +1110,7 @@
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="WorkflowTemplateBox"
                                       Background="#0B151C"
-                                      Foreground="#F4FAFF"
+                                      Foreground="#081016"
                                       AutomationProperties.Name="Starter workflow template" />
                             <Button Grid.Column="1"
                                     Content="Add template"
@@ -1064,7 +1169,7 @@
                                   Margin="0,6,0,8"
                                   Background="#0B151C"
                                   AutomationProperties.Name="Rule trigger"
-                                  Foreground="#F4FAFF">
+                                  Foreground="#081016">
                             <ComboBoxItem Content="CaptureCreated" />
                             <ComboBoxItem Content="CaptureEdited" />
                             <ComboBoxItem Content="FileAddedToWatchFolder" />
@@ -1093,7 +1198,7 @@
                                           Margin="0,4,0,0"
                                           Background="#0B151C"
                                           AutomationProperties.Name="Capture kind condition"
-                                          Foreground="#F4FAFF">
+                                          Foreground="#081016">
                                     <ComboBoxItem Content="Any" />
                                     <ComboBoxItem Content="Region" />
                                     <ComboBoxItem Content="Fullscreen" />
@@ -1147,7 +1252,7 @@
                                   Margin="0,6,0,10"
                                   Background="#0B151C"
                                   AutomationProperties.Name="Sensitive-data condition"
-                                  Foreground="#F4FAFF">
+                                  Foreground="#081016">
                             <ComboBoxItem Content="Any" />
                             <ComboBoxItem Content="Requires sensitive data" />
                             <ComboBoxItem Content="Excludes sensitive data" />
@@ -1175,7 +1280,7 @@
                                           Margin="0,4,0,0"
                                           Background="#0B151C"
                                           AutomationProperties.Name="Image effect mode"
-                                          Foreground="#F4FAFF">
+                                          Foreground="#081016">
                                     <ComboBoxItem Content="Solid" />
                                     <ComboBoxItem Content="Blur" />
                                     <ComboBoxItem Content="Pixelate" />

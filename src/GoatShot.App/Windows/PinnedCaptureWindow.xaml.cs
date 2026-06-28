@@ -10,6 +10,7 @@ public partial class PinnedCaptureWindow : Window
     public PinnedCaptureWindow(CaptureItem item)
     {
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this);
         Title = $"Pinned - {item.FileName}";
         PinnedTitle.Text = item.FileName;
         PinnedImage.Source = ImageInterop.LoadBitmapImage(item.FilePath);

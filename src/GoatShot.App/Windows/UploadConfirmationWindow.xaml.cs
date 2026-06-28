@@ -8,6 +8,7 @@ public partial class UploadConfirmationWindow : Window
     public UploadConfirmationWindow(UploadConfirmationViewModel model)
     {
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this, cancelDialog: true);
         Title = model.Title;
         DestinationText.Text = model.Destination;
         FileNameText.Text = model.FileName;

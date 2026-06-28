@@ -90,7 +90,7 @@
                        FontSize="13"
                        MaxWidth="560"
                        TextWrapping="Wrap"
-                       Text="Drag to capture a region. Use Shift to ignore snapping. Press Esc to cancel." />
+                       Text="Drag a region. Shift disables snap. Esc cancels." />
         </Border>
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"
@@ -105,12 +105,12 @@
                           Width="290"
                           MinHeight="30"
                           Background="#0B151C"
-                          Foreground="#081016"
+                          Foreground="#F4FAFF"
                           IsEditable="True"
                           IsReadOnly="True"
                           AutomationProperties.Name="Window or monitor chooser"
                           SelectionChanged="TargetChooser_SelectionChanged" />
-                <Button Content="Capture target"
+                <Button Content="Capture"
                         Margin="8,0,0,0"
                         Padding="10,5"
                         MinHeight="30"

@@ -14,12 +14,13 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Share history"
@@ -29,18 +30,50 @@
                            Foreground="{StaticResource MutedInkBrush}"
                            Margin="0,4,0,0" />
             </StackPanel>
-            <TextBox x:Name="SearchBox"
-                     Grid.Column="1"
-                     VerticalAlignment="Bottom"
-                     MinHeight="36"
-                     TextChanged="SearchBox_TextChanged"
-                     AutomationProperties.Name="Search share history" />
+            <StackPanel Grid.Column="1">
+                <TextBox x:Name="SearchBox"
+                         MinHeight="36"
+                         Margin="0,0,0,6"
+                         TextChanged="SearchBox_TextChanged"
+                         AutomationProperties.Name="Search share history" />
+                <UniformGrid Columns="2">
+                    <ComboBox x:Name="StatusFilterBox"
+                              SelectedIndex="0"
+                              SelectionChanged="Filter_SelectionChanged"
+                              Background="#0B151C"
+                              Foreground="#081016"
+                              AutomationProperties.Name="Share status filter"
+                              Margin="0,0,8,0">
+                        <ComboBoxItem Content="All statuses" />
+                        <ComboBoxItem Content="Succeeded" />
+                        <ComboBoxItem Content="Failed" />
+                    </ComboBox>
+                    <ComboBox x:Name="DestinationFilterBox"
+                              SelectedIndex="0"
+                              SelectionChanged="Filter_SelectionChanged"
+                              Background="#0B151C"
+                              Foreground="#081016"
+                              AutomationProperties.Name="Share destination filter">
+                        <ComboBoxItem Content="All destinations" />
+                        <ComboBoxItem Content="External only" />
+                        <ComboBoxItem Content="Local only" />
+                        <ComboBoxItem Content="ClipboardImage" />
+                        <ComboBoxItem Content="MarkdownImageLink" />
+                        <ComboBoxItem Content="LocalFolder" />
+                        <ComboBoxItem Content="S3Compatible" />
+                        <ComboBoxItem Content="Imgur" />
+                        <ComboBoxItem Content="Cloudinary" />
+                        <ComboBoxItem Content="Dropbox" />
+                        <ComboBoxItem Content="GoogleDrive" />
+                        <ComboBoxItem Content="OneDrive" />
+                        <ComboBoxItem Content="Linear" />
+                    </ComboBox>
+                </UniformGrid>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -129,10 +162,16 @@
                 </WrapPanel>
             </Grid>
 
-            <Grid Grid.Column="2">
+        </Grid>
+
+        <Expander Grid.Row="2"
+                  Header="Upload Queue"
+                  IsExpanded="False"
+                  Margin="0,14,0,0">
+            <Grid Margin="0,10,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="180" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock x:Name="QueueSummaryText"
@@ -194,9 +233,9 @@
                             AutomationProperties.Name="Retry selected queued upload" />
                 </WrapPanel>
             </Grid>
-        </Grid>
+        </Expander>
 
-        <DockPanel Grid.Row="2"
+        <DockPanel Grid.Row="3"
                    Margin="0,14,0,0">
             <TextBlock x:Name="StatusText"
                        DockPanel.Dock="Left"

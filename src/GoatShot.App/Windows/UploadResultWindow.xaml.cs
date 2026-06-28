@@ -12,6 +12,7 @@ public partial class UploadResultWindow : Window
     {
         _model = model;
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this, cancelDialog: true);
         Title = model.Title;
         TitleText.Text = model.Title;
         DestinationText.Text = model.Destination;

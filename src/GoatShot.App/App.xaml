@@ -58,6 +58,12 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#101922" />
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="#385063" />
+                                <Setter Property="Foreground" Value="#7890A1" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -67,6 +73,27 @@
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="#101B23" />
             <Setter Property="Foreground" Value="{StaticResource MutedInkBrush}" />
+        </Style>
+
+        <Style x:Key="IconActionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth" Value="66" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Background" Value="#12242D" />
+        </Style>
+
+        <Style x:Key="QuietCardBorder" TargetType="Border">
+            <Setter Property="Background" Value="#0B151C" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+
+        <Style TargetType="Expander">
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Background" Value="#0B151C" />
         </Style>
 
         <Style TargetType="TextBox">

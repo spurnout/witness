@@ -92,6 +92,18 @@ public sealed class RecordingSettingsNormalizerTests
     }
 
     [TestMethod]
+    public void Normalize_AllowsUltraSmoothSourceFps()
+    {
+        var normalized = RecordingSettingsNormalizer.Normalize(new RecordingSettings
+        {
+            QualityProfile = "Archive",
+            FramesPerSecond = 120
+        });
+
+        Assert.AreEqual(120, normalized.FramesPerSecond);
+    }
+
+    [TestMethod]
     public void Normalize_PreservesHevcPreferenceInSummary()
     {
         var normalized = RecordingSettingsNormalizer.Normalize(new RecordingSettings

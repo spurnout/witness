@@ -460,6 +460,7 @@ public sealed class VideoToolService
         CaptureItem item,
         string? format,
         string? outputPath = null,
+        AnimationExportOptions? animationOptions = null,
         bool addToWorkspace = false,
         CancellationToken cancellationToken = default)
     {
@@ -486,9 +487,10 @@ public sealed class VideoToolService
             $"converted-{Path.GetFileNameWithoutExtension(item.FileName)}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.{normalizedFormat}");
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
+        animationOptions ??= new AnimationExportOptions();
         var result = await RunFfmpegAsync(
             ffmpeg,
-            ConvertArguments(item.FilePath, normalizedFormat, outputPath),
+            ConvertArguments(item.FilePath, normalizedFormat, outputPath, animationOptions),
             cancellationToken);
 
         if (!result.Succeeded || !File.Exists(outputPath))
@@ -498,13 +500,26 @@ public sealed class VideoToolService
                 : result;
         }
 
+        var companionMessage = string.Empty;
+        if (normalizedFormat.Equals("gif", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(GifTimingPlanner.NormalizeCompanionFormat(animationOptions.CompanionFormat)))
+        {
+            companionMessage = await TryConvertAnimationCompanionAsync(
+                ffmpeg,
+                item.FilePath,
+                outputPath,
+                animationOptions,
+                addToWorkspace,
+                cancellationToken);
+        }
+
         CaptureItem? saved = null;
         if (addToWorkspace)
         {
             saved = await _workspaceStore.AddImageFileAsync(
                 outputPath,
                 CaptureKind.ConvertedVideo,
-                $"Converted copy exported from {item.FileName}; format {normalizedFormat}.");
+                $"Converted copy exported from {item.FileName}; format {normalizedFormat}. {GifTimingPlanner.Plan(null, animationOptions).Message}");
         }
 
         return new VideoToolResult
@@ -513,8 +528,8 @@ public sealed class VideoToolService
             OutputPath = outputPath,
             Item = saved,
             Message = saved is null
-                ? $"Converted video exported: {outputPath}"
-                : $"Converted video exported and indexed: {saved.FileName}"
+                ? $"Converted video exported: {outputPath}{FormatCompanionMessage(companionMessage)}"
+                : $"Converted video exported and indexed: {saved.FileName}{FormatCompanionMessage(companionMessage)}"
         };
     }
 
@@ -2819,8 +2834,57 @@ public sealed class VideoToolService
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(path));
     }
 
-    private static IReadOnlyList<string> ConvertArguments(string inputPath, string format, string outputPath)
+    private async Task<string> TryConvertAnimationCompanionAsync(
+        string ffmpeg,
+        string inputPath,
+        string gifOutputPath,
+        AnimationExportOptions animationOptions,
+        bool addToWorkspace,
+        CancellationToken cancellationToken)
     {
+        var companionFormat = GifTimingPlanner.NormalizeCompanionFormat(animationOptions.CompanionFormat);
+        if (string.IsNullOrWhiteSpace(companionFormat))
+        {
+            return string.Empty;
+        }
+
+        var plan = GifTimingPlanner.Plan(null, animationOptions);
+        var companionPath = Path.ChangeExtension(gifOutputPath, companionFormat);
+        var result = await RunFfmpegAsync(
+            ffmpeg,
+            BuildConvertCompanionArguments(inputPath, companionFormat, companionPath, plan.CaptureFrameRate),
+            cancellationToken);
+        if (!result.Succeeded || !File.Exists(companionPath))
+        {
+            return result.Succeeded
+                ? $"Companion {companionFormat.ToUpperInvariant()} was requested, but FFmpeg did not create an output."
+                : $"Companion {companionFormat.ToUpperInvariant()} export failed: {result.Message}";
+        }
+
+        if (addToWorkspace)
+        {
+            await _workspaceStore.AddImageFileAsync(
+                companionPath,
+                CaptureKind.ConvertedVideo,
+                $"High-frame-rate {companionFormat.ToUpperInvariant()} companion exported from GIF conversion at {plan.CaptureFrameRate} fps.");
+        }
+
+        return $"Companion {companionFormat.ToUpperInvariant()} saved: {companionPath}.";
+    }
+
+    private static string FormatCompanionMessage(string message)
+    {
+        return string.IsNullOrWhiteSpace(message) ? string.Empty : $" {message}";
+    }
+
+    internal static IReadOnlyList<string> ConvertArguments(
+        string inputPath,
+        string format,
+        string outputPath,
+        AnimationExportOptions? animationOptions = null)
+    {
+        animationOptions ??= new AnimationExportOptions();
+        var timingPlan = GifTimingPlanner.Plan(null, animationOptions);
         return format switch
         {
             "gif" =>
@@ -2828,8 +2892,8 @@ public sealed class VideoToolService
                 "-y",
                 "-i",
                 inputPath,
-                "-filter:v",
-                "fps=10",
+                "-filter_complex",
+                $"[0:v]fps={timingPlan.EffectiveGifFrameRate.ToString(CultureInfo.InvariantCulture)},split[v0][v1];[v0]palettegen=stats_mode=full[p];[v1][p]paletteuse=dither=sierra2_4a",
                 "-an",
                 outputPath
             ],
@@ -2874,6 +2938,66 @@ public sealed class VideoToolService
                 outputPath
             ]
         };
+    }
+
+    internal static IReadOnlyList<string> BuildConvertCompanionArguments(
+        string inputPath,
+        string format,
+        string outputPath,
+        int frameRate)
+    {
+        var fps = Math.Clamp(frameRate, GifTimingPlanner.MinimumFrameRate, GifTimingPlanner.MaximumSourceFrameRate)
+            .ToString(CultureInfo.InvariantCulture);
+        if (format.Equals("webm", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "-y",
+                "-i",
+                inputPath,
+                "-filter:v",
+                $"fps={fps}",
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-c:v",
+                "libvpx-vp9",
+                "-b:v",
+                "0",
+                "-crf",
+                "28",
+                "-c:a",
+                "libopus",
+                outputPath
+            ];
+        }
+
+        return
+        [
+            "-y",
+            "-i",
+            inputPath,
+            "-filter:v",
+            $"fps={fps}",
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-movflags",
+            "+faststart",
+            outputPath
+        ];
     }
 
     private static VideoToolResult Succeeded(string outputPath, CaptureItem? saved, string messagePrefix)

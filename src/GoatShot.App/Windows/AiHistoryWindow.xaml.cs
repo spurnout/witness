@@ -17,6 +17,7 @@ public partial class AiHistoryWindow : Window
     {
         _services = services;
         InitializeComponent();
+        EscapeKeyCloseBehavior.Attach(this);
         HistoryList.ItemsSource = _entries;
         PromptHistoryList.ItemsSource = _prompts;
         PromptActionFilter.Items.Add("All actions");
