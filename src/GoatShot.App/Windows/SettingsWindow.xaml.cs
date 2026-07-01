@@ -61,11 +61,12 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        foreach (var item in SettingsSectionBox.Items.OfType<ComboBoxItem>())
+        foreach (var item in SettingsSectionBox.Items.OfType<ListBoxItem>())
         {
             if ((item.Tag as string)?.Equals(section.Key, StringComparison.OrdinalIgnoreCase) == true)
             {
                 SettingsSectionBox.SelectedItem = item;
+                SettingsSectionBox.ScrollIntoView(item);
                 break;
             }
         }
@@ -120,12 +121,14 @@ public partial class SettingsWindow : Window
         SettingsSectionBox.Items.Clear();
         foreach (var section in SettingsSectionCatalog.All)
         {
-            SettingsSectionBox.Items.Add(new ComboBoxItem
+            var item = new ListBoxItem
             {
                 Content = section.Label,
                 Tag = section.Key,
                 ToolTip = section.Description
-            });
+            };
+            System.Windows.Automation.AutomationProperties.SetName(item, $"{section.Label} settings section");
+            SettingsSectionBox.Items.Add(item);
         }
 
         SettingsSectionBox.SelectedIndex = SettingsSectionBox.Items.Count > 0 ? 0 : -1;
@@ -134,7 +137,7 @@ public partial class SettingsWindow : Window
     private void SettingsSection_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_settingsSectionNavigationReady ||
-            SettingsSectionBox.SelectedItem is not ComboBoxItem item ||
+            SettingsSectionBox.SelectedItem is not ListBoxItem item ||
             item.Tag is not string key)
         {
             return;

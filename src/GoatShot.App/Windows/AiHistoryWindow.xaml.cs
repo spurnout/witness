@@ -91,6 +91,8 @@ public partial class AiHistoryWindow : Window
     {
         if (entry is null)
         {
+            EmptyDetailsPanel.Visibility = Visibility.Visible;
+            EntryDetailsPanel.Visibility = Visibility.Collapsed;
             EntryTitleText.Text = "No AI action selected";
             EntryMetaText.Text = string.Empty;
             PromptText.Text = string.Empty;
@@ -100,6 +102,8 @@ public partial class AiHistoryWindow : Window
             return;
         }
 
+        EmptyDetailsPanel.Visibility = Visibility.Collapsed;
+        EntryDetailsPanel.Visibility = Visibility.Visible;
         EntryTitleText.Text = $"{entry.Action} - {entry.FileName}";
         EntryMetaText.Text =
             $"{entry.CreatedAt.LocalDateTime:g} | {(entry.Succeeded ? "Succeeded" : "Failed")} | review={entry.ReviewStatus} | model={entry.ModelId} | id={entry.Id[..Math.Min(10, entry.Id.Length)]}";
@@ -123,6 +127,9 @@ public partial class AiHistoryWindow : Window
         OpenOutputButton.IsEnabled = entry is not null &&
             !string.IsNullOrWhiteSpace(entry.OutputPath) &&
             File.Exists(entry.OutputPath);
+        OpenOutputButton.Visibility = OpenOutputButton.IsEnabled
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void HistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -2,11 +2,46 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="GoatShot Settings"
-        Width="860"
+        Width="980"
         Height="700"
-        MinWidth="760"
+        MinWidth="860"
         MinHeight="520"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Style x:Key="SettingsRailItem" TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Foreground" Value="{StaticResource MutedInkBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border x:Name="ItemChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#101B23" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#143C3D" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid Background="#081016">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,38 +54,49 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="18,14">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="260" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="GoatShot Settings"
-                               FontSize="20"
-                               FontWeight="Bold" />
-                    <TextBlock Text="Grouped controls for capture, recording, sharing, automation, plugins, AI, and local privacy posture."
-                               Foreground="{StaticResource MutedInkBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,2,20,0" />
-                </StackPanel>
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="Jump to section"
-                               Foreground="{StaticResource MutedInkBrush}"
-                               FontSize="12"
-                               Margin="0,0,0,4" />
-                    <ComboBox x:Name="SettingsSectionBox"
-                              Background="#0B151C"
-                              Foreground="#081016"
-                              AutomationProperties.Name="Settings section"
-                              SelectionChanged="SettingsSection_SelectionChanged" />
-                </StackPanel>
-            </Grid>
+            <StackPanel>
+                <TextBlock Text="GoatShot Settings"
+                           FontSize="20"
+                           FontWeight="Bold" />
+                <TextBlock Text="Grouped controls for capture, recording, sharing, automation, plugins, AI, and local privacy posture."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,2,20,0" />
+            </StackPanel>
         </Border>
 
-        <ScrollViewer x:Name="SettingsScroll"
-                      Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      Padding="18,14,18,0">
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="#091118"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0"
+                    Padding="14">
+                <DockPanel>
+                    <TextBlock Text="Sections"
+                               DockPanel.Dock="Top"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="2,0,0,10" />
+                    <ListBox x:Name="SettingsSectionBox"
+                             AutomationProperties.Name="Settings section"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{StaticResource MutedInkBrush}"
+                             ItemContainerStyle="{StaticResource SettingsRailItem}"
+                             SelectionChanged="SettingsSection_SelectionChanged" />
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer x:Name="SettingsScroll"
+                          Grid.Column="1"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="18,14,18,0">
             <StackPanel>
                 <TextBlock x:Name="GeneralSettingsSection"
                            Text="General"
@@ -101,6 +147,35 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
+                <UniformGrid Columns="3" Margin="0,0,0,12">
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="6 presets" FontWeight="SemiBold" />
+                            <TextBlock Text="Fast MP4, GIF, tutorial, webcam, and custom profiles"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="Local devices" FontWeight="SemiBold" />
+                            <TextBlock Text="Mic, system audio, and webcam refresh after open"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="Overlays" FontWeight="SemiBold" />
+                            <TextBlock Text="Countdown, border, timer, and keystroke controls"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
                 <CheckBox x:Name="PreferProductionRecorderBox" Content="Prefer production recorder when available" />
                 <CheckBox x:Name="PreferHevcRecorderBox"
                           Content="Prefer HEVC when Media Foundation support is available"
@@ -180,8 +255,7 @@
                 <TextBlock Text="MP4 quality profile" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
                 <ComboBox x:Name="RecordingQualityBox"
                           Margin="0,6,0,10"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="Small" />
                     <ComboBoxItem Content="Balanced" />
                     <ComboBoxItem Content="High quality" />
@@ -207,8 +281,7 @@
                 <TextBlock Text="Microphone device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingMicDeviceBox"
                           Margin="0,6,0,10"
-                          Background="#0B151C"
-                          Foreground="#081016" />
+                          Style="{StaticResource GoatComboBox}" />
                 <TextBlock Text="Microphone gain" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="RecordingMicGainBox" Margin="0,6,0,6" />
                 <CheckBox x:Name="RecordingMicMutedBox"
@@ -218,8 +291,7 @@
                 <TextBlock Text="System audio device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingSystemAudioDeviceBox"
                           Margin="0,6,0,10"
-                          Background="#0B151C"
-                          Foreground="#081016" />
+                          Style="{StaticResource GoatComboBox}" />
                 <TextBlock Text="System audio gain" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="RecordingSystemAudioGainBox" Margin="0,6,0,6" />
                 <CheckBox x:Name="RecordingSystemAudioMutedBox"
@@ -236,8 +308,7 @@
                 <TextBlock Text="Webcam device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingWebcamDeviceBox"
                           Margin="0,6,0,10"
-                          Background="#0B151C"
-                          Foreground="#081016" />
+                          Style="{StaticResource GoatComboBox}" />
                 <Button Content="Refresh recording devices"
                         Click="RefreshRecordingDevices_Click"
                         Style="{StaticResource SecondaryButton}"
@@ -255,8 +326,7 @@
                 <TextBlock Text="Timer position" Foreground="{StaticResource MutedInkBrush}" Margin="0,8,0,0" />
                 <ComboBox x:Name="RecordingTimerPositionBox"
                           Margin="0,6,0,8"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -267,8 +337,7 @@
                 <TextBlock Text="Keystroke position" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="RecordingKeystrokePositionBox"
                           Margin="0,6,0,8"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -281,8 +350,7 @@
                 <TextBlock Text="Overlay badge style" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="RecordingOverlayStyleBox"
                           Margin="0,6,0,8"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="Neon" />
                     <ComboBoxItem Content="HighContrast" />
                     <ComboBoxItem Content="Subtle" />
@@ -325,8 +393,7 @@
                 <TextBlock Text="Default share destination" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="DefaultShareBox"
                           Margin="0,6,0,14"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="Clipboard image" />
                     <ComboBoxItem Content="Clipboard file" />
                     <ComboBoxItem Content="Clipboard path" />
@@ -800,8 +867,7 @@
                 <TextBlock Text="YouTube privacy status" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="YouTubePrivacyStatusBox"
                           Margin="0,6,0,10"
-                          Background="#0B151C"
-                          Foreground="#081016">
+                          Style="{StaticResource GoatComboBox}">
                     <ComboBoxItem Content="unlisted" />
                     <ComboBoxItem Content="private" />
                     <ComboBoxItem Content="public" />
@@ -1047,6 +1113,35 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
+                <UniformGrid Columns="3" Margin="0,0,0,12">
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="Watch folders" FontWeight="SemiBold" />
+                            <TextBlock Text="Import, copy, strip metadata, and quick-share options"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="Workflow recipes" FontWeight="SemiBold" />
+                            <TextBlock Text="Disabled starter rules stay reviewable before save"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
+                        <StackPanel>
+                            <TextBlock Text="Rule editor" FontWeight="SemiBold" />
+                            <TextBlock Text="Conditions, actions, image effects, scripts, and webhooks"
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
                 <CheckBox x:Name="EnableWatchFoldersBox" Content="Enable watch folders while GoatShot is running" />
                 <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
                 <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
@@ -1109,8 +1204,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="WorkflowTemplateBox"
-                                      Background="#0B151C"
-                                      Foreground="#081016"
+                                      Style="{StaticResource GoatComboBox}"
                                       AutomationProperties.Name="Starter workflow template" />
                             <Button Grid.Column="1"
                                     Content="Add template"
@@ -1121,7 +1215,7 @@
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="210" />
+                                <ColumnDefinition Width="280" />
                             </Grid.ColumnDefinitions>
                             <ListBox x:Name="AutomationRuleListBox"
                                      Height="128"
@@ -1142,7 +1236,7 @@
                                         Style="{StaticResource SecondaryButton}" />
                                 <Button Content="Delete rule"
                                         Click="DeleteAutomationRule_Click"
-                                        Style="{StaticResource SecondaryButton}" />
+                                        Style="{StaticResource DangerButton}" />
                                 <Button Content="Update rule"
                                         Click="ApplyAutomationRuleEditor_Click"
                                         Style="{StaticResource SecondaryButton}" />
@@ -1167,9 +1261,8 @@
                         <TextBlock Text="Trigger" Foreground="{StaticResource MutedInkBrush}" />
                         <ComboBox x:Name="RuleTriggerBox"
                                   Margin="0,6,0,8"
-                                  Background="#0B151C"
                                   AutomationProperties.Name="Rule trigger"
-                                  Foreground="#081016">
+                                  Style="{StaticResource GoatComboBox}">
                             <ComboBoxItem Content="CaptureCreated" />
                             <ComboBoxItem Content="CaptureEdited" />
                             <ComboBoxItem Content="FileAddedToWatchFolder" />
@@ -1196,9 +1289,8 @@
                                 <TextBlock Text="Capture kind" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
                                 <ComboBox x:Name="RuleCaptureKindBox"
                                           Margin="0,4,0,0"
-                                          Background="#0B151C"
                                           AutomationProperties.Name="Capture kind condition"
-                                          Foreground="#081016">
+                                          Style="{StaticResource GoatComboBox}">
                                     <ComboBoxItem Content="Any" />
                                     <ComboBoxItem Content="Region" />
                                     <ComboBoxItem Content="Fullscreen" />
@@ -1250,9 +1342,8 @@
                         <TextBlock Text="Sensitive-data condition" Foreground="{StaticResource MutedInkBrush}" />
                         <ComboBox x:Name="RuleSensitiveConditionBox"
                                   Margin="0,6,0,10"
-                                  Background="#0B151C"
                                   AutomationProperties.Name="Sensitive-data condition"
-                                  Foreground="#081016">
+                                  Style="{StaticResource GoatComboBox}">
                             <ComboBoxItem Content="Any" />
                             <ComboBoxItem Content="Requires sensitive data" />
                             <ComboBoxItem Content="Excludes sensitive data" />
@@ -1278,9 +1369,8 @@
                                 <TextBlock Text="Image effect mode" Foreground="{StaticResource MutedInkBrush}" FontSize="12" />
                                 <ComboBox x:Name="RuleImageEffectModeBox"
                                           Margin="0,4,0,0"
-                                          Background="#0B151C"
                                           AutomationProperties.Name="Image effect mode"
-                                          Foreground="#081016">
+                                          Style="{StaticResource GoatComboBox}">
                                     <ComboBoxItem Content="Solid" />
                                     <ComboBoxItem Content="Blur" />
                                     <ComboBoxItem Content="Pixelate" />
@@ -1429,7 +1519,8 @@
                                Text="Gemini keys are saved with Windows DPAPI for the current user and are not written to settings JSON. Screenshots leave the machine only when AI is enabled and you run an image AI action. Video-intel AI sends redacted transcript text, not the video file." />
                 </Border>
             </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+        </Grid>
 
         <StackPanel Grid.Row="2"
                     Orientation="Horizontal"

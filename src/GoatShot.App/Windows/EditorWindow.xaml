@@ -53,17 +53,17 @@
                                            FontSize="12"
                                            Margin="2,0,0,6" />
                                 <WrapPanel>
-                                    <Button x:Name="RectangleToolButton" Content="▭" ToolTip="Rectangle" Tag="Rectangle" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="EllipseToolButton" Content="○" ToolTip="Ellipse" Tag="Ellipse" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="LineToolButton" Content="/" ToolTip="Line" Tag="Line" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="ArrowToolButton" Content="→" ToolTip="Arrow" Tag="Arrow" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="FreehandToolButton" Content="✎" ToolTip="Freehand pen" Tag="Freehand" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="TextToolButton" Content="T" ToolTip="Text" Tag="Text" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="CalloutToolButton" Content="!" ToolTip="Callout note" Tag="Callout" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="StepToolButton" Content="#" ToolTip="Step marker" Tag="Step" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="HighlightToolButton" Content="H" ToolTip="Highlight" Tag="Highlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="SpotlightToolButton" Content="◉" ToolTip="Spotlight" Tag="Spotlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
-                                    <Button x:Name="CropToolButton" Content="⌗" ToolTip="Crop" Tag="Crop" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="RectangleToolButton" Content="▭" ToolTip="Rectangle" AutomationProperties.Name="Rectangle" AutomationProperties.HelpText="Rectangle annotation tool" Tag="Rectangle" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="EllipseToolButton" Content="○" ToolTip="Ellipse" AutomationProperties.Name="Ellipse" AutomationProperties.HelpText="Ellipse annotation tool" Tag="Ellipse" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="LineToolButton" Content="/" ToolTip="Line" AutomationProperties.Name="Line" AutomationProperties.HelpText="Line annotation tool" Tag="Line" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="ArrowToolButton" Content="→" ToolTip="Arrow" AutomationProperties.Name="Arrow" AutomationProperties.HelpText="Arrow annotation tool" Tag="Arrow" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="FreehandToolButton" Content="✎" ToolTip="Freehand pen" AutomationProperties.Name="Freehand pen" AutomationProperties.HelpText="Freehand pen annotation tool" Tag="Freehand" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="TextToolButton" Content="T" ToolTip="Text" AutomationProperties.Name="Text" AutomationProperties.HelpText="Text annotation tool" Tag="Text" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="CalloutToolButton" Content="!" ToolTip="Callout note" AutomationProperties.Name="Callout note" AutomationProperties.HelpText="Callout note annotation tool" Tag="Callout" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="StepToolButton" Content="#" ToolTip="Step marker" AutomationProperties.Name="Step marker" AutomationProperties.HelpText="Step marker annotation tool" Tag="Step" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="HighlightToolButton" Content="H" ToolTip="Highlight" AutomationProperties.Name="Highlight" AutomationProperties.HelpText="Highlight annotation tool" Tag="Highlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="SpotlightToolButton" Content="◉" ToolTip="Spotlight" AutomationProperties.Name="Spotlight" AutomationProperties.HelpText="Spotlight annotation tool" Tag="Spotlight" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
+                                    <Button x:Name="CropToolButton" Content="⌗" ToolTip="Crop" AutomationProperties.Name="Crop" AutomationProperties.HelpText="Crop annotation tool" Tag="Crop" Click="Tool_Click" Style="{StaticResource EditorToolButton}" />
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
@@ -82,9 +82,9 @@
                                            FontWeight="SemiBold"
                                            Margin="2,0,0,6" />
                                 <WrapPanel>
-                                    <Button x:Name="RedactToolButton" Content="█" ToolTip="Solid redaction" Tag="Redact" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="BlurToolButton" Content="~" ToolTip="Blur selected area" Tag="Blur" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
-                                    <Button x:Name="PixelateToolButton" Content="▦" ToolTip="Pixelate selected area" Tag="Pixelate" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="RedactToolButton" Content="█" ToolTip="Solid redaction" AutomationProperties.Name="Solid redaction" AutomationProperties.HelpText="Solid redaction privacy masking tool" Tag="Redact" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="BlurToolButton" Content="~" ToolTip="Blur selected area" AutomationProperties.Name="Blur selected area" AutomationProperties.HelpText="Blur selected area privacy masking tool" Tag="Blur" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
+                                    <Button x:Name="PixelateToolButton" Content="▦" ToolTip="Pixelate selected area" AutomationProperties.Name="Pixelate selected area" AutomationProperties.HelpText="Pixelate selected area privacy masking tool" Tag="Pixelate" Click="Tool_Click" Style="{StaticResource PrivacyToolButton}" />
                                     <Button x:Name="ReviewSensitiveRegionsButton" Content="OCR" ToolTip="Review OCR-sensitive regions" Click="ReviewSensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
                                     <Button x:Name="ApplySensitiveRegionsButton" Content="Apply" ToolTip="Apply OCR-sensitive redactions" Click="ApplySensitiveRegions_Click" Style="{StaticResource PrivacyToolButton}" />
                                 </WrapPanel>
