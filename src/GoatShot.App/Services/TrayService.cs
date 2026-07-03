@@ -5,6 +5,7 @@ namespace GoatShot.App.Services;
 public sealed class TrayService : IDisposable
 {
     private readonly Forms.NotifyIcon _notifyIcon;
+    private readonly System.Drawing.Icon _trayIcon;
 
     public TrayService(MainWindow window)
     {
@@ -21,15 +22,31 @@ public sealed class TrayService : IDisposable
             menu.Items.Add(definition.Label, null, (_, _) => Dispatch(window, actionKind));
         }
 
+        _trayIcon = LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
             Text = "GoatShot",
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = _trayIcon,
             Visible = true,
             ContextMenuStrip = menu
         };
 
         _notifyIcon.DoubleClick += (_, _) => window.Dispatcher.Invoke(window.ShowWorkspaceCommand);
+    }
+
+    private static System.Drawing.Icon LoadTrayIcon()
+    {
+        var processPath = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(processPath) && File.Exists(processPath))
+        {
+            var icon = System.Drawing.Icon.ExtractAssociatedIcon(processPath);
+            if (icon is not null)
+            {
+                return icon;
+            }
+        }
+
+        return (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
     }
 
     private static void Dispatch(MainWindow window, TrayMenuActionKind actionKind)
@@ -102,5 +119,6 @@ public sealed class TrayService : IDisposable
     {
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _trayIcon.Dispose();
     }
 }

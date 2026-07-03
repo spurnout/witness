@@ -186,6 +186,78 @@ public sealed class UploadQueueServiceTests
     }
 
     [TestMethod]
+    public async Task Queue_ProcessDue_ProcessesReservedUploadsConcurrently()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var provider = new BlockingShareProvider(targetStartCount: 2);
+            var settings = new AppSettings();
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(
+                paths,
+                settings,
+                new SecretStore(paths),
+                new IShareProvider[] { provider });
+
+            await queue.EnqueueAsync(CreateCaptureItem(paths, "queued-concurrent-one.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+            await queue.EnqueueAsync(CreateCaptureItem(paths, "queued-concurrent-two.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+
+            var processing = queue.ProcessDueAsync(sharing, 2, CancellationToken.None);
+
+            await WaitWithTimeoutAsync(provider.AllStarted, "both uploads to start");
+            var uploading = await queue.ListAsync(CancellationToken.None);
+
+            Assert.AreEqual(2, uploading.Count(item => item.Status.Equals("Uploading", StringComparison.OrdinalIgnoreCase)));
+
+            provider.Release();
+            var result = await processing;
+
+            Assert.AreEqual(2, result.Processed);
+            Assert.AreEqual(2, result.Succeeded);
+            Assert.AreEqual(2, provider.UploadCount);
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_ProcessDue_PreservesOperatorCancelDuringInFlightUpload()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var provider = new BlockingShareProvider();
+            var settings = new AppSettings();
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(
+                paths,
+                settings,
+                new SecretStore(paths),
+                new IShareProvider[] { provider });
+            var queued = await queue.EnqueueAsync(
+                CreateCaptureItem(paths, "queued-cancel-in-flight.png", 32),
+                ShareDestination.LocalFolder,
+                CancellationToken.None);
+
+            var processing = queue.ProcessDueAsync(sharing, 1, CancellationToken.None);
+
+            await WaitWithTimeoutAsync(provider.AllStarted, "the upload to start");
+            var canceled = await queue.CancelAsync(queued.Id, CancellationToken.None);
+
+            Assert.IsNotNull(canceled);
+            Assert.AreEqual("Canceled", canceled.Status);
+
+            provider.Release();
+            var result = await processing;
+            var loaded = await queue.ListAsync(CancellationToken.None);
+
+            Assert.AreEqual(1, result.Processed);
+            Assert.AreEqual(0, result.Succeeded);
+            Assert.AreEqual("Canceled", result.Items[0].Status);
+            Assert.AreEqual("Canceled", loaded[0].Status);
+            Assert.AreEqual("Canceled by operator.", loaded[0].LastMessage);
+            Assert.AreEqual(1, provider.UploadCount);
+        });
+    }
+
+    [TestMethod]
     public async Task Queue_ProcessDue_StoresFailureAndSchedulesRetry()
     {
         await WithTempPathsAsync(async paths =>
@@ -500,6 +572,27 @@ public sealed class UploadQueueServiceTests
         }).GetAwaiter().GetResult();
     }
 
+    [TestMethod]
+    public async Task Worker_ProcessOnceAfterDispose_ReturnsWithoutThrowing()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var settings = new AppSettings();
+            settings.UploadQueue.EnableBackgroundProcessing = true;
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var worker = new UploadQueueWorkerService(
+                settings.UploadQueue,
+                queue,
+                new ShareService(paths, settings, new SecretStore(paths)));
+
+            worker.Dispose();
+
+            var result = await worker.ProcessOnceAsync(CancellationToken.None);
+
+            Assert.AreEqual(0, result.Processed);
+        });
+    }
+
     private static CaptureItem CreateCaptureItem(AppPaths paths, string fileName, int bytes)
     {
         var filePath = Path.Combine(paths.ImagesRoot, fileName);
@@ -539,6 +632,80 @@ public sealed class UploadQueueServiceTests
             {
                 Directory.Delete(root, recursive: true);
             }
+        }
+    }
+
+    private static async Task WaitWithTimeoutAsync(Task task, string condition)
+    {
+        var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
+        if (!ReferenceEquals(completed, task))
+        {
+            Assert.Fail($"Timed out waiting for {condition}.");
+        }
+
+        await task;
+    }
+
+    private sealed class BlockingShareProvider : IShareProvider
+    {
+        private readonly TaskCompletionSource<object?> _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<object?> _allStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly List<ShareUploadRequest> _requests = new();
+        private readonly object _gate = new();
+        private readonly int _targetStartCount;
+
+        public BlockingShareProvider(int targetStartCount = 1)
+        {
+            _targetStartCount = Math.Max(1, targetStartCount);
+        }
+
+        public ShareDestination? Destination => ShareDestination.LocalFolder;
+        public string ProviderName => "Blocking local folder test adapter";
+        public string AuthType => "None";
+        public bool IsImplemented => true;
+        public bool SupportsPublicLinks => true;
+        public bool SupportsPrivateLinks => true;
+        public bool SupportsExpiration => false;
+        public bool SupportsPassword => false;
+        public Task AllStarted => _allStarted.Task;
+
+        public int UploadCount
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _requests.Count;
+                }
+            }
+        }
+
+        public void Release()
+        {
+            _release.TrySetResult(null);
+        }
+
+        public Task<ProviderHealth> ValidateCredentialsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new ProviderHealth(true, "ready"));
+        }
+
+        public async Task<ShareUploadResult> UploadAsync(ShareUploadRequest request, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                _requests.Add(request);
+                if (_requests.Count >= _targetStartCount)
+                {
+                    _allStarted.TrySetResult(null);
+                }
+            }
+
+            await _release.Task.WaitAsync(cancellationToken);
+            return new ShareUploadResult(
+                true,
+                $"https://example.test/{Path.GetFileName(request.FilePath)}",
+                "blocking adapter completed");
         }
     }
 

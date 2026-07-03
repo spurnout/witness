@@ -70,20 +70,28 @@ public sealed class UploadQueueWorkerService : IDisposable
 
     public async Task<UploadQueueProcessResult> ProcessOnceAsync(CancellationToken cancellationToken = default)
     {
+        if (_disposed)
+        {
+            return new UploadQueueProcessResult();
+        }
+
         if (!_settings.EnableQueue)
         {
             SetStatus("Upload queue is disabled.");
             return new UploadQueueProcessResult();
         }
 
-        if (!await _runGate.WaitAsync(0, cancellationToken))
-        {
-            SetStatus("Background upload queue worker skipped because a previous run is still active.");
-            return new UploadQueueProcessResult();
-        }
-
+        var entered = false;
         try
         {
+            if (!await _runGate.WaitAsync(0, cancellationToken))
+            {
+                SetStatus("Background upload queue worker skipped because a previous run is still active.");
+                return new UploadQueueProcessResult();
+            }
+
+            entered = true;
+
             var result = await _queue.ProcessDueAsync(
                 _sharing,
                 Math.Max(1, _settings.MaxConcurrentUploads),
@@ -100,6 +108,10 @@ public sealed class UploadQueueWorkerService : IDisposable
         {
             throw;
         }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            return new UploadQueueProcessResult();
+        }
         catch (Exception ex)
         {
             SetStatus($"Background upload queue worker failed: {ex.Message}");
@@ -107,7 +119,16 @@ public sealed class UploadQueueWorkerService : IDisposable
         }
         finally
         {
-            _runGate.Release();
+            if (entered)
+            {
+                try
+                {
+                    _runGate.Release();
+                }
+                catch (ObjectDisposedException) when (_disposed)
+                {
+                }
+            }
         }
     }
 
@@ -134,7 +155,30 @@ public sealed class UploadQueueWorkerService : IDisposable
 
     private void OnTimer(object? state)
     {
-        _ = ProcessOnceAsync();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ = ProcessTimerAsync();
+    }
+
+    private async Task ProcessTimerAsync()
+    {
+        try
+        {
+            await ProcessOnceAsync();
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (!_disposed)
+            {
+                SetStatus($"Background upload queue worker failed: {ex.Message}");
+            }
+        }
     }
 
     private TimeSpan PollInterval()

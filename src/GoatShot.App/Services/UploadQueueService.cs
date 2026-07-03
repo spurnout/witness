@@ -133,16 +133,12 @@ public sealed class UploadQueueService : IUploadQueue
         cancellationToken.ThrowIfCancellationRequested();
 
         var reserved = ReserveDueItems(maxItems);
-        var processed = new List<UploadQueueItem>();
-        foreach (var item in reserved)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            processed.Add(await ProcessOneAsync(item, sharing, cancellationToken));
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        var processed = await Task.WhenAll(reserved.Select(item => ProcessOneAsync(item, sharing, cancellationToken)));
 
         return new UploadQueueProcessResult
         {
-            Processed = processed.Count,
+            Processed = processed.Length,
             Succeeded = processed.Count(item => item.Status.Equals("Succeeded", StringComparison.OrdinalIgnoreCase)),
             Failed = processed.Count(item => item.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase)),
             WaitingRetry = processed.Count(item => item.Status.Equals("WaitingRetry", StringComparison.OrdinalIgnoreCase)),
@@ -280,7 +276,13 @@ public sealed class UploadQueueService : IUploadQueue
         lock (_gate)
         {
             var items = LoadCore();
-            var item = Find(items, processed.Id) ?? processed;
+            var existing = Find(items, processed.Id);
+            if (existing is not null && IsTerminal(existing.Status))
+            {
+                return Clone(existing);
+            }
+
+            var item = existing ?? processed;
             item.Status = status;
             item.Attempts = processed.Attempts;
             item.MaxAttempts = Math.Max(1, processed.MaxAttempts);
