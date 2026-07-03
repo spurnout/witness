@@ -8,7 +8,10 @@
         MinHeight="180"
         Topmost="True"
         ResizeMode="CanResizeWithGrip"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True"
+        controls:AppWindowChrome.CaptionHeight="0">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

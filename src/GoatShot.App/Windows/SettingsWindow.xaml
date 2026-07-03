@@ -6,7 +6,9 @@
         Height="700"
         MinWidth="860"
         MinHeight="520"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
     <Window.Resources>
         <Style x:Key="SettingsRailItem" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Foreground" Value="{StaticResource MutedInkBrush}" />
@@ -42,6 +44,8 @@
             </Setter>
         </Style>
     </Window.Resources>
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
     <Grid Background="#081016">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -1479,4 +1483,5 @@
             <Button Content="Save" Click="Save_Click" />
         </StackPanel>
     </Grid>
+    </DockPanel>
 </Window>

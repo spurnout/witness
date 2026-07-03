@@ -8,7 +8,11 @@
         MinHeight="520"
         Background="#081016"
         ResizeMode="CanResize"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -249,4 +253,5 @@
                     AutomationProperties.Name="Close share history" />
         </DockPanel>
     </Grid>
+    </DockPanel>
 </Window>

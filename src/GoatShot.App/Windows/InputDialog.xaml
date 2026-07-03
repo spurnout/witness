@@ -5,7 +5,11 @@
         Width="420"
         Height="190"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -29,4 +33,5 @@
             <Button Content="OK" Click="Ok_Click" />
         </StackPanel>
     </Grid>
+    </DockPanel>
 </Window>

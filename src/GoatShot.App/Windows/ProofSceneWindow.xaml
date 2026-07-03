@@ -9,7 +9,9 @@
         Background="#081016"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
-        AutomationProperties.Name="GoatShot safe proof scene">
+        AutomationProperties.Name="GoatShot safe proof scene"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
     <Window.Resources>
         <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16" />
@@ -28,6 +30,8 @@
             <Setter Property="Margin" Value="0,0,14,8" />
         </Style>
     </Window.Resources>
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -398,4 +402,5 @@
                     AutomationProperties.Name="Close proof scene" />
         </StackPanel>
     </Grid>
+    </DockPanel>
 </Window>

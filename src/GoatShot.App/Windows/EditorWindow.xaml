@@ -7,7 +7,9 @@
         MinWidth="900"
         MinHeight="620"
         WindowStartupLocation="CenterOwner"
-        PreviewKeyDown="EditorWindow_PreviewKeyDown">
+        PreviewKeyDown="EditorWindow_PreviewKeyDown"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
     <Window.Resources>
         <Style x:Key="EditorToolButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinWidth" Value="44" />
@@ -22,6 +24,8 @@
             <Setter Property="AutomationProperties.HelpText" Value="Privacy masking editor tool" />
         </Style>
     </Window.Resources>
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -172,4 +176,5 @@
                        Text="Rectangle tool active. Drag on the image to annotate." />
         </Border>
     </Grid>
+    </DockPanel>
 </Window>

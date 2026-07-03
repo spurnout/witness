@@ -8,7 +8,11 @@
         MinHeight="520"
         Background="#081016"
         ResizeMode="CanResize"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        controls:AppWindowChrome.IsEnabled="True">
+    <DockPanel>
+        <controls:AppTitleBar DockPanel.Dock="Top" />
     <Grid Margin="18"
           Background="#081016">
         <Grid.RowDefinitions>
@@ -95,4 +99,5 @@
                     AutomationProperties.Name="Close capture actions" />
         </StackPanel>
     </Grid>
+    </DockPanel>
 </Window>
