@@ -17,6 +17,8 @@ public sealed class HotkeyService : IDisposable
     private const uint VkC = 0x43;
     private const uint VkU = 0x55;
 
+    public const string AllInOneCaptureLabel = "PrintScreen";
+
     private readonly Dictionary<int, HotkeyAction> _actions = new();
     private readonly List<string> _registrationReport = new();
     private HwndSource? _source;
@@ -25,6 +27,8 @@ public sealed class HotkeyService : IDisposable
     public event EventHandler<HotkeyAction>? ActionTriggered;
 
     public IReadOnlyList<string> RegistrationReport => _registrationReport;
+
+    public bool IsRegistered(HotkeyAction action) => _actions.ContainsValue(action);
 
     public void Attach(Window window)
     {
@@ -37,7 +41,7 @@ public sealed class HotkeyService : IDisposable
         _source = HwndSource.FromHwnd(_handle);
         _source?.AddHook(WndProc);
 
-        Register(100, HotkeyAction.AllInOneCapture, 0, VkSnapshot, "PrintScreen");
+        Register(100, HotkeyAction.AllInOneCapture, 0, VkSnapshot, AllInOneCaptureLabel);
         Register(101, HotkeyAction.RegionCapture, ModControl, VkSnapshot, "Ctrl + PrintScreen");
         Register(102, HotkeyAction.WindowCapture, ModAlt, VkSnapshot, "Alt + PrintScreen");
         Register(103, HotkeyAction.LastRegionCapture, ModShift, VkSnapshot, "Shift + PrintScreen");

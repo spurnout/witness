@@ -134,6 +134,7 @@ public partial class MainWindow : Window
         _services.Hotkeys.Attach(this);
         _services.Hotkeys.ActionTriggered += Hotkeys_ActionTriggered;
         HotkeyText.Text = string.Join(Environment.NewLine, _services.Hotkeys.RegistrationReport);
+        EmptyStateHotkeyRun.Text = _services.Hotkeys.IsRegistered(HotkeyAction.AllInOneCapture) ? HotkeyService.AllInOneCaptureLabel : "the Screen button";
 
         _services.Automation.StatusChanged += Service_StatusChanged;
         _services.Automation.CaptureImported += Automation_CaptureImported;

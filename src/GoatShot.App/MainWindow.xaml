@@ -221,6 +221,7 @@
                                 <Button Grid.Column="1"
                                         Content="Apply"
                                         Click="ApplyRecordingProfile_Click"
+                                        AutomationProperties.Name="Apply saved recording profile"
                                         Style="{StaticResource SecondaryButton}"
                                         Margin="6,0,0,0" />
                             </Grid>
@@ -358,25 +359,40 @@
                             Margin="18"
                             AutomationProperties.Name="Empty workspace guidance">
                         <StackPanel>
-                            <TextBlock Text="Capture -> Edit/Redact -> Share"
+                            <TextBlock Text="Three steps to your first capture"
                                        FontSize="16"
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap" />
-                            <TextBlock Text="Start with PrintScreen, a region capture, or clipboard import. Captures stay local until you choose a share action."
+                            <TextBlock Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0"><Run Text="1. Press " /><Run x:Name="EmptyStateHotkeyRun" FontWeight="SemiBold" Text="PrintScreen" /><Run Text=" &#8212; or click the button below &#8212; to grab a screen region." /></TextBlock>
+                            <TextBlock Text="2. Edit or redact in the editor before anything leaves this machine."
                                        Foreground="{StaticResource MutedInkBrush}"
                                        FontSize="12"
                                        TextWrapping="Wrap"
-                                       Margin="0,8,0,12" />
+                                       Margin="0,6,0,0" />
+                            <TextBlock Text="3. Share with Copy, Quick share, or a configured provider."
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Margin="0,6,0,0" />
+                            <TextBlock Text="Captures stay local until you choose a share action."
+                                       Foreground="{StaticResource MutedInkBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Margin="0,10,0,12" />
                             <StackPanel>
-                                <Button Content="Screen region"
+                                <Button Content="Capture screen region"
                                         Click="CaptureRegion_Click"
+                                        Style="{StaticResource PrimaryButton}"
                                         HorizontalAlignment="Stretch"
                                         AutomationProperties.Name="Capture screen region from empty workspace" />
-                                <Button Content="Import clipboard"
+                                <Button Content="Import clipboard instead"
                                         Click="ImportClipboard_Click"
                                         Style="{StaticResource SecondaryButton}"
                                         HorizontalAlignment="Stretch"
-                                        AutomationProperties.Name="Import clipboard from empty workspace" />
+                                        AutomationProperties.Name="Import clipboard image from empty workspace" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
