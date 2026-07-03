@@ -9,9 +9,15 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Assets\goatshot-icon.ico</ApplicationIcon>
     <AssemblyName>GoatShot</AssemblyName>
     <RootNamespace>GoatShot.App</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\goatshot-icon.ico" />
+    <Resource Include="Assets\goatshot-logo.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AnimatedGif" Version="1.0.5" />

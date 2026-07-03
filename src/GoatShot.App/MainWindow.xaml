@@ -10,51 +10,11 @@
         Closing="Window_Closing">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Background="#0B151C"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="18,14">
-            <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="34"
-                            Height="34"
-                            CornerRadius="6"
-                            Background="{StaticResource AccentBrush}"
-                            Margin="0,0,12,0">
-                        <TextBlock Text="G"
-                                   Foreground="#061116"
-                                   FontWeight="Black"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel>
-                        <TextBlock Text="GoatShot"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource InkBrush}" />
-                        <TextBlock Text="Local-first Windows capture workspace"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedInkBrush}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <StackPanel DockPanel.Dock="Right"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right">
-                    <Button Content="Settings" Click="Settings_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Diagnostics" Click="Diagnostics_Click" Style="{StaticResource SecondaryButton}" />
-                </StackPanel>
-            </DockPanel>
-        </Border>
-
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" />
                 <ColumnDefinition Width="360" />
@@ -698,16 +658,64 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="1"
                 Background="#0B151C"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"
-                Padding="14,9">
-            <TextBlock x:Name="StatusText"
-                       AutomationProperties.Name="Application status"
-                       AutomationProperties.LiveSetting="Polite"
-                       Foreground="{StaticResource MutedInkBrush}"
-                       Text="Ready" />
+                Padding="10,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Image Source="Assets/goatshot-logo.png"
+                           Width="18"
+                           Height="18"
+                           Margin="0,0,8,0"
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           AutomationProperties.Name="GoatShot logo" />
+                    <TextBlock x:Name="StatusText"
+                               AutomationProperties.Name="Application status"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               VerticalAlignment="Center"
+                               Text="Ready" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Click="Settings_Click"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="34"
+                            Height="30"
+                            Padding="0"
+                            Margin="0,0,6,0"
+                            ToolTip="Settings"
+                            AutomationProperties.Name="Open settings">
+                        <TextBlock Text="&#xE713;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="14" />
+                    </Button>
+                    <Button Click="Diagnostics_Click"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="34"
+                            Height="30"
+                            Padding="0"
+                            Margin="0"
+                            ToolTip="Diagnostics"
+                            AutomationProperties.Name="Open diagnostics">
+                        <TextBlock Text="&#xE9D9;"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

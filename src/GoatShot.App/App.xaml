@@ -23,6 +23,7 @@
             <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="Background" Value="#081016" />
+            <Setter Property="Icon" Value="pack://application:,,,/Assets/goatshot-icon.ico" />
         </Style>
 
         <Style TargetType="TextBlock">
