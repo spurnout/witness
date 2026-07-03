@@ -32,6 +32,27 @@ function Add-Message {
     [void]$List.Add($Message)
 }
 
+function Get-FileSha256Hex {
+    param([string]$PathValue)
+
+    # Get-FileHash is a script function that goes missing when powershell.exe
+    # inherits a pwsh 7 PSModulePath (as under the test harness), so hash via
+    # .NET directly.
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($PathValue)
+        try {
+            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace("-", "")
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
 function Write-TextFile {
     param(
         [string]$PathValue,
@@ -229,7 +250,7 @@ if ($BuildInstaller) {
 
 $installerExists = Test-Path -LiteralPath $expectedInstaller -PathType Leaf
 $installerLength = if ($installerExists) { (Get-Item -LiteralPath $expectedInstaller).Length } else { 0 }
-$installerSha256 = if ($installerExists) { (Get-FileHash -LiteralPath $expectedInstaller -Algorithm SHA256).Hash } else { "" }
+$installerSha256 = if ($installerExists) { Get-FileSha256Hex $expectedInstaller } else { "" }
 
 if ($installerExists -and $installerLength -le 0) {
     Add-Message $issues "Installer artifact is empty: $expectedInstaller"

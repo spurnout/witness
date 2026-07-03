@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace GoatShot.Tests;
@@ -83,11 +84,73 @@ public sealed class InstallerPackageVerifierScriptTests
         }
     }
 
+    [TestMethod]
+    public void VerifyInstallerPackage_HashesInstallerUnderPwshModulePath()
+    {
+        var repoRoot = FindRepoRoot();
+        var scriptPath = Path.Combine(repoRoot, "scripts", "verify-installer-package.ps1");
+        var tempRoot = Path.Combine(Path.GetTempPath(), "goatshot-installer-verify-test-" + Guid.NewGuid().ToString("N"));
+        var outputRoot = Path.Combine(tempRoot, "out");
+        var installerPath = Path.Combine(tempRoot, "GoatShot-Setup-0.1.0-win-x64.exe");
+        Directory.CreateDirectory(tempRoot);
+
+        var installerBytes = new byte[2048];
+        for (var i = 0; i < installerBytes.Length; i++)
+        {
+            installerBytes[i] = (byte)(i % 251);
+        }
+
+        File.WriteAllBytes(installerPath, installerBytes);
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(installerBytes));
+
+        try
+        {
+            var result = RunPowerShell(
+                repoRoot,
+                scriptPath,
+                outputRoot,
+                installerScript: Path.Combine(repoRoot, "packaging", "GoatShot.iss"),
+                installerPath: installerPath,
+                psModulePath: PwshOnlyModulePath());
+
+            Assert.AreEqual(0, result.ExitCode, result.Output);
+
+            var jsonPath = Path.Combine(outputRoot, "installer-package-verification.json");
+            Assert.IsTrue(File.Exists(jsonPath), "JSON verification artifact was not created.");
+            using var json = JsonDocument.Parse(File.ReadAllText(jsonPath));
+            var installer = json.RootElement.GetProperty("installer");
+
+            Assert.IsTrue(installer.GetProperty("exists").GetBoolean());
+            Assert.AreEqual((long)installerBytes.Length, installer.GetProperty("length").GetInt64());
+            Assert.AreEqual(expectedSha256, installer.GetProperty("sha256").GetString());
+        }
+        finally
+        {
+            DeleteIfExists(tempRoot);
+        }
+    }
+
+    private static string PwshOnlyModulePath()
+    {
+        // Mimics powershell.exe inheriting a pwsh 7 PSModulePath: the pwsh module
+        // directories shadow the Windows PowerShell ones, so 5.1 script functions
+        // like Get-FileHash stop resolving while compiled cmdlets keep working.
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return string.Join(
+            Path.PathSeparator,
+            Path.Combine(documents, "PowerShell", "Modules"),
+            Path.Combine(programFiles, "PowerShell", "Modules"),
+            Path.Combine(programFiles, "PowerShell", "7", "Modules"));
+    }
+
     private static (int ExitCode, string Output) RunPowerShell(
         string repoRoot,
         string scriptPath,
         string outputRoot,
-        string installerScript)
+        string installerScript,
+        string? installerPath = null,
+        string? psModulePath = null)
     {
         var processInfo = new ProcessStartInfo
         {
@@ -107,6 +170,17 @@ public sealed class InstallerPackageVerifierScriptTests
         processInfo.ArgumentList.Add("-OutputRoot");
         processInfo.ArgumentList.Add(outputRoot);
         processInfo.ArgumentList.Add("-Json");
+
+        if (installerPath is not null)
+        {
+            processInfo.ArgumentList.Add("-InstallerPath");
+            processInfo.ArgumentList.Add(installerPath);
+        }
+
+        if (psModulePath is not null)
+        {
+            processInfo.Environment["PSModulePath"] = psModulePath;
+        }
 
         using var process = Process.Start(processInfo) ?? throw new InvalidOperationException("PowerShell did not start.");
         var stdout = process.StandardOutput.ReadToEnd();
