@@ -64,11 +64,11 @@
                     <Button x:Name="EditButton" Content="Edit" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
                     <Button x:Name="CopyButton" Content="Copy" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
                     <Button x:Name="ShareButton" Content="Share" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button x:Name="AiButton" Content="AI" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="AiButton" Content="AI" Click="Action_Click" Style="{StaticResource SecondaryButton}" AutomationProperties.Name="AI actions for selected capture" />
                     <Button x:Name="DocumentButton" Content="Document" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
                     <Button x:Name="ScriptDryRunButton" Content="Dry-run script" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
                     <Button x:Name="WebhookDryRunButton" Content="Dry-run webhook" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button x:Name="DeleteButton" Content="Delete local" Click="Action_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="DeleteButton" Content="Delete local" Click="Action_Click" Style="{StaticResource DangerButton}" />
                 </UniformGrid>
 
                 <Border Background="{StaticResource PanelAltBrush}"

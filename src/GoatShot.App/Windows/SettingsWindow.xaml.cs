@@ -15,7 +15,10 @@ public partial class SettingsWindow : Window
 {
     private readonly AppServices _services;
     private readonly List<AutomationRule> _automationRuleDrafts = new();
+    private readonly RecordingSummaryTileService _recordingSummaryTiles = new();
+    private readonly AutomationSummaryTileService _automationSummaryTiles = new();
     private bool _settingsSectionNavigationReady;
+    private bool _suppressSectionSelectionSync;
     private bool _automationRuleSelectionUpdating;
     private bool _deferredStartupStarted;
     private string? _selectedAutomationRuleId;
@@ -136,6 +139,11 @@ public partial class SettingsWindow : Window
 
     private void SettingsSection_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_suppressSectionSelectionSync)
+        {
+            return;
+        }
+
         if (!_settingsSectionNavigationReady ||
             SettingsSectionBox.SelectedItem is not ListBoxItem item ||
             item.Tag is not string key)
@@ -145,6 +153,56 @@ public partial class SettingsWindow : Window
 
         var target = FindSettingsSectionTarget(key);
         target?.BringIntoView();
+    }
+
+    private void SettingsScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (!_settingsSectionNavigationReady || e.VerticalChange == 0)
+        {
+            return;
+        }
+
+        var sectionTops = SettingsSectionCatalog.All
+            .Select(section => (section.Key, Top: GetSettingsSectionTop(section.Key)))
+            .ToList();
+        var activeKey = SettingsSectionScrollSpy.PickActiveSectionKey(
+            sectionTops,
+            SettingsSectionScrollSpy.ActivationThreshold);
+        if (activeKey is null)
+        {
+            return;
+        }
+
+        var activeItem = SettingsSectionBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(item =>
+                (item.Tag as string)?.Equals(activeKey, StringComparison.OrdinalIgnoreCase) == true);
+        if (activeItem is null || ReferenceEquals(SettingsSectionBox.SelectedItem, activeItem))
+        {
+            return;
+        }
+
+        _suppressSectionSelectionSync = true;
+        try
+        {
+            SettingsSectionBox.SelectedItem = activeItem;
+            SettingsSectionBox.ScrollIntoView(activeItem);
+        }
+        finally
+        {
+            _suppressSectionSelectionSync = false;
+        }
+    }
+
+    private double GetSettingsSectionTop(string key)
+    {
+        var target = FindSettingsSectionTarget(key);
+        if (target is null || !target.IsLoaded)
+        {
+            return double.PositiveInfinity;
+        }
+
+        return target.TransformToAncestor(SettingsScroll).Transform(new System.Windows.Point(0, 0)).Y;
     }
 
     private FrameworkElement? FindSettingsSectionTarget(string key)
@@ -341,6 +399,8 @@ public partial class SettingsWindow : Window
         SelectComboBoxItem(DefaultShareBox, settings.DefaultShareDestination);
         DefaultShareBox.SelectedIndex = DefaultShareBox.SelectedIndex < 0 ? 0 : DefaultShareBox.SelectedIndex;
         RefreshProviderSetupSummary();
+        RefreshRecordingSummaryTiles();
+        RefreshAutomationSummaryTiles();
     }
 
     private void RefreshProviderSetupSummary()
@@ -358,10 +418,15 @@ public partial class SettingsWindow : Window
 
     private Border CreateProviderSetupCard(ProviderSetupSummaryCard card)
     {
+        return CreateSummaryTileCard(card.Title, card.CountLabel, card.Detail, card.Tone);
+    }
+
+    private Border CreateSummaryTileCard(string title, string value, string detail, string tone)
+    {
         var border = new Border
         {
             Background = BrushFromHex("#101B23"),
-            BorderBrush = CardBrush(card.Tone),
+            BorderBrush = CardBrush(tone),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(10),
@@ -370,32 +435,56 @@ public partial class SettingsWindow : Window
         };
         System.Windows.Automation.AutomationProperties.SetName(
             border,
-            $"{card.Title}: {card.CountLabel}. {card.Detail}");
+            $"{title}: {value}. {detail}");
 
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock
         {
-            Text = card.Title,
+            Text = title,
             FontSize = 12,
             Foreground = (MediaBrush)FindResource("MutedInkBrush"),
             TextWrapping = TextWrapping.Wrap
         });
         stack.Children.Add(new TextBlock
         {
-            Text = card.CountLabel,
+            Text = value,
             FontSize = 22,
             FontWeight = FontWeights.Bold,
             Margin = new Thickness(0, 2, 0, 2)
         });
         stack.Children.Add(new TextBlock
         {
-            Text = card.Detail,
+            Text = detail,
             FontSize = 12,
             Foreground = (MediaBrush)FindResource("MutedInkBrush"),
             TextWrapping = TextWrapping.Wrap
         });
         border.Child = stack;
         return border;
+    }
+
+    private void RefreshRecordingSummaryTiles()
+    {
+        var draft = new RecordingSettings();
+        ApplyRecordingSettings(draft);
+        RecordingSummaryGrid.Children.Clear();
+        foreach (var tile in _recordingSummaryTiles.Create(draft))
+        {
+            RecordingSummaryGrid.Children.Add(CreateSummaryTileCard(tile.Title, tile.Value, tile.Detail, tile.Tone));
+        }
+    }
+
+    private void RefreshAutomationSummaryTiles()
+    {
+        var tiles = _automationSummaryTiles.Create(
+            _automationRuleDrafts,
+            EnableWatchFoldersBox.IsChecked == true,
+            SplitLines(WatchFoldersBox.Text));
+        AutomationSummaryGrid.Children.Clear();
+        foreach (var tile in tiles)
+        {
+            AutomationSummaryGrid.Children.Add(CreateSummaryTileCard(tile.Title, tile.Value, tile.Detail, tile.Tone));
+        }
     }
 
     private MediaBrush CardBrush(string tone)
@@ -1298,6 +1387,8 @@ public partial class SettingsWindow : Window
                 RecordingQualityBox.BringIntoView();
                 break;
         }
+
+        RefreshRecordingSummaryTiles();
     }
 
     private void ApplyRecordingPresetValues(
@@ -1941,6 +2032,7 @@ public partial class SettingsWindow : Window
         AutomationRuleListBox.SelectedItem = selectedItem;
         _selectedAutomationRuleId = selectedItem?.Tag as string;
         _automationRuleSelectionUpdating = false;
+        RefreshAutomationSummaryTiles();
     }
 
     private string? GetSelectedAutomationRuleId()
@@ -2217,4 +2309,30 @@ public partial class SettingsWindow : Window
         IReadOnlyList<AudioCaptureDevice> SystemAudio,
         IReadOnlyList<CameraOverlayDevice> Cameras,
         RecordingConfidenceReport Confidence);
+}
+
+internal static class SettingsSectionScrollSpy
+{
+    public const double ActivationThreshold = 60;
+
+    public static string? PickActiveSectionKey(
+        IReadOnlyList<(string Key, double Top)> orderedSectionTops,
+        double threshold)
+    {
+        if (orderedSectionTops.Count == 0)
+        {
+            return null;
+        }
+
+        var activeKey = orderedSectionTops[0].Key;
+        foreach (var (key, top) in orderedSectionTops)
+        {
+            if (top <= threshold)
+            {
+                activeKey = key;
+            }
+        }
+
+        return activeKey;
+    }
 }

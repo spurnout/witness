@@ -84,7 +84,7 @@
                                FontWeight="SemiBold"
                                Margin="2,0,0,10" />
                     <ListBox x:Name="SettingsSectionBox"
-                             AutomationProperties.Name="Settings section"
+                             AutomationProperties.Name="Settings sections"
                              Background="Transparent"
                              BorderThickness="0"
                              Foreground="{StaticResource MutedInkBrush}"
@@ -96,6 +96,7 @@
             <ScrollViewer x:Name="SettingsScroll"
                           Grid.Column="1"
                           VerticalScrollBarVisibility="Auto"
+                          ScrollChanged="SettingsScroll_ScrollChanged"
                           Padding="18,14,18,0">
             <StackPanel>
                 <TextBlock x:Name="GeneralSettingsSection"
@@ -147,35 +148,9 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
-                <UniformGrid Columns="3" Margin="0,0,0,12">
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="6 presets" FontWeight="SemiBold" />
-                            <TextBlock Text="Fast MP4, GIF, tutorial, webcam, and custom profiles"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="Local devices" FontWeight="SemiBold" />
-                            <TextBlock Text="Mic, system audio, and webcam refresh after open"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="Overlays" FontWeight="SemiBold" />
-                            <TextBlock Text="Countdown, border, timer, and keystroke controls"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
+                <UniformGrid x:Name="RecordingSummaryGrid"
+                             Columns="3"
+                             Margin="0,0,0,12" />
                 <CheckBox x:Name="PreferProductionRecorderBox" Content="Prefer production recorder when available" />
                 <CheckBox x:Name="PreferHevcRecorderBox"
                           Content="Prefer HEVC when Media Foundation support is available"
@@ -502,7 +477,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save S3 keys" Click="SaveS3Keys_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear S3 keys" Click="ClearS3Keys_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear S3 keys" Click="ClearS3Keys_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="S3KeyStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -525,7 +500,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save Imgur Client ID" Click="SaveImgurClientId_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Imgur Client ID" Click="ClearImgurClientId_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Imgur Client ID" Click="ClearImgurClientId_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="ImgurKeyStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -589,7 +564,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save WebDAV password" Click="SaveWebDavPassword_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear WebDAV password" Click="ClearWebDavPassword_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear WebDAV password" Click="ClearWebDavPassword_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="WebDavPasswordStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -621,7 +596,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save FTP/FTPS password" Click="SaveFtpPassword_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear FTP/FTPS password" Click="ClearFtpPassword_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear FTP/FTPS password" Click="ClearFtpPassword_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="FtpPasswordStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -669,7 +644,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save Cloudinary keys" Click="SaveCloudinaryKeys_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Cloudinary keys" Click="ClearCloudinaryKeys_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Cloudinary keys" Click="ClearCloudinaryKeys_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="CloudinaryKeyStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -714,7 +689,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect Dropbox" Click="ConnectDropboxOAuth_Click" />
                     <Button Content="Save Dropbox token" Click="SaveDropboxToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Dropbox token" Click="ClearDropboxToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Dropbox token" Click="ClearDropboxToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="DropboxTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -760,7 +735,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect Google Drive" Click="ConnectGoogleDriveOAuth_Click" />
                     <Button Content="Save Google Drive token" Click="SaveGoogleDriveToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Google Drive token" Click="ClearGoogleDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Google Drive token" Click="ClearGoogleDriveToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="GoogleDriveTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -807,7 +782,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect Google Photos" Click="ConnectGooglePhotosOAuth_Click" />
                     <Button Content="Save Google Photos token" Click="SaveGooglePhotosToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Google Photos token" Click="ClearGooglePhotosToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Google Photos token" Click="ClearGooglePhotosToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="GooglePhotosTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -846,7 +821,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect OneDrive" Click="ConnectOneDriveOAuth_Click" />
                     <Button Content="Save OneDrive token" Click="SaveOneDriveToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear OneDrive token" Click="ClearOneDriveToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear OneDrive token" Click="ClearOneDriveToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="OneDriveTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -896,7 +871,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect YouTube" Click="ConnectYouTubeOAuth_Click" />
                     <Button Content="Save YouTube token" Click="SaveYouTubeToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear YouTube token" Click="ClearYouTubeToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear YouTube token" Click="ClearYouTubeToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="YouTubeTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -936,7 +911,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Connect OneNote" Click="ConnectOneNoteOAuth_Click" />
                     <Button Content="Save OneNote token" Click="SaveOneNoteToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear OneNote token" Click="ClearOneNoteToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear OneNote token" Click="ClearOneNoteToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="OneNoteTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -982,7 +957,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save Linear credential" Click="SaveLinearCredential_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Linear credential" Click="ClearLinearCredential_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Linear credential" Click="ClearLinearCredential_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="LinearCredentialStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -1018,7 +993,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save GitHub token" Click="SaveGitHubToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear GitHub token" Click="ClearGitHubToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear GitHub token" Click="ClearGitHubToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="GitHubTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -1051,7 +1026,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save Jira token" Click="SaveJiraApiToken_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Jira token" Click="ClearJiraApiToken_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Jira token" Click="ClearJiraApiToken_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="JiraApiTokenStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -1091,7 +1066,7 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save Azure DevOps PAT" Click="SaveAzureDevOpsPat_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear Azure DevOps PAT" Click="ClearAzureDevOpsPat_Click" Style="{StaticResource SecondaryButton}" />
+                    <Button Content="Clear Azure DevOps PAT" Click="ClearAzureDevOpsPat_Click" Style="{StaticResource DangerButton}" />
                 </StackPanel>
                 <TextBlock x:Name="AzureDevOpsPatStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -1113,35 +1088,9 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
-                <UniformGrid Columns="3" Margin="0,0,0,12">
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="Watch folders" FontWeight="SemiBold" />
-                            <TextBlock Text="Import, copy, strip metadata, and quick-share options"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="Workflow recipes" FontWeight="SemiBold" />
-                            <TextBlock Text="Disabled starter rules stay reviewable before save"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource QuietCardBorder}" Padding="10" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="Rule editor" FontWeight="SemiBold" />
-                            <TextBlock Text="Conditions, actions, image effects, scripts, and webhooks"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
+                <UniformGrid x:Name="AutomationSummaryGrid"
+                             Columns="3"
+                             Margin="0,0,0,12" />
                 <CheckBox x:Name="EnableWatchFoldersBox" Content="Enable watch folders while GoatShot is running" />
                 <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
                 <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
@@ -1493,8 +1442,8 @@
                              Margin="0,6,0,8" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Save key" Click="SaveGeminiKey_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Clear key" Click="ClearGeminiKey_Click" Style="{StaticResource SecondaryButton}" />
-                    <Button Content="Validate" Click="ValidateGemini_Click" />
+                    <Button Content="Clear key" Click="ClearGeminiKey_Click" Style="{StaticResource DangerButton}" />
+                    <Button Content="Validate" Click="ValidateGemini_Click" AutomationProperties.Name="Validate Gemini API key" />
                 </StackPanel>
                 <TextBlock x:Name="GeminiKeyStatusText"
                            Foreground="{StaticResource MutedInkBrush}"

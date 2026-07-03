@@ -128,7 +128,7 @@
             <Button x:Name="DeleteRemoteButton"
                     Content="Delete remote"
                     IsEnabled="False"
-                    Style="{StaticResource SecondaryButton}"
+                    Style="{StaticResource DangerButton}"
                     AutomationProperties.Name="Delete remote share unavailable" />
             <Button Content="Close"
                     Click="Close_Click"
