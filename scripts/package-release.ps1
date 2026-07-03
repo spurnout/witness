@@ -2,7 +2,8 @@ param(
     [string] $Configuration = "Release",
     [string] $Runtime = "win-x64",
     [string] $Version = "0.1.0",
-    [switch] $SkipInstaller
+    [switch] $SkipInstaller,
+    [switch] $SkipSingleExe
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +15,8 @@ $publishRoot = Join-Path $repoRoot "artifacts\publish"
 $distRoot = Join-Path $repoRoot "artifacts\dist"
 $publishDir = Join-Path $publishRoot "GoatShot-$Runtime"
 $zipPath = Join-Path $distRoot "GoatShot-$Version-$Runtime-portable.zip"
+$singleExePublishDir = Join-Path $publishRoot "GoatShot-$Runtime-single-exe"
+$singleExeDistDir = Join-Path $distRoot "GoatShot-$Version-$Runtime-single-exe"
 $installerScript = Join-Path $repoRoot "packaging\GoatShot.iss"
 
 if (-not (Test-Path $appProject)) {
@@ -62,6 +65,36 @@ if (Test-Path $zipPath) {
 
 Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
 
+$singleExeDir = $null
+if (-not $SkipSingleExe) {
+    if (Test-Path $singleExePublishDir) {
+        Remove-Item -LiteralPath $singleExePublishDir -Recurse -Force
+    }
+
+    if (Test-Path $singleExeDistDir) {
+        Remove-Item -LiteralPath $singleExeDistDir -Recurse -Force
+    }
+
+    # IncludeNativeLibrariesForSelfExtract is required: without it the WPF app
+    # crashes at startup with DllNotFoundException in SetWindowLongPtrWndProc.
+    dotnet publish $appProject `
+        -c $Configuration `
+        -r $Runtime `
+        --self-contained true `
+        -o $singleExePublishDir `
+        /p:PublishSingleFile=true `
+        /p:EnableCompressionInSingleFile=true `
+        /p:IncludeNativeLibrariesForSelfExtract=true `
+        /p:PublishReadyToRun=true `
+        /p:PublishTrimmed=false `
+        /p:Version=$Version
+
+    New-Item -ItemType Directory -Force -Path $singleExeDistDir | Out-Null
+    Copy-Item -LiteralPath (Join-Path $singleExePublishDir "GoatShot.exe") -Destination (Join-Path $singleExeDistDir "GoatShot.exe") -Force
+    Copy-Item -LiteralPath (Join-Path $singleExePublishDir "GoatShot.pdb") -Destination (Join-Path $singleExeDistDir "GoatShot.pdb") -Force
+    $singleExeDir = $singleExeDistDir
+}
+
 $isccCandidates = @()
 if ($env:INNO_SETUP_ISCC) {
     $isccCandidates += $env:INNO_SETUP_ISCC
@@ -96,6 +129,7 @@ elseif (-not $SkipInstaller) {
 [pscustomobject]@{
     PublishDir = $publishDir
     PortableZip = $zipPath
+    SingleExeDir = $singleExeDir
     Installer = $installerPath
     InnoSetupCompiler = $iscc
 }
