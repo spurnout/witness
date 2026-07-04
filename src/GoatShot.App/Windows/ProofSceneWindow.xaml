@@ -120,7 +120,6 @@
                                      Grid.Row="0"
                                      Grid.Column="1"
                                      Text="GS-VAL-001"
-                                     TabIndex="0"
                                      Margin="0,0,0,10"
                                      AutomationProperties.Name="Proof case name" />
 
@@ -131,27 +130,22 @@
                                 <RadioButton Content="Keyboard"
                                              GroupName="ProofMode"
                                              IsChecked="True"
-                                             TabIndex="1"
                                              Style="{StaticResource ProofRadio}"
                                              AutomationProperties.Name="Proof mode keyboard" />
                                 <RadioButton Content="Scaling"
                                              GroupName="ProofMode"
-                                             TabIndex="2"
                                              Style="{StaticResource ProofRadio}"
                                              AutomationProperties.Name="Proof mode scaling" />
                                 <RadioButton Content="Contrast"
                                              GroupName="ProofMode"
-                                             TabIndex="3"
                                              Style="{StaticResource ProofRadio}"
                                              AutomationProperties.Name="Proof mode contrast" />
                                 <RadioButton Content="Capture"
                                              GroupName="ProofMode"
-                                             TabIndex="4"
                                              Style="{StaticResource ProofRadio}"
                                              AutomationProperties.Name="Proof mode capture" />
                                 <RadioButton Content="Recording"
                                              GroupName="ProofMode"
-                                             TabIndex="5"
                                              Style="{StaticResource ProofRadio}"
                                              AutomationProperties.Name="Proof mode recording" />
                             </WrapPanel>
@@ -163,17 +157,13 @@
                                          Margin="0,0,0,8">
                                 <CheckBox Content="Ready"
                                           IsChecked="True"
-                                          TabIndex="6"
                                           AutomationProperties.Name="Proof result ready" />
                                 <CheckBox Content="Focus visible"
                                           IsChecked="True"
-                                          TabIndex="7"
                                           AutomationProperties.Name="Proof result focus visible" />
                                 <CheckBox Content="Text fits"
-                                          TabIndex="8"
                                           AutomationProperties.Name="Proof result text fits" />
                                 <CheckBox Content="Contrast readable"
-                                          TabIndex="9"
                                           AutomationProperties.Name="Proof result contrast readable" />
                             </UniformGrid>
 
@@ -185,7 +175,6 @@
                                      Text="Safe sample notes for local proof only."
                                      AcceptsReturn="True"
                                      TextWrapping="Wrap"
-                                     TabIndex="10"
                                      AutomationProperties.Name="Proof notes" />
                         </Grid>
                     </StackPanel>
@@ -206,12 +195,10 @@
                         <CheckBox x:Name="ConsentCheck"
                                   Content="Safe desktop content confirmed"
                                   IsChecked="True"
-                                  TabIndex="11"
                                   AutomationProperties.Name="Safe desktop content confirmed" />
                         <CheckBox x:Name="AudioCheck"
                                   Content="Synthetic recording motion only"
                                   IsChecked="True"
-                                  TabIndex="12"
                                   AutomationProperties.Name="Synthetic recording motion only" />
 
                         <Slider x:Name="ScaleSlider"
@@ -221,26 +208,22 @@
                                 TickFrequency="25"
                                 IsSnapToTickEnabled="True"
                                 Margin="0,6,8,10"
-                                TabIndex="13"
                                 AutomationProperties.Name="Proof scale sample slider" />
 
                         <UniformGrid Columns="3">
                             <Button x:Name="StartButton"
                                     Content="Start"
                                     Click="Start_Click"
-                                    TabIndex="14"
                                     AutomationProperties.Name="Start proof timer" />
                             <Button x:Name="PauseButton"
                                     Content="Pause"
                                     Click="Pause_Click"
                                     Style="{StaticResource SecondaryButton}"
-                                    TabIndex="15"
                                     AutomationProperties.Name="Pause proof timer" />
                             <Button x:Name="ResetButton"
                                     Content="Reset"
                                     Click="Reset_Click"
                                     Style="{StaticResource SecondaryButton}"
-                                    TabIndex="16"
                                     AutomationProperties.Name="Reset proof timer" />
                         </UniformGrid>
                     </StackPanel>
@@ -339,7 +322,6 @@
                                     Focusable="True"
                                     Padding="0"
                                     Margin="0"
-                                    TabIndex="17"
                                     PreviewMouseLeftButtonDown="DragTarget_MouseLeftButtonDown"
                                     PreviewMouseMove="DragTarget_MouseMove"
                                     PreviewMouseLeftButtonUp="DragTarget_MouseLeftButtonUp"
@@ -398,7 +380,6 @@
             <Button Content="Close"
                     Click="Close_Click"
                     Style="{StaticResource SecondaryButton}"
-                    TabIndex="18"
                     AutomationProperties.Name="Close proof scene" />
         </StackPanel>
     </Grid>

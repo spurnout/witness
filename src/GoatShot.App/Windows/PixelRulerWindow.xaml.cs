@@ -153,7 +153,7 @@ public partial class PixelRulerWindow : Window
         var dy = end.Y - start.Y;
         var distance = Math.Sqrt((dx * dx) + (dy * dy));
         var angle = Math.Atan2(dy, dx) * 180d / Math.PI;
-        System.Windows.Clipboard.SetText(
+        GoatShot.App.Services.ClipboardInterop.SetText(
             $"distance={distance:0.#}px; box={Math.Abs(dx)}x{Math.Abs(dy)}px; dx={FormatSigned(dx)}; dy={FormatSigned(dy)}; angle={angle:0.#}deg");
     }
 

@@ -33,6 +33,3 @@ artifacts/*
 *.key
 *.secret
 secrets/
-
-# Scratch files outside the app projects
-/Program.cs

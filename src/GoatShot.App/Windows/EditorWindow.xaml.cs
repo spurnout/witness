@@ -44,7 +44,41 @@ public partial class EditorWindow : Window
         InitializeComponent();
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         LoadImage();
+        InitializeToolShortcutHints();
         SetActiveToolFeedback();
+    }
+
+    // Surface each tool's keyboard shortcut in its tooltip and accessible name so the
+    // shortcuts defined in EditorToolCatalog are discoverable without reading source.
+    private void InitializeToolShortcutHints()
+    {
+        foreach (var button in ToolButtons())
+        {
+            if (button.Tag is not string tag ||
+                !Enum.TryParse<AnnotationMode>(tag, out var mode))
+            {
+                continue;
+            }
+
+            var shortcut = EditorToolCatalog.Shortcuts
+                .FirstOrDefault(entry => entry.Mode == mode)?.Shortcut;
+            if (string.IsNullOrEmpty(shortcut))
+            {
+                continue;
+            }
+
+            var badge = $" ({shortcut})";
+            var name = AutomationProperties.GetName(button);
+            if (!string.IsNullOrEmpty(name) && !name.EndsWith(badge, StringComparison.Ordinal))
+            {
+                AutomationProperties.SetName(button, name + badge);
+            }
+
+            if (button.ToolTip is string tip && !tip.EndsWith(badge, StringComparison.Ordinal))
+            {
+                button.ToolTip = tip + badge;
+            }
+        }
     }
 
     public event EventHandler<CaptureItem>? CaptureSaved;
@@ -93,6 +127,9 @@ public partial class EditorWindow : Window
             button.ClearValue(BorderBrushProperty);
             button.ClearValue(BorderThicknessProperty);
             button.ClearValue(ForegroundProperty);
+            // Expose the selected/not-selected state to assistive tech since these are
+            // plain buttons acting as a single-select tool group, not toggle buttons.
+            AutomationProperties.SetItemStatus(button, active ? "Selected" : "Not selected");
             AutomationProperties.SetHelpText(button, EditorToolCatalog.IsPrivacyTool(buttonMode)
                 ? "Privacy masking editor tool"
                 : "Editor annotation tool");
@@ -787,7 +824,7 @@ public partial class EditorWindow : Window
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Clipboard.SetImage(Render());
+        ClipboardInterop.SetImage(Render());
         ToolStatus.Text = _cropRect is null
             ? "Flattened edited image copied to clipboard."
             : "Cropped, flattened edited image copied to clipboard.";

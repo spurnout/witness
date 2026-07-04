@@ -9,7 +9,14 @@
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
+        xmlns:local="clr-namespace:GoatShot.App"
         controls:AppWindowChrome.IsEnabled="True">
+    <Window.InputBindings>
+        <KeyBinding Key="K" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}" />
+    </Window.InputBindings>
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}" Executed="OpenCommandPalette_Executed" />
+    </Window.CommandBindings>
     <DockPanel>
         <controls:AppTitleBar DockPanel.Dock="Top"
                               Subtitle="Local-first Windows capture workspace" />
@@ -271,6 +278,14 @@
                                      Margin="0,0,8,8"
                                      LostFocus="RecordingControl_Changed"
                                      ToolTip="Optional bitrate such as 6000k or 8M. Leave blank for profile CRF." />
+                            <TextBlock x:Name="RecordingValidationText"
+                                       AutomationProperties.Name="Recording input validation"
+                                       AutomationProperties.LiveSetting="Assertive"
+                                       Foreground="{StaticResource WarnBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"
+                                       Margin="0,0,8,8" />
                             <CheckBox x:Name="RecordingMicBox" Content="Mic audio" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
                             <CheckBox x:Name="RecordingSystemAudioBox" Content="System audio" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
                             <CheckBox x:Name="RecordingWebcamBox" Content="Webcam overlay" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
@@ -737,6 +752,54 @@
                     </Button>
                 </StackPanel>
             </Grid>
+        </Border>
+
+        <Border x:Name="CommandPaletteOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Background="#D802070B"
+                Visibility="Collapsed"
+                Panel.ZIndex="100"
+                MouseDown="CommandPaletteOverlay_MouseDown"
+                AutomationProperties.Name="Command palette">
+            <Border Width="560"
+                    MaxHeight="470"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Center"
+                    Margin="0,80,0,0"
+                    Background="#0B151C"
+                    BorderBrush="{StaticResource AccentBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="14">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Run a command"
+                               FontWeight="Bold"
+                               FontSize="14"
+                               Margin="0,0,0,8" />
+                    <TextBox x:Name="CommandPaletteSearch"
+                             DockPanel.Dock="Top"
+                             AutomationProperties.Name="Command palette search"
+                             TextChanged="CommandPaletteSearch_TextChanged"
+                             PreviewKeyDown="CommandPaletteSearch_PreviewKeyDown"
+                             Margin="0,0,0,10"
+                             ToolTip="Type to filter. Enter runs the selected command, Esc closes." />
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Text="&#x2191; &#x2193; to move  &#183;  Enter to run  &#183;  Esc to close"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontSize="11"
+                               Margin="0,8,0,0" />
+                    <ListBox x:Name="CommandPaletteList"
+                             AutomationProperties.Name="Command palette results"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{StaticResource InkBrush}"
+                             MaxHeight="330"
+                             DisplayMemberPath="Display"
+                             MouseDoubleClick="CommandPaletteList_MouseDoubleClick" />
+                </DockPanel>
+            </Border>
         </Border>
     </Grid>
     </DockPanel>

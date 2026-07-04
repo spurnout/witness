@@ -463,6 +463,38 @@
                            Margin="0,0,0,14" />
                 <Expander Header="Advanced provider configuration" IsExpanded="False" Margin="0,0,0,10">
                     <StackPanel Margin="0,10,0,0">
+                <TextBlock Text="Jump to provider"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12" />
+                <ComboBox x:Name="ProviderJumpBox"
+                          Style="{StaticResource GoatComboBox}"
+                          Margin="0,6,0,16"
+                          AutomationProperties.Name="Jump to sharing provider"
+                          ToolTip="Type a provider name to jump straight to its settings."
+                          SelectionChanged="ProviderJump_SelectionChanged">
+                    <ComboBoxItem Content="Local export folder" Tag="LocalExportFolderBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Custom script" Tag="CustomScriptBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Custom webhook" Tag="CustomWebhookBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Slack" Tag="SlackWebhookBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Discord" Tag="DiscordWebhookBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Microsoft Teams" Tag="TeamsWebhookBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Amazon S3 / S3-compatible" Tag="S3EndpointBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Imgur" Tag="ImgurEndpointBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="SFTP" Tag="SftpHostBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="WebDAV" Tag="WebDavBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="FTP / FTPS" Tag="FtpHostBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Cloudinary" Tag="CloudinaryApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Dropbox" Tag="DropboxContentApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Google Drive" Tag="GoogleDriveUploadApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Google Photos" Tag="GooglePhotosUploadApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="OneDrive" Tag="OneDriveGraphApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="YouTube" Tag="YouTubeUploadApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="OneNote" Tag="OneNoteGraphApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Linear" Tag="LinearGraphqlEndpointBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="GitHub" Tag="GitHubApiBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Jira" Tag="JiraBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                    <ComboBoxItem Content="Azure DevOps" Tag="AzureDevOpsBaseUrlBox" Style="{StaticResource GoatComboBoxItem}" />
+                </ComboBox>
                 <TextBlock Text="Local export folder" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="LocalExportFolderBox" Margin="0,6,0,14" />
                 <TextBlock Text="Custom script command" Foreground="{StaticResource MutedInkBrush}" />

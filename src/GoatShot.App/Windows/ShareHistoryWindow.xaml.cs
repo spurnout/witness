@@ -19,15 +19,17 @@ public partial class ShareHistoryWindow : Window
         EscapeKeyCloseBehavior.Attach(this);
         HistoryList.ItemsSource = _historyItems;
         QueueList.ItemsSource = _queueItems;
-        RefreshAll();
+        RefreshHistory();
+        UpdateActionState();
+        Loaded += async (_, _) => await RefreshQueueAsync();
     }
 
     public bool QueueChanged { get; private set; }
 
-    private void RefreshAll()
+    private async Task RefreshAllAsync()
     {
         RefreshHistory();
-        RefreshQueue();
+        await RefreshQueueAsync();
         UpdateActionState();
     }
 
@@ -75,12 +77,9 @@ public partial class ShareHistoryWindow : Window
         };
     }
 
-    private void RefreshQueue()
+    private async Task RefreshQueueAsync()
     {
-        var items = _services.UploadQueue
-            .ListAsync(CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
+        var items = await _services.UploadQueue.ListAsync(CancellationToken.None);
 
         _queueItems.Clear();
         foreach (var item in items.Take(25))
@@ -198,13 +197,13 @@ public partial class ShareHistoryWindow : Window
             selected.Entry.Destination,
             CancellationToken.None);
         QueueChanged = true;
-        RefreshQueue();
+        await RefreshQueueAsync();
         StatusText.Text = $"Queued retry {queued.ShortId} for {selected.FileName}.";
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e)
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        RefreshAll();
+        await RefreshAllAsync();
         StatusText.Text = "Share history and upload queue refreshed.";
     }
 
@@ -218,7 +217,7 @@ public partial class ShareHistoryWindow : Window
 
         var updated = await _services.UploadQueue.CancelAsync(selected.Id, CancellationToken.None);
         QueueChanged = true;
-        RefreshQueue();
+        await RefreshQueueAsync();
         StatusText.Text = updated is null
             ? $"Queue item not found: {selected.ShortId}."
             : $"{updated.ShortId}: {updated.LastMessage}";
@@ -234,7 +233,7 @@ public partial class ShareHistoryWindow : Window
 
         var updated = await _services.UploadQueue.RetryAsync(selected.Id, CancellationToken.None);
         QueueChanged = true;
-        RefreshQueue();
+        await RefreshQueueAsync();
         StatusText.Text = updated is null
             ? $"Queue item not found: {selected.ShortId}."
             : $"{updated.ShortId}: {updated.LastMessage}";

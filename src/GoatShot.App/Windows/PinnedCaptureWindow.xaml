@@ -40,6 +40,8 @@
                             TickFrequency="0.05"
                             IsSnapToTickEnabled="False"
                             ValueChanged="OpacitySlider_ValueChanged"
+                            AutomationProperties.Name="Pinned window opacity"
+                            AutomationProperties.HelpText="Adjust how transparent the pinned capture window is"
                             Margin="0,0,10,8" />
                     <Button Content="Close"
                             Click="Close_Click"
@@ -50,7 +52,8 @@
                            FontWeight="SemiBold"
                            Foreground="{StaticResource InkBrush}"
                            TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center" />
+                           VerticalAlignment="Center"
+                           AutomationProperties.Name="Pinned capture title" />
             </DockPanel>
         </Border>
 
@@ -59,7 +62,8 @@
                 Padding="10">
             <Image x:Name="PinnedImage"
                    Stretch="Uniform"
-                   RenderOptions.BitmapScalingMode="HighQuality" />
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   AutomationProperties.Name="Pinned capture image" />
         </Border>
     </Grid>
 </Window>

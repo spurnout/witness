@@ -160,6 +160,19 @@ public partial class SettingsWindow : Window
         target?.BringIntoView();
     }
 
+    // Jumps to a provider's first field inside the long "Advanced provider configuration"
+    // list. The ComboBox supports type-ahead, so an operator can type "jira" and land on
+    // the Jira block without scrolling past a dozen other providers.
+    private void ProviderJump_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProviderJumpBox.SelectedItem is ComboBoxItem { Tag: string anchorName } &&
+            FindName(anchorName) is FrameworkElement anchor)
+        {
+            anchor.BringIntoView();
+            anchor.Focus();
+        }
+    }
+
     private void SettingsScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (!_settingsSectionNavigationReady || e.VerticalChange == 0)
@@ -636,7 +649,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            System.Windows.Clipboard.SetText(_lastPluginUpdateCliCommand);
+            ClipboardInterop.SetText(_lastPluginUpdateCliCommand);
             PluginUpdateStatusText.Text = $"Copied CLI command. {PluginUpdateStatusText.Text}";
         }
         catch (Exception exception)

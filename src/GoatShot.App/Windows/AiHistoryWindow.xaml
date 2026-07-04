@@ -11,24 +11,9 @@
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
         controls:AppWindowChrome.IsEnabled="True">
     <Window.Resources>
-        <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinWidth" Value="92" />
-            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Foreground" Value="#061116" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
-        <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinWidth" Value="92" />
-            <Setter Property="Background" Value="#101B23" />
-            <Setter Property="Foreground" Value="{StaticResource MutedInkBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
+        <!-- Uses the shared PrimaryButton/SecondaryButton styles from App.xaml so button
+             sizing, chrome, and focus/hover behavior match the rest of the app instead of
+             the previous locally-redefined variants. -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
         </Style>

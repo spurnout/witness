@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     private bool _recordingControlsReady;
     private bool _settingsPrewarmQueued;
     private SettingsWindow? _prewarmedSettingsWindow;
+    private ShareHistoryWindow? _shareHistoryWindow;
+    private AiHistoryWindow? _aiHistoryWindow;
     private CancellationTokenSource? _webcamPreviewCts;
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
@@ -511,6 +513,7 @@ public partial class MainWindow : Window
         }
 
         ReadRecordingSettingsFromControls();
+        ValidateRecordingInputs();
         if (sender == RecordingWebcamBox && RecordingWebcamBox.IsChecked != true)
         {
             StopWebcamPreview("Preview stopped.");
@@ -724,6 +727,7 @@ public partial class MainWindow : Window
         RecordingKeystrokeBox.IsChecked = settings.ShowKeystrokeOverlay;
         _recordingControlsReady = true;
         RefreshRecordingSetupText();
+        ValidateRecordingInputs();
     }
 
     private RecordingSettings ReadRecordingSettingsFromControls()
@@ -1150,18 +1154,32 @@ public partial class MainWindow : Window
 
     private void ShareHistory_Click(object sender, RoutedEventArgs e)
     {
+        // Modeless so the operator can review share history while continuing to work in
+        // the main window (e.g. copy a URL and reuse it elsewhere).
+        if (_shareHistoryWindow is not null)
+        {
+            _shareHistoryWindow.Activate();
+            return;
+        }
+
         var window = new ShareHistoryWindow(_services)
         {
             Owner = this
         };
-        window.ShowDialog();
-        if (window.QueueChanged)
+        _shareHistoryWindow = window;
+        window.Closed += (_, _) =>
         {
-            _ = RefreshUploadQueueAsync();
-            RefreshDiagnostics();
-        }
+            _shareHistoryWindow = null;
+            if (window.QueueChanged)
+            {
+                _ = RefreshUploadQueueAsync();
+                RefreshDiagnostics();
+            }
 
-        SetStatus("Share history closed.");
+            SetStatus("Share history closed.");
+        };
+        window.Show();
+        SetStatus("Share history opened.");
     }
 
     private async void ExportBugReport_Click(object sender, RoutedEventArgs e)
@@ -1294,12 +1312,304 @@ public partial class MainWindow : Window
 
     private void AiHistory_Click(object sender, RoutedEventArgs e)
     {
+        // Modeless: AI history is a review-while-working surface (copy a prompt to reuse).
+        if (_aiHistoryWindow is not null)
+        {
+            _aiHistoryWindow.Activate();
+            return;
+        }
+
         var window = new AiHistoryWindow(_services)
         {
             Owner = this
         };
-        window.ShowDialog();
-        SetStatus("AI review history closed.");
+        _aiHistoryWindow = window;
+        window.Closed += (_, _) =>
+        {
+            _aiHistoryWindow = null;
+            SetStatus("AI review history closed.");
+        };
+        window.Show();
+        SetStatus("AI review history opened.");
+    }
+
+    // ---- Command palette (Ctrl+K) --------------------------------------------------
+    // Most tools live inside collapsed expanders; the palette makes every action
+    // reachable by name from the keyboard without hunting through the rail.
+    public static readonly System.Windows.Input.RoutedUICommand OpenCommandPaletteCommand =
+        new("Open command palette", "OpenCommandPalette", typeof(MainWindow));
+
+    private sealed record CommandPaletteEntry(string Name, string Group, Action Invoke)
+    {
+        public string Display => $"{Name}  ·  {Group}";
+    }
+
+    private List<CommandPaletteEntry>? _commandPaletteEntries;
+
+    private List<CommandPaletteEntry> CommandPaletteEntries => _commandPaletteEntries ??= BuildCommandPaletteEntries();
+
+    private List<CommandPaletteEntry> BuildCommandPaletteEntries()
+    {
+        var empty = new RoutedEventArgs();
+        CommandPaletteEntry E(string name, string group, Action invoke) => new(name, group, invoke);
+        return new List<CommandPaletteEntry>
+        {
+            E("Capture region", "Capture", () => CaptureRegion_Click(this, empty)),
+            E("Capture active window", "Capture", () => CaptureWindow_Click(this, empty)),
+            E("Capture scrolling window", "Capture", () => CaptureScrollingWindow_Click(this, empty)),
+            E("Capture horizontal scrolling window", "Capture", () => CaptureHorizontalScrollingWindow_Click(this, empty)),
+            E("Capture fullscreen", "Capture", () => CaptureFullscreen_Click(this, empty)),
+            E("Capture all monitors", "Capture", () => CaptureAllMonitors_Click(this, empty)),
+            E("Capture active monitor", "Capture", () => CaptureMonitor_Click(this, empty)),
+            E("Capture last region", "Capture", () => CaptureLastRegion_Click(this, empty)),
+            E("Capture delayed region", "Capture", () => CaptureDelayed_Click(this, empty)),
+            E("Import from clipboard", "Capture", () => ImportClipboard_Click(this, empty)),
+            E("Start / stop GIF recording", "Record", () => Recording_Click(this, empty)),
+            E("Pause / resume recording", "Record", () => PauseRecording_Click(this, empty)),
+            E("Record quick MP4 (5s)", "Record", () => RecordMp4_Click(this, empty)),
+            E("Record all monitors MP4 (5s)", "Record", () => RecordAllMonitorsMp4_Click(this, empty)),
+            E("Start / stop step recorder", "Record", () => StepRecorder_Click(this, empty)),
+            E("Open editor", "Workspace", () => OpenEditor_Click(this, empty)),
+            E("Quick actions", "Workspace", () => CaptureTask_Click(this, empty)),
+            E("Combine selected captures", "Workspace", () => CombineSelected_Click(this, empty)),
+            E("Pin capture to screen", "Workspace", () => PinCapture_Click(this, empty)),
+            E("Copy image", "Clipboard", () => CopyImage_Click(this, empty)),
+            E("Copy file", "Clipboard", () => CopyFile_Click(this, empty)),
+            E("Copy path", "Clipboard", () => CopyPath_Click(this, empty)),
+            E("Copy markdown", "Clipboard", () => CopyMarkdown_Click(this, empty)),
+            E("Show in Explorer", "Workspace", () => ShowInExplorer_Click(this, empty)),
+            E("Quick share", "Share", () => QuickShare_Click(this, empty)),
+            E("Share history", "Share", () => ShareHistory_Click(this, empty)),
+            E("Export bug report", "Share", () => ExportBugReport_Click(this, empty)),
+            E("Explain with AI", "AI", () => AiExplain_Click(this, empty)),
+            E("AI history", "AI", () => AiHistory_Click(this, empty)),
+            E("Export video frame", "Video", () => ExportVideoFrame_Click(this, empty)),
+            E("Trim first 5s", "Video", () => TrimVideo_Click(this, empty)),
+            E("Mute video", "Video", () => MuteVideo_Click(this, empty)),
+            E("Set volume 150%", "Video", () => VolumeVideo_Click(this, empty)),
+            E("Speed 2x", "Video", () => SpeedVideo_Click(this, empty)),
+            E("Crop center 75%", "Video", () => CropVideo_Click(this, empty)),
+            E("Resize to 720p", "Video", () => ResizeVideo_Click(this, empty)),
+            E("Cut 2s from middle", "Video", () => CutVideo_Click(this, empty)),
+            E("Convert to smooth GIF 60", "Video", () => ConvertVideo_Click(this, empty)),
+            E("Strip metadata", "Privacy", () => StripMetadata_Click(this, empty)),
+            E("File details", "Workspace", () => FileDetails_Click(this, empty)),
+            E("Run OCR", "Analyze", () => RunOcr_Click(this, empty)),
+            E("Redact OCR secrets", "Privacy", () => RedactOcrSecrets_Click(this, empty)),
+            E("Scan for sensitive text", "Analyze", () => ScanText_Click(this, empty)),
+            E("Decode QR / barcode", "Analyze", () => DecodeBarcode_Click(this, empty)),
+            E("Pick color", "Analyze", () => ColorPicker_Click(this, empty)),
+            E("Pixel ruler", "Analyze", () => PixelRuler_Click(this, empty)),
+            E("Open settings", "App", () => Settings_Click(this, empty)),
+            E("Open diagnostics", "App", () => Diagnostics_Click(this, empty)),
+            E("Copy diagnostic bundle", "App", () => DiagnosticBundle_Click(this, empty))
+        };
+    }
+
+    private void OpenCommandPalette_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+    {
+        ShowCommandPalette();
+    }
+
+    private void ShowCommandPalette()
+    {
+        if (CommandPaletteOverlay is null)
+        {
+            return;
+        }
+
+        FilterCommandPalette(string.Empty);
+        CommandPaletteOverlay.Visibility = Visibility.Visible;
+        CommandPaletteSearch.Text = string.Empty;
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            CommandPaletteSearch.Focus();
+            System.Windows.Input.Keyboard.Focus(CommandPaletteSearch);
+        }));
+    }
+
+    private void HideCommandPalette()
+    {
+        if (CommandPaletteOverlay is null)
+        {
+            return;
+        }
+
+        CommandPaletteOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void FilterCommandPalette(string query)
+    {
+        query = query?.Trim() ?? string.Empty;
+        IEnumerable<CommandPaletteEntry> matches = CommandPaletteEntries;
+        if (query.Length > 0)
+        {
+            matches = matches.Where(entry =>
+                entry.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                entry.Group.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+
+        CommandPaletteList.ItemsSource = matches.ToList();
+        if (CommandPaletteList.Items.Count > 0)
+        {
+            CommandPaletteList.SelectedIndex = 0;
+        }
+    }
+
+    private void CommandPaletteOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        // Click on the dimmed backdrop (not the panel) closes the palette.
+        if (ReferenceEquals(e.OriginalSource, CommandPaletteOverlay))
+        {
+            HideCommandPalette();
+        }
+    }
+
+    private void CommandPaletteSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        FilterCommandPalette(CommandPaletteSearch.Text);
+    }
+
+    private void CommandPaletteSearch_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case System.Windows.Input.Key.Escape:
+                HideCommandPalette();
+                e.Handled = true;
+                break;
+            case System.Windows.Input.Key.Enter:
+                ExecuteCommandPaletteSelection();
+                e.Handled = true;
+                break;
+            case System.Windows.Input.Key.Down:
+                if (CommandPaletteList.Items.Count > 0)
+                {
+                    CommandPaletteList.SelectedIndex = Math.Min(
+                        CommandPaletteList.SelectedIndex + 1,
+                        CommandPaletteList.Items.Count - 1);
+                    CommandPaletteList.ScrollIntoView(CommandPaletteList.SelectedItem);
+                }
+
+                e.Handled = true;
+                break;
+            case System.Windows.Input.Key.Up:
+                if (CommandPaletteList.Items.Count > 0)
+                {
+                    CommandPaletteList.SelectedIndex = Math.Max(CommandPaletteList.SelectedIndex - 1, 0);
+                    CommandPaletteList.ScrollIntoView(CommandPaletteList.SelectedItem);
+                }
+
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void CommandPaletteList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        ExecuteCommandPaletteSelection();
+    }
+
+    private void ExecuteCommandPaletteSelection()
+    {
+        var entry = CommandPaletteList.SelectedItem as CommandPaletteEntry
+            ?? CommandPaletteList.Items.OfType<CommandPaletteEntry>().FirstOrDefault();
+        if (entry is null)
+        {
+            return;
+        }
+
+        HideCommandPalette();
+        try
+        {
+            entry.Invoke();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Command failed: {ex.Message}");
+        }
+    }
+
+    // ---- Recording input validation ------------------------------------------------
+    private void ValidateRecordingInputs()
+    {
+        if (RecordingValidationText is null)
+        {
+            return;
+        }
+
+        var hints = new List<string>();
+        var fpsValid = IsFpsInputValid(RecordingFpsBox.Text);
+        var sizeValid = IsSizeInputValid(RecordingSizeBox.Text);
+        var bitrateValid = IsBitrateInputValid(RecordingBitrateBox.Text);
+
+        SetFieldInvalid(RecordingFpsBox, !fpsValid);
+        SetFieldInvalid(RecordingSizeBox, !sizeValid);
+        SetFieldInvalid(RecordingBitrateBox, !bitrateValid);
+
+        if (!fpsValid)
+        {
+            hints.Add("FPS must be a whole number like 30.");
+        }
+
+        if (!sizeValid)
+        {
+            hints.Add("Size must be WIDTHxHEIGHT like 1280x720, 'auto', or blank.");
+        }
+
+        if (!bitrateValid)
+        {
+            hints.Add("Bitrate must look like 6000k or 8M, or be blank.");
+        }
+
+        if (hints.Count == 0)
+        {
+            RecordingValidationText.Visibility = Visibility.Collapsed;
+            RecordingValidationText.Text = string.Empty;
+        }
+        else
+        {
+            RecordingValidationText.Text = string.Join(" ", hints);
+            RecordingValidationText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void SetFieldInvalid(System.Windows.Controls.TextBox box, bool invalid)
+    {
+        box.BorderBrush = (System.Windows.Media.Brush)FindResource(invalid ? "WarnBrush" : "BorderBrush");
+        box.BorderThickness = new Thickness(invalid ? 1.5 : 1);
+    }
+
+    private static bool IsFpsInputValid(string text)
+    {
+        text = text.Trim();
+        return !string.IsNullOrEmpty(text) &&
+            int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) &&
+            value > 0;
+    }
+
+    private static bool IsSizeInputValid(string text)
+    {
+        text = text.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return true;
+        }
+
+        var parts = text.Split('x', 'X');
+        return parts.Length == 2 && IsDimensionToken(parts[0]) && IsDimensionToken(parts[1]);
+    }
+
+    private static bool IsDimensionToken(string text)
+    {
+        text = text.Trim();
+        return text.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
+            (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0);
+    }
+
+    private static bool IsBitrateInputValid(string text)
+    {
+        return string.IsNullOrWhiteSpace(text) || ParseRecordingBitrateKbps(text) > 0;
     }
 
     private async void ExportVideoFrame_Click(object sender, RoutedEventArgs e)
@@ -2107,7 +2417,7 @@ public partial class MainWindow : Window
     private void PickColor()
     {
         var picked = _services.ColorPicker.PickUnderCursor();
-        System.Windows.Clipboard.SetText(picked.Hex);
+        ClipboardInterop.SetText(picked.Hex);
         SetStatus($"Picked color {picked.Display}; hex copied to clipboard.");
     }
 

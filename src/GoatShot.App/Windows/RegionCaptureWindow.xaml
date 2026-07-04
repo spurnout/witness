@@ -90,7 +90,7 @@
                        FontSize="13"
                        MaxWidth="560"
                        TextWrapping="Wrap"
-                       Text="Drag a region. Shift disables snap. Esc cancels." />
+                       Text="Drag a region, or pick a window/monitor from the chooser (top-right). The pixel lens magnifies around the cursor. Shift disables snap. Esc cancels." />
         </Border>
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"
