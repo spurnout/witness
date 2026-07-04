@@ -113,6 +113,16 @@ public sealed class WindowsAudioCaptureService : IAudioCaptureService
             catch
             {
                 SafeStop(capture);
+                try
+                {
+                    // Drain the WASAPI capture thread before the using blocks dispose the
+                    // writer, otherwise a late DataAvailable callback races writer disposal.
+                    await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+                }
+                catch (TimeoutException)
+                {
+                    // Best effort: disposal below finalizes whatever was captured.
+                }
                 throw;
             }
 

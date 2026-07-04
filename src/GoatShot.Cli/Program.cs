@@ -1414,6 +1414,12 @@ internal static class Program
     private static async Task<int> MergeVideoAsync(AppServices services, string[] args)
     {
         var targets = PositionalValues(args, "--output", "-o").Select(target => ResolveVideoTarget(services, [target])).ToList();
+        if (targets.Count < 2)
+        {
+            Console.Error.WriteLine("video merge requires at least two video files or capture ids.");
+            return 2;
+        }
+
         if (targets.Any(item => item is null))
         {
             return 2;

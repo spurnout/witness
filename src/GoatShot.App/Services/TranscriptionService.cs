@@ -422,7 +422,7 @@ public sealed partial class TranscriptionService
         var result = await RunProcessAsync(
             engine.ExecutablePath,
             arguments,
-            TimeSpan.FromMinutes(15),
+            ComputeLocalWhisperTimeout(wavPath),
             cancellationToken);
         if (!result.Succeeded)
         {
@@ -440,6 +440,24 @@ public sealed partial class TranscriptionService
         return Directory.EnumerateFiles(outputDirectory, "*.srt", SearchOption.TopDirectoryOnly)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
+    }
+
+    private static readonly TimeSpan MinimumLocalWhisperTimeout = TimeSpan.FromMinutes(15);
+
+    private static TimeSpan ComputeLocalWhisperTimeout(string wavPath)
+    {
+        // A fixed 15-minute ceiling kills legitimate CPU-only transcriptions of long
+        // recordings mid-run; scale with the source audio length (4x realtime) instead.
+        try
+        {
+            using var reader = new NAudio.Wave.WaveFileReader(wavPath);
+            var scaled = TimeSpan.FromTicks(reader.TotalTime.Ticks * 4);
+            return scaled > MinimumLocalWhisperTimeout ? scaled : MinimumLocalWhisperTimeout;
+        }
+        catch
+        {
+            return MinimumLocalWhisperTimeout;
+        }
     }
 
     internal static IReadOnlyList<string> BuildOpenAiWhisperArguments(

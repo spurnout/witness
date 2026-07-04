@@ -284,7 +284,9 @@ public sealed class WorkflowProfileService
             ? "us-east-1"
             : profile.Sharing.S3Region;
         _settings.S3Bucket = profile.Sharing.S3Bucket;
-        _settings.S3KeyPrefix = profile.Sharing.S3KeyPrefix;
+        _settings.S3KeyPrefix = string.IsNullOrWhiteSpace(profile.Sharing.S3KeyPrefix)
+            ? "goatshot/"
+            : profile.Sharing.S3KeyPrefix;
         _settings.S3PublicBaseUrl = profile.Sharing.S3PublicBaseUrl;
         _settings.ImgurApiEndpoint = string.IsNullOrWhiteSpace(profile.Sharing.ImgurApiEndpoint)
             ? "https://api.imgur.com/3/image"

@@ -1,5 +1,7 @@
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
@@ -251,29 +253,30 @@ public sealed class VideoMaskQualityEvaluationService
             return;
         }
 
-        for (var y = 0; y < generated.Height; y++)
+        // GetPixel costs a lock/convert round-trip per call; at 1080p that is ~4M calls
+        // per frame pair. Bulk-copy both frames once and score from raw BGRA bytes.
+        var generatedPixels = CopyBgraPixels(generated);
+        var referencePixels = CopyBgraPixels(reference);
+        for (var index = 0; index < generatedPixels.Length; index += 4)
         {
-            for (var x = 0; x < generated.Width; x++)
-            {
-                var predictedForeground = IsForeground(generated.GetPixel(x, y), threshold);
-                var referenceForeground = IsForeground(reference.GetPixel(x, y), threshold);
+            var predictedForeground = IsForeground(generatedPixels, index, threshold);
+            var referenceForeground = IsForeground(referencePixels, index, threshold);
 
-                if (predictedForeground && referenceForeground)
-                {
-                    frame.TruePositivePixels++;
-                }
-                else if (predictedForeground)
-                {
-                    frame.FalsePositivePixels++;
-                }
-                else if (referenceForeground)
-                {
-                    frame.FalseNegativePixels++;
-                }
-                else
-                {
-                    frame.TrueNegativePixels++;
-                }
+            if (predictedForeground && referenceForeground)
+            {
+                frame.TruePositivePixels++;
+            }
+            else if (predictedForeground)
+            {
+                frame.FalsePositivePixels++;
+            }
+            else if (referenceForeground)
+            {
+                frame.FalseNegativePixels++;
+            }
+            else
+            {
+                frame.TrueNegativePixels++;
             }
         }
 
@@ -531,6 +534,35 @@ public sealed class VideoMaskQualityEvaluationService
     {
         var luminance = (0.2126d * color.R) + (0.7152d * color.G) + (0.0722d * color.B);
         return luminance >= threshold;
+    }
+
+    private static bool IsForeground(byte[] bgra, int index, int threshold)
+    {
+        var luminance = (0.2126d * bgra[index + 2]) + (0.7152d * bgra[index + 1]) + (0.0722d * bgra[index]);
+        return luminance >= threshold;
+    }
+
+    private static byte[] CopyBgraPixels(Bitmap bitmap)
+    {
+        var data = bitmap.LockBits(
+            new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+            ImageLockMode.ReadOnly,
+            PixelFormat.Format32bppArgb);
+        try
+        {
+            var rowBytes = bitmap.Width * 4;
+            var pixels = new byte[rowBytes * bitmap.Height];
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), pixels, y * rowBytes, rowBytes);
+            }
+
+            return pixels;
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
     }
 
     private static string? NormalizeInputPath(string? path)

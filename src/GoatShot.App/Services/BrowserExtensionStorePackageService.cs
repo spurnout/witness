@@ -154,20 +154,11 @@ public sealed class BrowserExtensionStorePackageService
             ? "store-package-created-manual-submission-required"
             : "blocked";
 
-        targetResult.SubmissionManifestPath = await WriteFileAsync(
-            targetRoot,
-            "store-submission-manifest.json",
-            JsonSerializer.Serialize(targetResult, JsonOptions) + Environment.NewLine,
-            cancellationToken);
-        targetResult.GeneratedFiles.Add(targetResult.SubmissionManifestPath);
-
-        var checklistPath = await WriteFileAsync(
-            targetRoot,
-            "store-submission-checklist.md",
-            BuildTargetChecklistMarkdown(targetResult),
-            cancellationToken);
-        targetResult.GeneratedFiles.Add(checklistPath);
-
+        // Build the submission bundle from the target folder BEFORE writing the
+        // submission manifest/checklist. Those two files describe the bundle including
+        // its own hash and size, which a zip cannot honestly contain about itself, so
+        // they are written as authoritative sibling files on disk rather than embedded
+        // as a stale, self-contradicting copy inside the zip.
         var submissionBundlePath = Path.Combine(outputRoot, $"goatshot-browser-extension-{targetName}-store-submission.zip");
         if (File.Exists(submissionBundlePath))
         {
@@ -180,7 +171,13 @@ public sealed class BrowserExtensionStorePackageService
         targetResult.SubmissionBundleSha256 = await Sha256FileAsync(submissionBundlePath, cancellationToken);
         targetResult.GeneratedFiles.Add(submissionBundlePath);
 
-        targetResult.SubmissionManifestPath = await WriteFileAsync(
+        var submissionManifestPath = Path.Combine(targetRoot, "store-submission-manifest.json");
+        var submissionChecklistPath = Path.Combine(targetRoot, "store-submission-checklist.md");
+        targetResult.SubmissionManifestPath = submissionManifestPath;
+        targetResult.GeneratedFiles.Add(submissionManifestPath);
+        targetResult.GeneratedFiles.Add(submissionChecklistPath);
+
+        await WriteFileAsync(
             targetRoot,
             "store-submission-manifest.json",
             JsonSerializer.Serialize(targetResult, JsonOptions) + Environment.NewLine,

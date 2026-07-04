@@ -180,10 +180,23 @@ public sealed class AndroidAdbCaptureService
             : request.RemoteDirectory.Trim().TrimEnd('/');
         var remotePath = $"{remoteDirectory}/goatshot-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
 
-        var mkdir = await _runner.RunTextAsync(
-            diagnostics.AdbPath,
-            DeviceArgs(selected.Device, ["shell", "mkdir", "-p", remoteDirectory]),
-            cancellationToken);
+        AdbProcessResult mkdir;
+        try
+        {
+            // Bound the handshake like the screenrecord step below; a sleeping device or
+            // stalled adb daemon must not hang the capture indefinitely.
+            using var mkdirTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            mkdirTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+            mkdir = await _runner.RunTextAsync(
+                diagnostics.AdbPath,
+                DeviceArgs(selected.Device, ["shell", "mkdir", "-p", remoteDirectory]),
+                mkdirTimeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return FailedVideo(diagnostics, durationSeconds, remotePath, "ADB timed out preparing the Android screenrecord folder.");
+        }
+
         if (mkdir.ExitCode != 0)
         {
             return FailedVideo(diagnostics, durationSeconds, remotePath, $"ADB could not prepare the Android screenrecord folder. {ShortOutput(mkdir.StandardError, mkdir.StandardOutputText)}");
@@ -215,10 +228,24 @@ public sealed class AndroidAdbCaptureService
             return FailedVideo(diagnostics, durationSeconds, remotePath, "ADB screenrecord timed out before the bounded recording finished.");
         }
 
-        var pull = await _runner.RunTextAsync(
-            diagnostics.AdbPath,
-            DeviceArgs(selected.Device, ["pull", remotePath, output]),
-            cancellationToken);
+        AdbProcessResult pull;
+        try
+        {
+            // Even a slow adb-over-Wi-Fi transfer finishes well within recording
+            // duration plus this buffer; a stalled USB link must not hang forever.
+            using var pullTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pullTimeout.CancelAfter(TimeSpan.FromSeconds(durationSeconds + 120));
+            pull = await _runner.RunTextAsync(
+                diagnostics.AdbPath,
+                DeviceArgs(selected.Device, ["pull", remotePath, output]),
+                pullTimeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            await TryRemoveRemoteFileAsync(diagnostics.AdbPath, selected.Device, remotePath);
+            return FailedVideo(diagnostics, durationSeconds, remotePath, "ADB pull timed out transferring the Android screenrecord payload.");
+        }
+
         await TryRemoveRemoteFileAsync(diagnostics.AdbPath, selected.Device, remotePath);
         if (pull.ExitCode != 0)
         {

@@ -839,8 +839,12 @@ public sealed class RecordingService : IDisposable
         var clone = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
         clone.SetResolution(source.HorizontalResolution, source.VerticalResolution);
         using var graphics = Graphics.FromImage(clone);
-        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-        graphics.DrawImage(source, 0, 0, source.Width, source.Height);
+        // Same-size format-converting copy on the per-frame path: source-copy compositing
+        // with no resampling filter; bicubic interpolation here just burns CPU per frame.
+        graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+        graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+        graphics.DrawImage(source, new Rectangle(0, 0, source.Width, source.Height));
         return clone;
     }
 

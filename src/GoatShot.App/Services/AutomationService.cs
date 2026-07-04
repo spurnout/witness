@@ -168,18 +168,26 @@ public sealed class AutomationService
         bool dryRun = false,
         CancellationToken cancellationToken = default)
     {
-        var evaluations = EvaluateRules(trigger, item).ToList();
         var result = new AutomationRunResult
         {
             Trigger = trigger,
-            DryRun = dryRun,
-            TotalRules = evaluations.Count,
-            MatchingRules = evaluations.Count(evaluation => evaluation.Matches),
-            Evaluations = evaluations
+            DryRun = dryRun
         };
 
-        foreach (var evaluation in evaluations.Where(evaluation => evaluation.Matches))
+        // Evaluate each rule immediately before executing it, not as an up-front
+        // snapshot: earlier rules in the batch can mutate the item (e.g. RunOcr
+        // populating OcrText), and later OCR/sensitive-data conditions must observe
+        // that fresh state or they silently never match.
+        var evaluations = new List<AutomationRuleEvaluation>();
+        foreach (var rule in _settings.AutomationRules.ToList())
         {
+            var evaluation = EvaluateRule(rule, trigger, item);
+            evaluations.Add(evaluation);
+            if (!evaluation.Matches)
+            {
+                continue;
+            }
+
             var ruleResult = new AutomationRuleRunResult
             {
                 Evaluation = evaluation
@@ -200,14 +208,16 @@ public sealed class AutomationService
             }
 
             PublishStatus($"Automation rule running: {evaluation.RuleName}");
-            var rule = _settings.AutomationRules.FirstOrDefault(candidate =>
-                candidate.Id.Equals(evaluation.RuleId, StringComparison.OrdinalIgnoreCase));
             foreach (var action in evaluation.Actions)
             {
                 var actionResult = await ExecuteActionAsync(action, item, rule, cancellationToken);
                 ruleResult.Actions.Add(actionResult);
             }
         }
+
+        result.TotalRules = evaluations.Count;
+        result.MatchingRules = evaluations.Count(evaluation => evaluation.Matches);
+        result.Evaluations = evaluations;
 
         if (_workflowRunLogs is not null)
         {

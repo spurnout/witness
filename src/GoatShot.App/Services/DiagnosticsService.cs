@@ -41,7 +41,7 @@ public sealed class DiagnosticsService
 
     public DiagnosticSnapshot GetSnapshot()
     {
-        var capabilities = RecordingCapabilityProbe.Probe();
+        var capabilities = RecordingCapabilityProbe.Probe(refresh: true);
         var productionEncoder = capabilities.SelectProductionVideoEncoder(_settings.Recording);
         var recordingPlan = RecordingEnginePlanner.BuildPlan(
             _settings.Recording,
@@ -109,7 +109,7 @@ public sealed class DiagnosticsService
         RecordingSettings? recordingSettings,
         CancellationToken cancellationToken = default)
     {
-        var capabilities = RecordingCapabilityProbe.Probe();
+        var capabilities = RecordingCapabilityProbe.Probe(refresh: true);
         var settings = recordingSettings ?? _settings.Recording;
         var devices = await GetRecordingDeviceSnapshotAsync(settings, cancellationToken);
         var plan = RecordingEnginePlanner.BuildPlan(

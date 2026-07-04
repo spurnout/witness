@@ -197,7 +197,8 @@ public static class NativeMediaFoundationMp4Encoder
 
             if (audioPayload is not null && audioStreamIndex.HasValue)
             {
-                WriteAudioSamples(writer, audioStreamIndex.Value, audioPayload, cancellationToken);
+                var videoDurationHns = frames.Count * frameDuration;
+                WriteAudioSamples(writer, audioStreamIndex.Value, audioPayload, videoDurationHns, cancellationToken);
             }
 
             CheckHResult(writer.Finalize_(), "finalize MP4");
@@ -409,21 +410,26 @@ public static class NativeMediaFoundationMp4Encoder
         IMFSinkWriter writer,
         int streamIndex,
         NativeAudioPayload payload,
+        long maxDurationHns,
         CancellationToken cancellationToken)
     {
         var bytesPerFrame = payload.Channels * (payload.BitsPerSample / 8);
         var bytesPerSample = NativeAudioFramesPerSample * bytesPerFrame;
+        // Trim audio to the encoded video duration so the MP4 does not trail off with
+        // audio-only content; the FFmpeg fallback enforces the same bound via -shortest.
+        var maxAudioFrames = maxDurationHns * payload.SampleRate / HnsPerSecond;
         long framesWritten = 0;
         for (var offset = 0; offset < payload.Pcm16.Length; offset += bytesPerSample)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var byteCount = Math.Min(bytesPerSample, payload.Pcm16.Length - offset);
-            var frameCount = byteCount / bytesPerFrame;
+            var frameCount = (int)Math.Min(byteCount / bytesPerFrame, maxAudioFrames - framesWritten);
             if (frameCount <= 0)
             {
                 break;
             }
 
+            byteCount = frameCount * bytesPerFrame;
             var sampleTime = framesWritten * HnsPerSecond / payload.SampleRate;
             var sampleDuration = frameCount * HnsPerSecond / payload.SampleRate;
             using var sample = CreateSampleFromBytes(payload.Pcm16, offset, byteCount, sampleTime, sampleDuration);
@@ -448,12 +454,10 @@ public static class NativeMediaFoundationMp4Encoder
 
     private static ComSample CreateSampleFromBitmap(Bitmap source, long sampleTime, long sampleDuration)
     {
-        using var bitmap = source.PixelFormat == PixelFormat.Format32bppArgb
-            ? (Bitmap)source.Clone()
-            : source.Clone(new Rectangle(0, 0, source.Width, source.Height), PixelFormat.Format32bppArgb);
-
-        var rowBytes = checked(bitmap.Width * 4);
-        var bufferBytes = checked(rowBytes * bitmap.Height);
+        // No format clone needed: CopyBitmapToBgraBuffer locks with Format32bppArgb,
+        // and GDI+ converts on read for other source formats.
+        var rowBytes = checked(source.Width * 4);
+        var bufferBytes = checked(rowBytes * source.Height);
         IMFMediaBuffer? buffer = null;
         IMFSample? sample = null;
         try
@@ -462,7 +466,7 @@ public static class NativeMediaFoundationMp4Encoder
             CheckHResult(buffer.Lock(out var destination, out _, out _), "lock frame buffer");
             try
             {
-                CopyBitmapToBgraBuffer(bitmap, destination, rowBytes);
+                CopyBitmapToBgraBuffer(source, destination, rowBytes);
             }
             finally
             {

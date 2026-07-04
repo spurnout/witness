@@ -67,7 +67,7 @@ public sealed class BrowserExtensionNativeBridgeService
             request.ScreenshotPath,
             request.RedactedOutputPath,
             request.StitchPackagePath,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     public async Task<BrowserExtensionBridgeResult> AcceptPayloadAsync(
@@ -75,6 +75,7 @@ public sealed class BrowserExtensionNativeBridgeService
         string? screenshotPath = null,
         string? redactedOutputPath = null,
         string? stitchPackagePath = null,
+        bool confineImportsToBridgeRoot = false,
         CancellationToken cancellationToken = default)
     {
         var validation = BrowserExtensionPayloadContractService.Validate(payload);
@@ -96,6 +97,24 @@ public sealed class BrowserExtensionNativeBridgeService
 
         if (!string.IsNullOrWhiteSpace(stitchPackagePath))
         {
+            // Same trust boundary as the screenshot path: over native messaging the
+            // package location is attacker/extension-controlled, so confine it to the
+            // app-owned bridge folder. The stitch service only confines paths *within*
+            // the package, not the package root itself.
+            if (confineImportsToBridgeRoot &&
+                !IsInsideDirectory(
+                    _paths.BrowserBridgeRoot,
+                    Path.GetFullPath(Environment.ExpandEnvironmentVariables(stitchPackagePath))))
+            {
+                return new BrowserExtensionBridgeResult
+                {
+                    Succeeded = false,
+                    Message = "Browser stitch package must be located inside the GoatShot browser bridge folder for native handoff.",
+                    RedactedPayloadPath = redactedPath,
+                    Warnings = warnings
+                };
+            }
+
             var packageValidation = new BrowserExtensionStitchPackageService().Validate(
                 stitchPackagePath,
                 redacted.Intent.CorrelationId);
@@ -133,7 +152,7 @@ public sealed class BrowserExtensionNativeBridgeService
         {
             try
             {
-                item = await ImportScreenshotAsync(screenshotPath, redacted, redactedPath, cancellationToken);
+                item = await ImportScreenshotAsync(screenshotPath, redacted, redactedPath, confineImportsToBridgeRoot, cancellationToken);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FileNotFoundException or InvalidOperationException)
             {
@@ -181,9 +200,21 @@ public sealed class BrowserExtensionNativeBridgeService
         string screenshotPath,
         BrowserExtensionCapturePayload payload,
         string redactedPayloadPath,
+        bool confineToBridgeRoot,
         CancellationToken cancellationToken)
     {
         var fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(screenshotPath));
+
+        // When the handoff is driven over native messaging (attacker/extension-controlled),
+        // the screenshot must live inside the app-owned bridge folder. Otherwise a
+        // compromised extension could import any readable image on disk into the workspace.
+        // The operator-driven CLI path leaves confineToBridgeRoot false and stays flexible.
+        if (confineToBridgeRoot && !IsInsideDirectory(_paths.BrowserBridgeRoot, fullPath))
+        {
+            throw new InvalidOperationException(
+                "Browser extension screenshot must be located inside the GoatShot browser bridge folder for native handoff.");
+        }
+
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException("Browser extension screenshot was not found.", fullPath);
@@ -274,6 +305,22 @@ public sealed class BrowserExtensionNativeBridgeService
         var status = string.IsNullOrWhiteSpace(stitch.Status) ? "unknown" : stitch.Status;
         var direction = stitch.HorizontalScrollIncluded ? "vertical+horizontal" : "vertical";
         return $"{status}, {stitch.TileCount} tile(s), {direction}, overlap {stitch.OverlapPixels}px, sticky mitigation {stitch.StickyHeaderMitigationPixels}px";
+    }
+
+    private static bool IsInsideDirectory(string root, string candidate)
+    {
+        var normalizedRoot = Path.GetFullPath(root)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedCandidate = Path.GetFullPath(candidate)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(normalizedRoot, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return normalizedCandidate.StartsWith(
+            normalizedRoot + Path.DirectorySeparatorChar,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static string SafeFileName(string? value, string fallback)

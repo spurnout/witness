@@ -450,9 +450,31 @@ public sealed class AdvancedVideoEditPlannerService
             return (false, string.Empty, "FFmpeg could not be started for silence detection.");
         }
 
-        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        string stderr;
+        string stdout;
+        try
+        {
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            stderr = await stderrTask;
+            stdout = await stdoutTask;
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                // Silence detection decodes the whole file; don't orphan ffmpeg on cancel.
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort cleanup on cancellation.
+            }
+
+            throw;
+        }
+
         var output = stderr + Environment.NewLine + stdout;
         return process.ExitCode == 0
             ? (true, output, "Silence detection completed.")

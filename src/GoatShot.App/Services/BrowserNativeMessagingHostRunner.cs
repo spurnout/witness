@@ -92,6 +92,7 @@ public sealed class BrowserNativeMessagingHostRunner
             payload,
             screenshotPath,
             stitchPackagePath: stitchPackagePath,
+            confineImportsToBridgeRoot: true,
             cancellationToken: cancellationToken);
         return new BrowserNativeHostMessageResult
         {

@@ -294,7 +294,11 @@ public sealed class WindowsGraphicsCaptureFrameSource : IDisposable
             Math.Min(_bounds.Height, Math.Max(1, fullFrame.Height - Math.Clamp(sourceY, 0, Math.Max(0, fullFrame.Height - 1)))));
         var output = new Bitmap(_bounds.Width, _bounds.Height, PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(output);
-        graphics.Clear(Color.Transparent);
+        // Output stays pinned at the recording-start size (the MP4 encoder rejects size
+        // changes mid-recording). If the live frame shrank below those bounds, letterbox
+        // with opaque black; transparent fill turns into GIF artifacts and implicit black
+        // in MP4 anyway.
+        graphics.Clear(Color.Black);
         graphics.DrawImage(
             fullFrame,
             new Rectangle(0, 0, source.Width, source.Height),

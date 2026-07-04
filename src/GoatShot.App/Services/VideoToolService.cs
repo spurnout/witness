@@ -1423,8 +1423,10 @@ public sealed class VideoToolService
             }
 
             using var form = new MultipartFormDataContent();
-            var videoBytes = await File.ReadAllBytesAsync(item.FilePath, linked.Token);
-            var videoContent = new ByteArrayContent(videoBytes);
+            // Stream the recording instead of buffering it: source videos can be
+            // hundreds of MB, and ReadAllBytes + ByteArrayContent held 2-3 copies.
+            await using var sourceStream = File.OpenRead(item.FilePath);
+            using var videoContent = new StreamContent(sourceStream);
             videoContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             form.Add(videoContent, "sourceVideo", Path.GetFileName(item.FilePath));
             form.Add(new StringContent("mask-video"), "responseKind");
@@ -1434,22 +1436,26 @@ public sealed class VideoToolService
             }
 
             request.Content = form;
-            using var response = await _httpClient.SendAsync(request, linked.Token);
-            var responseBytes = await response.Content.ReadAsByteArrayAsync(linked.Token);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, linked.Token);
             if (!response.IsSuccessStatusCode)
             {
-                var message = responseBytes.Length == 0
+                var body = await response.Content.ReadAsStringAsync(linked.Token);
+                var message = string.IsNullOrEmpty(body)
                     ? response.ReasonPhrase ?? "no response body"
-                    : Encoding.UTF8.GetString(responseBytes, 0, Math.Min(responseBytes.Length, 512));
+                    : body[..Math.Min(body.Length, 512)];
                 return Failed($"Hosted person-segmentation service returned {(int)response.StatusCode} {response.StatusCode}. {SensitiveTextDetector.Redact(message)}");
             }
 
-            if (responseBytes.Length == 0)
+            await using (var maskStream = File.Create(outputPath))
             {
-                return Failed("Hosted person-segmentation service returned an empty mask video.");
+                await response.Content.CopyToAsync(maskStream, linked.Token);
             }
 
-            await File.WriteAllBytesAsync(outputPath, responseBytes, linked.Token);
+            if (new FileInfo(outputPath).Length == 0)
+            {
+                File.Delete(outputPath);
+                return Failed("Hosted person-segmentation service returned an empty mask video.");
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -2483,9 +2489,30 @@ public sealed class VideoToolService
             return Failed("FFmpeg could not be started.");
         }
 
-        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        string stderr;
+        string stdout;
+        try
+        {
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            stderr = await stderrTask;
+            stdout = await stdoutTask;
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                // Without this, cancelling an export leaves an orphaned ffmpeg.exe running.
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort cleanup on cancellation.
+            }
+
+            throw;
+        }
 
         if (process.ExitCode != 0)
         {
@@ -2562,6 +2589,51 @@ public sealed class VideoToolService
         };
     }
 
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(30);
+
+    private static async Task<(int ExitCode, string StdOut)?> RunProbeProcessAsync(
+        ProcessStartInfo start,
+        CancellationToken cancellationToken)
+    {
+        using var process = Process.Start(start);
+        if (process is null)
+        {
+            return null;
+        }
+
+        // Metadata probes should be sub-second; bound them so a stalled input
+        // (network mount, corrupt container) cannot hang the caller or orphan ffprobe.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ProbeTimeout);
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            await process.WaitForExitAsync(timeoutCts.Token);
+            var stdout = await stdoutTask;
+            _ = await stderrTask;
+            return (process.ExitCode, stdout);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort cleanup for a stalled probe.
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            return null;
+        }
+    }
+
     private static async Task<bool> HasAudioStreamAsync(
         string ffmpeg,
         string inputPath,
@@ -2596,17 +2668,9 @@ public sealed class VideoToolService
 
         try
         {
-            using var process = Process.Start(start);
-            if (process is null)
-            {
-                return false;
-            }
-
-            var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            _ = await process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            return process.ExitCode == 0 &&
-                stdout.Contains("audio", StringComparison.OrdinalIgnoreCase);
+            var probe = await RunProbeProcessAsync(start, cancellationToken);
+            return probe is { ExitCode: 0 } result &&
+                result.StdOut.Contains("audio", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -2646,17 +2710,9 @@ public sealed class VideoToolService
 
         try
         {
-            using var process = Process.Start(start);
-            if (process is null)
-            {
-                return null;
-            }
-
-            var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            _ = await process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            return process.ExitCode == 0 &&
-                double.TryParse(stdout.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) &&
+            var probe = await RunProbeProcessAsync(start, cancellationToken);
+            return probe is { ExitCode: 0 } result &&
+                double.TryParse(result.StdOut.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) &&
                 seconds > 0d
                 ? seconds
                 : null;
@@ -2701,17 +2757,9 @@ public sealed class VideoToolService
 
         try
         {
-            using var process = Process.Start(start);
-            if (process is null)
-            {
-                return null;
-            }
-
-            var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            _ = await process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            var parts = stdout.Trim().Split('x', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return process.ExitCode == 0 &&
+            var probe = await RunProbeProcessAsync(start, cancellationToken);
+            var parts = (probe?.StdOut ?? string.Empty).Trim().Split('x', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return probe is { ExitCode: 0 } &&
                 parts.Length == 2 &&
                 int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) &&
                 int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) &&

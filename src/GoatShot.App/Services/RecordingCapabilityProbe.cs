@@ -326,9 +326,27 @@ public static class RecordingCapabilityProbe
         "hevc_mf"
     ];
 
-    public static RecordingCapabilitySnapshot Probe()
+    private static readonly object ProbeGate = new();
+    private static readonly TimeSpan ProbeCacheTtl = TimeSpan.FromMinutes(5);
+    private static RecordingCapabilitySnapshot? _cachedSnapshot;
+    private static DateTimeOffset _cachedSnapshotAt;
+
+    public static RecordingCapabilitySnapshot Probe(bool refresh = false)
     {
-        return new RecordingCapabilitySnapshot(
+        // Probing is expensive (four MFT enumerations, a D3D11 device creation, and an
+        // `ffmpeg -encoders` child process) and runs on recording start and recording-panel
+        // edits, so serve a cached snapshot unless it is stale or a refresh is requested.
+        lock (ProbeGate)
+        {
+            if (!refresh &&
+                _cachedSnapshot is not null &&
+                DateTimeOffset.UtcNow - _cachedSnapshotAt < ProbeCacheTtl)
+            {
+                return _cachedSnapshot;
+            }
+        }
+
+        var snapshot = new RecordingCapabilitySnapshot(
             ProbeWindowsGraphicsCapture(out var wgcStatus),
             wgcStatus,
             ProbeDirect3D11Device(),
@@ -337,6 +355,13 @@ public static class RecordingCapabilityProbe
             ProbeMediaFoundationEncoder(MfVideoFormatHevc, hardwareOnly: true),
             ProbeMediaFoundationEncoder(MfVideoFormatHevc, hardwareOnly: false),
             ProbeFfmpeg());
+        lock (ProbeGate)
+        {
+            _cachedSnapshot = snapshot;
+            _cachedSnapshotAt = DateTimeOffset.UtcNow;
+        }
+
+        return snapshot;
     }
 
     public static string FormatHResult(int hr)

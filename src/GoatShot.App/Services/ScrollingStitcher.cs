@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using GoatShot.App.Models;
 
 namespace GoatShot.App.Services;
@@ -32,23 +33,23 @@ public static class ScrollingStitcher
             return false;
         }
 
-        var sticky = EffectiveStickyPixels(previous, current, options);
+        var previousPixels = new PixelBuffer(previous);
+        var currentPixels = new PixelBuffer(current);
+        var sticky = EffectiveStickyPixels(previousPixels, currentPixels, options);
         var startX = options.Axis == ScrollingCaptureAxis.Horizontal ? sticky : 0;
         var startY = options.Axis == ScrollingCaptureAxis.Vertical ? sticky : 0;
-        var width = Math.Max(1, current.Width - startX);
-        var height = Math.Max(1, current.Height - startY);
+        var width = Math.Max(1, currentPixels.Width - startX);
+        var height = Math.Max(1, currentPixels.Height - startY);
         var sampleX = Math.Max(1, width / 20);
         var sampleY = Math.Max(1, height / 20);
         long score = 0;
         var samples = 0;
 
-        for (var y = startY; y < current.Height; y += sampleY)
+        for (var y = startY; y < currentPixels.Height; y += sampleY)
         {
-            for (var x = startX; x < current.Width; x += sampleX)
+            for (var x = startX; x < currentPixels.Width; x += sampleX)
             {
-                var a = previous.GetPixel(x, y);
-                var b = current.GetPixel(x, y);
-                score += PixelDistance(a, b);
+                score += PixelDistance(previousPixels, x, y, currentPixels, x, y);
                 samples++;
             }
         }
@@ -59,20 +60,24 @@ public static class ScrollingStitcher
     public static int FindBestOverlap(Bitmap previous, Bitmap current, ScrollingCaptureOptions? options = null)
     {
         options = (options ?? new ScrollingCaptureOptions()).Normalize();
+        var previousPixels = new PixelBuffer(previous);
+        var currentPixels = new PixelBuffer(current);
+        var sticky = EffectiveStickyPixels(previousPixels, currentPixels, options);
         return options.Axis == ScrollingCaptureAxis.Horizontal
-            ? FindBestHorizontalOverlap(previous, current, options, EffectiveStickyPixels(previous, current, options))
-            : FindBestVerticalOverlap(previous, current, options, EffectiveStickyPixels(previous, current, options));
+            ? FindBestHorizontalOverlap(previousPixels, currentPixels, options, sticky)
+            : FindBestVerticalOverlap(previousPixels, currentPixels, options, sticky);
     }
 
     private static Bitmap StitchVertical(IReadOnlyList<Bitmap> frames, ScrollingCaptureOptions options)
     {
+        var buffers = CreatePixelBuffers(frames);
         var overlaps = new List<int> { 0 };
         var stickies = new List<int> { 0 };
         for (var index = 1; index < frames.Count; index++)
         {
-            var sticky = EffectiveStickyPixels(frames[index - 1], frames[index], options);
+            var sticky = EffectiveStickyPixels(buffers[index - 1], buffers[index], options);
             stickies.Add(sticky);
-            overlaps.Add(FindBestVerticalOverlap(frames[index - 1], frames[index], options, sticky));
+            overlaps.Add(FindBestVerticalOverlap(buffers[index - 1], buffers[index], options, sticky));
         }
 
         var width = frames.Min(frame => frame.Width);
@@ -111,13 +116,14 @@ public static class ScrollingStitcher
 
     private static Bitmap StitchHorizontal(IReadOnlyList<Bitmap> frames, ScrollingCaptureOptions options)
     {
+        var buffers = CreatePixelBuffers(frames);
         var overlaps = new List<int> { 0 };
         var stickies = new List<int> { 0 };
         for (var index = 1; index < frames.Count; index++)
         {
-            var sticky = EffectiveStickyPixels(frames[index - 1], frames[index], options);
+            var sticky = EffectiveStickyPixels(buffers[index - 1], buffers[index], options);
             stickies.Add(sticky);
-            overlaps.Add(FindBestHorizontalOverlap(frames[index - 1], frames[index], options, sticky));
+            overlaps.Add(FindBestHorizontalOverlap(buffers[index - 1], buffers[index], options, sticky));
         }
 
         var width = frames[0].Width + frames.Skip(1)
@@ -154,7 +160,7 @@ public static class ScrollingStitcher
         return stitched;
     }
 
-    private static int FindBestVerticalOverlap(Bitmap previous, Bitmap current, ScrollingCaptureOptions options, int sticky)
+    private static int FindBestVerticalOverlap(in PixelBuffer previous, in PixelBuffer current, ScrollingCaptureOptions options, int sticky)
     {
         var maxOverlap = Math.Min(Math.Min(previous.Height, current.Height - sticky) / 2, options.MaximumOverlapPixels);
         if (maxOverlap < options.MinimumOverlapPixels)
@@ -177,7 +183,7 @@ public static class ScrollingStitcher
         return bestOverlap;
     }
 
-    private static int FindBestHorizontalOverlap(Bitmap previous, Bitmap current, ScrollingCaptureOptions options, int sticky)
+    private static int FindBestHorizontalOverlap(in PixelBuffer previous, in PixelBuffer current, ScrollingCaptureOptions options, int sticky)
     {
         var maxOverlap = Math.Min(Math.Min(previous.Width, current.Width - sticky) / 2, options.MaximumOverlapPixels);
         if (maxOverlap < options.MinimumOverlapPixels)
@@ -200,7 +206,7 @@ public static class ScrollingStitcher
         return bestOverlap;
     }
 
-    private static long VerticalOverlapScore(Bitmap previous, Bitmap current, int overlap, int sticky)
+    private static long VerticalOverlapScore(in PixelBuffer previous, in PixelBuffer current, int overlap, int sticky)
     {
         var width = Math.Min(previous.Width, current.Width);
         var sampleX = Math.Max(1, width / 24);
@@ -212,14 +218,14 @@ public static class ScrollingStitcher
             var currentY = sticky + y;
             for (var x = 0; x < width; x += sampleX)
             {
-                score += PixelDistance(previous.GetPixel(x, previousY), current.GetPixel(x, currentY));
+                score += PixelDistance(previous, x, previousY, current, x, currentY);
             }
         }
 
         return score;
     }
 
-    private static long HorizontalOverlapScore(Bitmap previous, Bitmap current, int overlap, int sticky)
+    private static long HorizontalOverlapScore(in PixelBuffer previous, in PixelBuffer current, int overlap, int sticky)
     {
         var height = Math.Min(previous.Height, current.Height);
         var sampleX = Math.Max(1, overlap / 12);
@@ -231,19 +237,19 @@ public static class ScrollingStitcher
             var currentX = sticky + x;
             for (var y = 0; y < height; y += sampleY)
             {
-                score += PixelDistance(previous.GetPixel(previousX, y), current.GetPixel(currentX, y));
+                score += PixelDistance(previous, previousX, y, current, currentX, y);
             }
         }
 
         return score;
     }
 
-    private static int PixelDistance(Color a, Color b)
+    internal static int EffectiveStickyPixels(Bitmap previous, Bitmap current, ScrollingCaptureOptions options)
     {
-        return Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);
+        return EffectiveStickyPixels(new PixelBuffer(previous), new PixelBuffer(current), options);
     }
 
-    internal static int EffectiveStickyPixels(Bitmap previous, Bitmap current, ScrollingCaptureOptions options)
+    private static int EffectiveStickyPixels(in PixelBuffer previous, in PixelBuffer current, ScrollingCaptureOptions options)
     {
         var limit = options.Axis == ScrollingCaptureAxis.Horizontal
             ? Math.Max(0, current.Width - 1)
@@ -260,7 +266,7 @@ public static class ScrollingStitcher
         return Math.Min(limit, Math.Max(configured, detected));
     }
 
-    private static int DetectStickyTopPixels(Bitmap previous, Bitmap current, ScrollingCaptureOptions options)
+    private static int DetectStickyTopPixels(in PixelBuffer previous, in PixelBuffer current, ScrollingCaptureOptions options)
     {
         if (previous.Width != current.Width || previous.Height != current.Height)
         {
@@ -279,7 +285,7 @@ public static class ScrollingStitcher
             var samples = 0;
             for (var x = 0; x < width; x += sampleX)
             {
-                rowDistance += PixelDistance(previous.GetPixel(x, y), current.GetPixel(x, y));
+                rowDistance += PixelDistance(previous, x, y, current, x, y);
                 samples++;
             }
 
@@ -294,7 +300,7 @@ public static class ScrollingStitcher
         return sticky >= 4 ? sticky : 0;
     }
 
-    private static int DetectStickyLeftPixels(Bitmap previous, Bitmap current, ScrollingCaptureOptions options)
+    private static int DetectStickyLeftPixels(in PixelBuffer previous, in PixelBuffer current, ScrollingCaptureOptions options)
     {
         if (previous.Width != current.Width || previous.Height != current.Height)
         {
@@ -313,7 +319,7 @@ public static class ScrollingStitcher
             var samples = 0;
             for (var y = 0; y < height; y += sampleY)
             {
-                columnDistance += PixelDistance(previous.GetPixel(x, y), current.GetPixel(x, y));
+                columnDistance += PixelDistance(previous, x, y, current, x, y);
                 samples++;
             }
 
@@ -326,5 +332,61 @@ public static class ScrollingStitcher
         }
 
         return sticky >= 4 ? sticky : 0;
+    }
+
+    private static int PixelDistance(in PixelBuffer a, int ax, int ay, in PixelBuffer b, int bx, int by)
+    {
+        var indexA = (ay * a.Width + ax) * 4;
+        var indexB = (by * b.Width + bx) * 4;
+        var pixelsA = a.Pixels;
+        var pixelsB = b.Pixels;
+        // BGRA layout: |B|G|R|A| — same R+G+B distance the Color-based scorer used.
+        return Math.Abs(pixelsA[indexA + 2] - pixelsB[indexB + 2]) +
+            Math.Abs(pixelsA[indexA + 1] - pixelsB[indexB + 1]) +
+            Math.Abs(pixelsA[indexA] - pixelsB[indexB]);
+    }
+
+    private static PixelBuffer[] CreatePixelBuffers(IReadOnlyList<Bitmap> frames)
+    {
+        var buffers = new PixelBuffer[frames.Count];
+        for (var index = 0; index < frames.Count; index++)
+        {
+            buffers[index] = new PixelBuffer(frames[index]);
+        }
+
+        return buffers;
+    }
+
+    // Bulk BGRA copy of a bitmap. GetPixel pays a lock/validate/convert round-trip per
+    // call; the overlap/sticky scoring loops made tens of thousands of those per frame
+    // pair, which is what made interactive scrolling captures take multiple seconds.
+    private readonly struct PixelBuffer
+    {
+        public PixelBuffer(Bitmap bitmap)
+        {
+            Width = bitmap.Width;
+            Height = bitmap.Height;
+            Pixels = new byte[Width * Height * 4];
+            var data = bitmap.LockBits(
+                new Rectangle(0, 0, Width, Height),
+                ImageLockMode.ReadOnly,
+                PixelFormat.Format32bppArgb);
+            try
+            {
+                var rowBytes = Width * 4;
+                for (var y = 0; y < Height; y++)
+                {
+                    Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), Pixels, y * rowBytes, rowBytes);
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(data);
+            }
+        }
+
+        public int Width { get; }
+        public int Height { get; }
+        public byte[] Pixels { get; }
     }
 }
