@@ -174,7 +174,9 @@ public sealed class BrowserNativeHostRegistrationServiceTests
         await WithTempPathsAsync(async paths =>
         {
             var bridge = CreateBridge(paths);
-            var packageRoot = Path.Combine(paths.TempRoot, "stitch-package");
+            // Native-messaging imports are confined to the bridge folder, so a valid
+            // package for this positive test must live inside it.
+            var packageRoot = Path.Combine(paths.BrowserBridgeRoot, "stitch-package");
             WriteStitchPackage(packageRoot);
             var runner = new BrowserNativeMessagingHostRunner(bridge);
             await using var input = new MemoryStream();
@@ -198,6 +200,39 @@ public sealed class BrowserNativeHostRegistrationServiceTests
             Assert.IsFalse(string.IsNullOrWhiteSpace(response.WorkspaceFilePath));
             Assert.IsTrue(File.Exists(response.WorkspaceFilePath));
             Assert.IsFalse(string.IsNullOrWhiteSpace(response.StitchPackagePath));
+        });
+    }
+
+    [TestMethod]
+    public async Task NativeMessagingRunner_RejectsStitchPackageOutsideBridgeRoot()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var bridge = CreateBridge(paths);
+            // A compromised extension pointing at a package anywhere outside the bridge
+            // folder must be rejected over native messaging.
+            var packageRoot = Path.Combine(paths.TempRoot, "attacker-stitch-package");
+            WriteStitchPackage(packageRoot);
+            var runner = new BrowserNativeMessagingHostRunner(bridge);
+            await using var input = new MemoryStream();
+            await BrowserNativeMessagingHostRunner.WriteMessageAsync(input, new
+            {
+                payload = JsonSerializer.Deserialize<object>(ValidPayloadJson()),
+                stitchPackagePath = packageRoot
+            });
+            input.Position = 0;
+            await using var output = new MemoryStream();
+
+            var exitCode = await runner.RunOnceAsync(input, output);
+            output.Position = 0;
+            var responseJson = ReadNativeMessage(output);
+            var response = JsonSerializer.Deserialize<BrowserNativeHostMessageResult>(responseJson, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+            Assert.IsNotNull(response);
+            Assert.AreEqual(1, exitCode, responseJson);
+            Assert.IsFalse(response.Succeeded);
+            StringAssert.Contains(response.Message, "bridge folder");
+            Assert.IsTrue(string.IsNullOrWhiteSpace(response.WorkspaceFilePath));
         });
     }
 

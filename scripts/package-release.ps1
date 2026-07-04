@@ -8,6 +8,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Assert-LastExitCode([string] $step) {
+    # $ErrorActionPreference = "Stop" does not cover native exit codes; without this
+    # a failed publish still produces a "successful" (but incomplete) package.
+    if ($LASTEXITCODE -ne 0) {
+        throw "$step failed with exit code $LASTEXITCODE."
+    }
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $appProject = Join-Path $repoRoot "src\GoatShot.App\GoatShot.App.csproj"
 $cliProject = Join-Path $repoRoot "src\GoatShot.Cli\GoatShot.Cli.csproj"
@@ -41,6 +49,7 @@ dotnet publish $appProject `
     /p:PublishReadyToRun=true `
     /p:PublishTrimmed=false `
     /p:Version=$Version
+Assert-LastExitCode "App publish"
 
 dotnet publish $cliProject `
     -c $Configuration `
@@ -51,6 +60,7 @@ dotnet publish $cliProject `
     /p:PublishReadyToRun=true `
     /p:PublishTrimmed=false `
     /p:Version=$Version
+Assert-LastExitCode "CLI publish"
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $publishDir "README.md") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "spec.md") -Destination (Join-Path $publishDir "spec.md") -Force
@@ -88,6 +98,7 @@ if (-not $SkipSingleExe) {
         /p:PublishReadyToRun=true `
         /p:PublishTrimmed=false `
         /p:Version=$Version
+    Assert-LastExitCode "Single-exe publish"
 
     New-Item -ItemType Directory -Force -Path $singleExeDistDir | Out-Null
     Copy-Item -LiteralPath (Join-Path $singleExePublishDir "GoatShot.exe") -Destination (Join-Path $singleExeDistDir "GoatShot.exe") -Force
@@ -119,8 +130,12 @@ if (-not $SkipInstaller -and $iscc) {
         "/DPublishDir=$publishDir" `
         "/DOutputDir=$distRoot" `
         $installerScript
+    Assert-LastExitCode "Inno Setup compile"
 
     $installerPath = Join-Path $distRoot "GoatShot-Setup-$Version-win-x64.exe"
+    if (-not (Test-Path $installerPath)) {
+        throw "Inno Setup reported success but the installer was not created: $installerPath"
+    }
 }
 elseif (-not $SkipInstaller) {
     Write-Warning "Inno Setup compiler was not found. Portable zip was created; install Inno Setup 6 or set INNO_SETUP_ISCC to build the .exe installer."

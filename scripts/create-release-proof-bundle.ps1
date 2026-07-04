@@ -198,8 +198,11 @@ function Invoke-ProofCommand {
     }
 
     $process = [Diagnostics.Process]::Start($processInfo)
+    # Drain stderr asynchronously: sequential ReadToEnd calls deadlock once the child
+    # fills the ~4 KB stderr pipe while stdout is still being read (dotnet test spew).
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
     $process.WaitForExit()
 
     $combined = @(

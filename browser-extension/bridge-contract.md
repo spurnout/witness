@@ -21,6 +21,7 @@ Schema version: `goatshot.browser-capture.v1`
 - `consent.screenshotConsented` must be true for any capture handoff.
 - `consent.telemetryConsented` must be true when `intent.includeTelemetry` is true or console/network events are present.
 - Bug-report telemetry is opt-in and must be visible before collection.
+- Consent originates from a user gesture in the extension popup. A page `postMessage` is untrusted and cannot grant consent or trigger tile capture, downloads, or native handoff; page-initiated requests return geometry/plan metadata only.
 
 ## Data Boundary
 
@@ -61,7 +62,7 @@ The optional `stitch` object lets the extension describe how a full-page capture
 Required shape when `stitch.requested` is true:
 
 - `mode`: capture mode such as `full-page`, `visible-viewport`, or `selected-element`.
-- `status`: `planned`, `planned-partial`, `captured-metadata-only`, `capture-partial`, or `blocked`.
+- `status`: `planned`, `planned-partial`, `captured`, `captured-metadata-only`, `capture-partial`, `blocked`, or `not-requested`.
 - `captureApi`: browser API used by the prototype, currently `tabs.captureVisibleTab`.
 - `tileCount` and `maxTileCount`: declared tile count and safety cap.
 - `overlapPixels`: overlap between adjacent tiles.

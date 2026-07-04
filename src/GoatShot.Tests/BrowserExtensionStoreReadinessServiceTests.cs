@@ -37,7 +37,7 @@ public sealed class BrowserExtensionStoreReadinessServiceTests
             var rationale = await File.ReadAllTextAsync(Path.Combine(output, "permission-rationale.md"));
             StringAssert.Contains(rationale, "nativeMessaging");
             StringAssert.Contains(rationale, "downloads");
-            StringAssert.Contains(rationale, "host:<all_urls>");
+            StringAssert.Contains(rationale, "activeTab");
 
             var privacy = await File.ReadAllTextAsync(Path.Combine(output, "privacy-data-use.md"));
             StringAssert.Contains(privacy, "Not Collected In This Prototype");

@@ -8,12 +8,12 @@ function setStatus(message) {
 }
 
 function readSettings() {
+  // captureMode and captureTiles belong to the popup UI; the options page must not
+  // write them or saving options silently resets the user's popup choices.
   return {
-    captureMode: "full-page",
     nativeHost: elements.nativeHost.checked,
     telemetryConsented: elements.telemetry.checked,
     includeHorizontalScroll: elements.horizontal.checked,
-    captureTiles: elements.exportPackage.checked,
     exportStitchPackage: elements.exportPackage.checked,
     maxTiles: Number.parseInt(elements.maxTiles.value, 10) || 80,
     tileOverlapPixels: Number.parseInt(elements.overlap.value, 10) || 64,
@@ -45,7 +45,10 @@ async function load() {
 }
 
 document.getElementById("save").addEventListener("click", async () => {
-  await chrome.storage.local.set({ [storageKey]: readSettings() });
+  const stored = await chrome.storage.local.get(storageKey);
+  await chrome.storage.local.set({
+    [storageKey]: { ...(stored[storageKey] || {}), ...readSettings() }
+  });
   setStatus("Saved.");
 });
 

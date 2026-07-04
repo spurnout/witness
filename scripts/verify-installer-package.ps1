@@ -270,8 +270,13 @@ if ($RunSilentInstallSmoke) {
     }
     else {
         New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-        & $expectedInstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART "/DIR=$installRoot" "/LOG=$installSmokeLog"
-        $installExit = $LASTEXITCODE
+        # Inno Setup's Setup.exe is a GUI-subsystem executable: `& $path` returns
+        # immediately with a stale $LASTEXITCODE while installation continues in the
+        # background, so wait on the process and take its real exit code.
+        $installProcess = Start-Process -FilePath $expectedInstaller `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installRoot", "/LOG=$installSmokeLog" `
+            -Wait -PassThru
+        $installExit = $installProcess.ExitCode
         if ($null -eq $installExit) {
             $installExit = 0
         }
@@ -293,8 +298,10 @@ if ($RunSilentInstallSmoke) {
                     Add-Message $issues "Silent install did not create an Inno uninstaller under $installRoot"
                 }
                 else {
-                    & $uninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-                    $uninstallExit = $LASTEXITCODE
+                    $uninstallProcess = Start-Process -FilePath $uninstaller.FullName `
+                        -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" `
+                        -Wait -PassThru
+                    $uninstallExit = $uninstallProcess.ExitCode
                     if ($null -eq $uninstallExit) {
                         $uninstallExit = 0
                     }
@@ -304,7 +311,20 @@ if ($RunSilentInstallSmoke) {
                         Add-Message $issues "Silent uninstall failed with exit code $uninstallExit."
                     }
                     else {
-                        $installSmokeStatus = "passed"
+                        # The Inno uninstaller respawns itself to %TEMP% before deleting
+                        # files, so poll briefly for the app exe to actually disappear.
+                        $deadline = (Get-Date).AddSeconds(30)
+                        while ((Test-Path -LiteralPath $installedExe) -and (Get-Date) -lt $deadline) {
+                            Start-Sleep -Milliseconds 500
+                        }
+
+                        if (Test-Path -LiteralPath $installedExe) {
+                            $installSmokeStatus = "failed-uninstall-residue"
+                            Add-Message $issues "Silent uninstall exited 0 but GoatShot.exe was still present after 30 seconds."
+                        }
+                        else {
+                            $installSmokeStatus = "passed"
+                        }
                     }
                 }
             }

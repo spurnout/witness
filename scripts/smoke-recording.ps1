@@ -23,6 +23,9 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot "artifacts\tranche-recording-smoke"
 }
+elseif ([System.IO.Path]::IsPathRooted($OutputRoot)) {
+    $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+}
 else {
     $OutputRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputRoot))
 }
@@ -44,6 +47,9 @@ if ([string]::IsNullOrWhiteSpace($CliPath)) {
 
 if (-not $NoBuild) {
     dotnet build (Join-Path $repoRoot "GoatShot.slnx") -c $Configuration | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed with exit code $LASTEXITCODE; refusing to smoke-test a stale CLI binary."
+    }
 }
 
 if (-not (Test-Path $CliPath)) {
@@ -131,8 +137,11 @@ function Invoke-CliArtifact {
     }
 
     $process = [Diagnostics.Process]::Start($processInfo)
+    # Drain stderr asynchronously: sequential ReadToEnd calls deadlock once the child
+    # fills the ~4 KB stderr pipe while stdout is still being read.
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $stdout = $process.StandardOutput.ReadToEnd().Trim()
-    $stderr = Redact-RecordingLogText -Text $process.StandardError.ReadToEnd().Trim()
+    $stderr = Redact-RecordingLogText -Text $stderrTask.GetAwaiter().GetResult().Trim()
     $process.WaitForExit()
 
     Set-Content -LiteralPath $OutputPath -Value $stdout -Encoding UTF8
@@ -362,8 +371,11 @@ function Invoke-RecordingSmoke {
     }
 
     $process = [Diagnostics.Process]::Start($processInfo)
+    # Drain stderr asynchronously: sequential ReadToEnd calls deadlock once the child
+    # fills the ~4 KB stderr pipe while stdout is still being read.
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $stdout = $process.StandardOutput.ReadToEnd().Trim()
-    $stderr = Redact-RecordingLogText -Text $process.StandardError.ReadToEnd().Trim()
+    $stderr = Redact-RecordingLogText -Text $stderrTask.GetAwaiter().GetResult().Trim()
     $process.WaitForExit()
     $exitCode = $process.ExitCode
 

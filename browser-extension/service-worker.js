@@ -84,6 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "GOATSHOT_CAPTURE_VISIBLE_TAB") {
     const windowId = sender?.tab?.windowId;
+    const senderTabId = sender?.tab?.id;
     const captureOptions = {
       format: message.format === "jpeg" ? "jpeg" : "png"
     };
@@ -91,27 +92,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       captureOptions.quality = message.quality;
     }
 
-    chrome.tabs.captureVisibleTab(
-      windowId,
-      captureOptions,
-      dataUrl => {
-        if (chrome.runtime.lastError) {
-          sendResponse({
-            succeeded: false,
-            diagnosticCode: "visible-tab-capture-failed",
-            message: chrome.runtime.lastError.message
-          });
-          return;
-        }
-
+    // captureVisibleTab shoots whatever tab is foreground in the window; if the user
+    // switched tabs mid scroll-capture we would silently capture an unrelated
+    // (possibly sensitive) tab, so abort instead.
+    chrome.tabs.query({ active: true, windowId }, tabs => {
+      if (chrome.runtime.lastError) {
         sendResponse({
-          succeeded: true,
-          diagnosticCode: "visible-tab-captured",
-          bytes: dataUrl ? dataUrl.length : 0,
-          dataUrl: message.includeDataUrl === true ? dataUrl : undefined
+          succeeded: false,
+          diagnosticCode: "visible-tab-capture-failed",
+          message: chrome.runtime.lastError.message
         });
+        return;
       }
-    );
+
+      const activeTab = tabs && tabs[0];
+      if (Number.isFinite(senderTabId) && activeTab && activeTab.id !== senderTabId) {
+        sendResponse({
+          succeeded: false,
+          diagnosticCode: "capture-tab-not-active",
+          message: "The capture tab is no longer the active tab; aborting so an unrelated tab is not captured."
+        });
+        return;
+      }
+
+      chrome.tabs.captureVisibleTab(
+        windowId,
+        captureOptions,
+        dataUrl => {
+          if (chrome.runtime.lastError) {
+            sendResponse({
+              succeeded: false,
+              diagnosticCode: "visible-tab-capture-failed",
+              message: chrome.runtime.lastError.message
+            });
+            return;
+          }
+
+          sendResponse({
+            succeeded: true,
+            diagnosticCode: "visible-tab-captured",
+            bytes: dataUrl ? dataUrl.length : 0,
+            dataUrl: message.includeDataUrl === true ? dataUrl : undefined
+          });
+        }
+      );
+    });
 
     return true;
   }

@@ -3,7 +3,6 @@
   const stitchPackageSchemaVersion = "goatshot.browser-stitch-package.v1";
   const requestType = "GOATSHOT_COLLECT_PAGE_CAPTURE";
   const responseType = "GOATSHOT_PAGE_CAPTURE_PAYLOAD";
-  const nativeResultType = "GOATSHOT_NATIVE_RECEIVE_RESULT";
   const defaultMaxTiles = 80;
   const defaultOverlapPixels = 64;
   const defaultMaxStitchedPixels = 32000000;
@@ -76,9 +75,11 @@
   }
 
   function rectToMetadata(rect, scrollX, scrollY) {
+    // The native payload validator rejects negative coordinates outright, so clamp
+    // rects for elements scrolled out of view instead of failing the whole handoff.
     return {
-      x: numberOrZero(rect.left + scrollX),
-      y: numberOrZero(rect.top + scrollY),
+      x: Math.max(0, numberOrZero(rect.left + scrollX)),
+      y: Math.max(0, numberOrZero(rect.top + scrollY)),
       width: Math.max(1, numberOrZero(rect.width)),
       height: Math.max(1, numberOrZero(rect.height))
     };
@@ -86,8 +87,8 @@
 
   function rectToViewportMetadata(rect) {
     return {
-      x: numberOrZero(rect.left),
-      y: numberOrZero(rect.top),
+      x: Math.max(0, numberOrZero(rect.left)),
+      y: Math.max(0, numberOrZero(rect.top)),
       width: Math.max(1, numberOrZero(rect.width)),
       height: Math.max(1, numberOrZero(rect.height))
     };
@@ -250,6 +251,32 @@
     return manifest;
   }
 
+  // Chrome caps tabs.captureVisibleTab at 2 calls per second; space captures out and
+  // retry once when the quota error surfaces so multi-tile runs do not fail silently.
+  const minCaptureIntervalMs = 550;
+  let lastCaptureAt = 0;
+
+  function isCaptureQuotaError(message) {
+    return typeof message === "string" &&
+      message.includes("MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND");
+  }
+
+  async function requestVisibleTabCaptureThrottled(includeDataUrl) {
+    const sinceLast = Date.now() - lastCaptureAt;
+    if (sinceLast < minCaptureIntervalMs) {
+      await sleep(minCaptureIntervalMs - sinceLast);
+    }
+
+    let response = await requestVisibleTabCapture(includeDataUrl);
+    if (!response?.succeeded && isCaptureQuotaError(response?.message)) {
+      await sleep(minCaptureIntervalMs + 200);
+      response = await requestVisibleTabCapture(includeDataUrl);
+    }
+
+    lastCaptureAt = Date.now();
+    return response;
+  }
+
   function requestVisibleTabCapture(includeDataUrl) {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
       return Promise.resolve({ succeeded: false, message: "Chrome runtime messaging is unavailable." });
@@ -373,7 +400,7 @@
     };
   }
 
-  async function buildStitchedImageDataUrl(capturedTiles, options) {
+  async function buildStitchedImageDataUrl(capturedTiles, options, manifest) {
     const warnings = [];
     if (capturedTiles.length === 0) {
       return {
@@ -411,24 +438,42 @@
       };
     }
 
+    const overlap = Math.max(0, numberOrZero(manifest?.overlapPixels));
+    const sticky = Math.max(0, numberOrZero(manifest?.stickyHeaderMitigationPixels));
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, width, height);
     for (const entry of capturedTiles) {
       const image = await loadImage(entry.dataUrl);
-      const destinationX = Math.round((entry.tile.x - bounds.x) * dpr);
-      const destinationY = Math.round((entry.tile.y - bounds.y) * dpr);
-      const destinationWidth = Math.max(1, Math.round(entry.tile.width * dpr));
-      const destinationHeight = Math.max(1, Math.round(entry.tile.height * dpr));
+      const tileDpr = entry.tile.devicePixelRatio || 1;
+      // The screenshot is the whole viewport taken at (scrollX, scrollY); the tile's
+      // logical region starts at (x - scrollX, y - scrollY) inside it. Additionally,
+      // rows/columns after the first skip the overlap band (already painted by the
+      // previous tile) plus the sticky-header band, so fixed headers are not
+      // re-painted at every seam.
+      const skipLeft = entry.tile.x > bounds.x
+        ? Math.min(overlap, Math.max(0, entry.tile.width - 1))
+        : 0;
+      const skipTop = entry.tile.y > bounds.y
+        ? Math.min(overlap + sticky, Math.max(0, entry.tile.height - 1))
+        : 0;
+      const regionX = entry.tile.x + skipLeft;
+      const regionY = entry.tile.y + skipTop;
+      const regionWidth = Math.max(1, entry.tile.width - skipLeft);
+      const regionHeight = Math.max(1, entry.tile.height - skipTop);
+      const sourceX = Math.max(0, Math.round((regionX - entry.tile.scrollX) * tileDpr));
+      const sourceY = Math.max(0, Math.round((regionY - entry.tile.scrollY) * tileDpr));
+      const sourceWidth = Math.max(1, Math.min(image.width - sourceX, Math.round(regionWidth * tileDpr)));
+      const sourceHeight = Math.max(1, Math.min(image.height - sourceY, Math.round(regionHeight * tileDpr)));
       context.drawImage(
         image,
-        0,
-        0,
-        Math.min(image.width, destinationWidth),
-        Math.min(image.height, destinationHeight),
-        destinationX,
-        destinationY,
-        destinationWidth,
-        destinationHeight
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        Math.round((regionX - bounds.x) * dpr),
+        Math.round((regionY - bounds.y) * dpr),
+        Math.max(1, Math.round(regionWidth * dpr)),
+        Math.max(1, Math.round(regionHeight * dpr))
       );
     }
 
@@ -466,7 +511,7 @@
     result.downloadRoot = root;
     result.manifestPath = `${root}/goatshot-stitch-package.json`;
 
-    const stitched = await buildStitchedImageDataUrl(capturedTiles, options);
+    const stitched = await buildStitchedImageDataUrl(capturedTiles, options, stitch);
     if (!stitched.dataUrl) {
       result.message = "Stitched image generation failed.";
       result.warnings.push(...stitched.warnings);
@@ -557,9 +602,11 @@
     let captured = 0;
     try {
       for (const tile of manifest.tiles) {
-        window.scrollTo(tile.scrollX, tile.scrollY);
+        // "instant" wins over page CSS scroll-behavior: smooth, which would otherwise
+        // leave the viewport mid-animation when the settle delay elapses.
+        window.scrollTo({ left: tile.scrollX, top: tile.scrollY, behavior: "instant" });
         await sleep(settleDelayMs);
-        const response = await requestVisibleTabCapture(includeDataUrl);
+        const response = await requestVisibleTabCaptureThrottled(includeDataUrl);
         if (response?.succeeded) {
           tile.captureState = includeDataUrl ? "captured" : "captured-metadata-only";
           tile.artifactName = `tile-${String(tile.index).padStart(4, "0")}.png`;
@@ -577,7 +624,7 @@
         }
       }
     } finally {
-      window.scrollTo(originalX, originalY);
+      window.scrollTo({ left: originalX, top: originalY, behavior: "instant" });
     }
 
     if (captured === manifest.tiles.length) {
@@ -687,13 +734,72 @@
     };
   }
 
+  // Serialize captures: overlapping runs would interleave scrollTo loops against the
+  // same viewport and corrupt both tile sets.
+  let captureInFlight = false;
+
+  async function buildPayloadExclusive(options) {
+    if (captureInFlight) {
+      throw new Error("Another GoatShot capture is already in progress.");
+    }
+
+    captureInFlight = true;
+    try {
+      return await buildPayload(options);
+    } finally {
+      captureInFlight = false;
+    }
+  }
+
+  // A page script is untrusted: it cannot grant screenshot/telemetry consent or drive
+  // privileged flows (tile capture, browser downloads, native handoff). Those require a
+  // user gesture through the extension popup. Page-initiated captures therefore return
+  // geometry/plan metadata only, with every privileged flag forced off regardless of
+  // what the page supplied.
+  function sanitizePageOptions(options) {
+    return {
+      captureMode: options.captureMode || "full-page",
+      fullPageCaptureRequested: options.fullPageCaptureRequested !== false,
+      includeHorizontalScroll: options.includeHorizontalScroll === true,
+      tileOverlapPixels: options.tileOverlapPixels,
+      stickyHeaderMitigationPixels: options.stickyHeaderMitigationPixels,
+      maxTiles: options.maxTiles,
+      maxStitchedPixels: options.maxStitchedPixels,
+      correlationId: options.correlationId || "",
+      screenshotConsented: false,
+      telemetryConsented: false,
+      captureTiles: false,
+      exportStitchPackage: false,
+      nativeHost: false
+    };
+  }
+
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.data?.type !== requestType) {
       return;
     }
 
-    const options = event.data.options || {};
-    const payload = await buildPayload(options);
+    // Untrusted page context: strip every privileged flag and never perform tile
+    // capture, downloads, or native handoff from a page postMessage. Real captures go
+    // through the extension popup, where the user clicked a button.
+    const options = sanitizePageOptions(event.data.options || {});
+    let payload;
+    try {
+      payload = await buildPayloadExclusive(options);
+    } catch (error) {
+      // Always answer the page; a silent unhandled rejection leaves callers
+      // waiting on GOATSHOT_PAGE_CAPTURE_PAYLOAD forever.
+      window.postMessage(
+        {
+          type: responseType,
+          payload: null,
+          error: error?.message || "GoatShot capture failed."
+        },
+        "*"
+      );
+      return;
+    }
+
     window.postMessage(
       {
         type: responseType,
@@ -701,25 +807,6 @@
       },
       "*"
     );
-
-    if (options.nativeHost === true && typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage(
-        {
-          type: "GOATSHOT_NATIVE_RECEIVE",
-          payload
-        },
-        (response) => {
-          window.postMessage(
-            {
-              type: nativeResultType,
-              correlationId: payload.intent.correlationId,
-              response
-            },
-            "*"
-          );
-        }
-      );
-    }
   });
 
   if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
@@ -730,7 +817,7 @@
 
       (async () => {
         const options = message.options || {};
-        const payload = await buildPayload(options);
+        const payload = await buildPayloadExclusive(options);
         let nativeResult = null;
         if (options.nativeHost === true && chrome.runtime?.sendMessage) {
           nativeResult = await new Promise((resolve) => {

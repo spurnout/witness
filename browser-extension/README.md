@@ -17,14 +17,14 @@ This folder is an optional companion-module prototype for browser page capture. 
 - Provide a popup/options UI for consented capture settings, host status, and last handoff feedback.
 - Generate browser-specific setup notes through `goatshot browser-extension install-guide`.
 - Report local operator diagnostics through `goatshot browser-extension status` / `diagnostics`, including stable diagnostic codes for missing extension source, missing/incomplete package files, safe fixture availability, native-host missing/manifest-missing/registered-but-browser-proof-needed states, rejected payload diagnostics, stitch-package import diagnostics, and the browser-download package boundary.
-- Forward a consented payload to `com.goatshot.bridge` when a caller passes `nativeHost: true` in the prototype page message.
+- Forward a consented payload to `com.goatshot.bridge` only from a popup-initiated capture (a user gesture). Page `postMessage` requests are untrusted and never trigger native handoff, tile capture, or downloads.
 - Validate and package the prototype with `goatshot browser-extension package`. The package ZIP intentionally includes the manifest, content script, service worker, popup/options UI, and shared extension CSS.
 - Generate store-readiness checklist artifacts with `goatshot browser-extension store-readiness`, including local/Chrome/Edge/Firefox target status, permission rationale, privacy/data-use copy, screenshot checklist, and native-host proof boundaries.
 - Generate local store-submission package folders with `goatshot browser-extension store-package`, including target-specific extension ZIPs, submission handoff ZIPs, SHA-256 manifests, readiness copy, missing manual-evidence lists, and publication non-goals.
 - Generate read-only publication plans with `goatshot browser-extension publication-plan`, including package/readiness references, browser-store authority boundaries, manual gates, required evidence, official store documentation references, and false mutation flags without contacting store accounts or uploading packages.
 - Generate read-only install plans with `goatshot browser-extension install-plan`, including browser-specific manual steps, native-host commands, generated package references, required evidence, and authority boundaries without changing browser profiles, registry keys, native-host folders, or store state.
 - Generate temporary install-assist artifacts with `goatshot browser-extension install-assist`, including isolated Chrome/Edge `--load-extension` launch scripts, browser launch plan JSON, manual Firefox temporary-load guidance, and false mutation flags for browser-store contact, permanent install, existing profile mutation, registry/policy writes, and native-host registration.
-- Use `<all_urls>` host permission for consented `tabs.captureVisibleTab` tile capture. Content scripts still match only `http://*/*` and `https://*/*`, and the prototype still excludes cookies, headers, form values, local/session storage, DOM text dumps, ids, classes, and raw selector paths.
+- Rely on the `activeTab` permission for consented `tabs.captureVisibleTab` tile capture, which is granted for the active tab only after the operator invokes the popup; no broad `<all_urls>` host permission is requested. Content scripts still match only `http://*/*` and `https://*/*`, and the prototype still excludes cookies, headers, form values, local/session storage, DOM text dumps, ids, classes, and raw selector paths.
 - Keep console/network telemetry opt-in.
 
 ## Not Yet Implemented
@@ -42,22 +42,22 @@ This folder is an optional companion-module prototype for browser page capture. 
 
 ## Prototype Handoff
 
-The content script listens for a page message:
+The content script listens for a page message and replies with geometry/plan metadata
+only. A page cannot grant consent or drive privileged flows: `screenshotConsented`,
+`telemetryConsented`, `captureTiles`, `exportStitchPackage`, and `nativeHost` supplied
+by a page are ignored and forced off. Actual tile capture, stitch-package downloads, and
+native handoff run only from the extension popup, where the user clicked a button.
 
 ```js
 window.postMessage({
   type: "GOATSHOT_COLLECT_PAGE_CAPTURE",
   options: {
-    screenshotConsented: true,
-    telemetryConsented: false,
     captureMode: "full-page",
     fullPageCaptureRequested: true,
     includeHorizontalScroll: true,
     tileOverlapPixels: 64,
     stickyHeaderMitigationPixels: 0,
     maxTiles: 80,
-    captureTiles: false,
-    exportStitchPackage: false,
     correlationId: "operator-generated-id"
   }
 }, "*");
@@ -98,9 +98,9 @@ The popup stores local defaults in extension storage. The popup and options Host
 
 `goatshot browser-extension status` prints a desktop-side diagnostic summary. These codes are intentionally split by proof boundary: `extension-source-ready` and `safe-fixture-ready` are local filesystem readiness, `native-host-missing` and `native-host-manifest-missing` are desktop registration problems, `native-host-registered-browser-proof-needed` still requires the browser popup Host Status check, and `payload-rejected-diagnostics-available` / `stitch-package-import-diagnostics-available` mean the native CLI has actionable failure reporting for fixture evidence. Desktop diagnostics cannot prove that Chrome, Edge, or Firefox has loaded the unpacked extension.
 
-`captureTiles: true` asks the prototype to scroll through the planned tile positions and call `chrome.tabs.captureVisibleTab` for each tile. The payload records capture state and tile metadata only; bitmap bytes are intentionally not embedded in native messaging payloads.
+`captureTiles: true` (popup-initiated only) asks the prototype to scroll through the planned tile positions and call `chrome.tabs.captureVisibleTab` for each tile. The payload records capture state and tile metadata only; bitmap bytes are intentionally not embedded in native messaging payloads.
 
-`exportStitchPackage: true` captures tile image bytes after screenshot consent and writes a local package under the browser downloads folder, using `GoatShot/<correlationId>/` as the relative folder hint. The browser does not expose a stable absolute downloads path to the native app, so import remains explicit:
+`exportStitchPackage: true` (popup-initiated only) captures tile image bytes after screenshot consent and writes a local package under the browser downloads folder, using `GoatShot/<correlationId>/` as the relative folder hint. The browser does not expose a stable absolute downloads path to the native app, so import remains explicit:
 
 ```powershell
 goatshot browser-extension receive .\samples\full-page-capture-payload.json --stitch-package "$env:USERPROFILE\Downloads\GoatShot\operator-generated-id" --json
