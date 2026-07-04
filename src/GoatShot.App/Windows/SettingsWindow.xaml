@@ -155,10 +155,15 @@
                 <UniformGrid x:Name="RecordingSummaryGrid"
                              Columns="3"
                              Margin="0,0,0,12" />
-                <CheckBox x:Name="PreferProductionRecorderBox" Content="Prefer production recorder when available" />
+                <CheckBox x:Name="PreferProductionRecorderBox"
+                          Content="Prefer production recorder when available"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
                 <CheckBox x:Name="PreferHevcRecorderBox"
-                          Content="Prefer HEVC when Media Foundation support is available"
-                          Margin="0,6,0,0" />
+                           Content="Prefer HEVC when Media Foundation support is available"
+                           Checked="RecordingSummaryInput_Changed"
+                           Unchecked="RecordingSummaryInput_Changed"
+                           Margin="0,6,0,0" />
                 <TextBlock Text="H.264 remains the default. HEVC is used only when explicitly enabled and a local Media Foundation HEVC encoder is reported."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
@@ -233,61 +238,90 @@
                            Margin="0,0,0,12" />
                 <TextBlock Text="MP4 quality profile" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
                 <ComboBox x:Name="RecordingQualityBox"
-                          Margin="0,6,0,10"
-                          Style="{StaticResource GoatComboBox}">
+                           Margin="0,6,0,10"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed">
                     <ComboBoxItem Content="Small" />
                     <ComboBoxItem Content="Balanced" />
                     <ComboBoxItem Content="High quality" />
                     <ComboBoxItem Content="Archive" />
                 </ComboBox>
                 <TextBlock Text="Frames per second" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingFpsBox" Margin="0,6,0,10" />
+                <TextBox x:Name="RecordingFpsBox"
+                         Margin="0,6,0,10"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Target size" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingSizeBox" Margin="0,6,0,6" />
+                <TextBox x:Name="RecordingSizeBox"
+                         Margin="0,6,0,6"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Use WIDTHxHEIGHT, WIDTHxauto, or leave blank for source/max fallback size."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
                 <TextBlock Text="Bitrate" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingBitrateBox" Margin="0,6,0,6" />
+                <TextBox x:Name="RecordingBitrateBox"
+                         Margin="0,6,0,6"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Optional. Examples: 6000k, 8M. Blank uses the selected quality profile CRF."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
-                <CheckBox x:Name="RecordingMicBox" Content="Request microphone recording" />
+                <CheckBox x:Name="RecordingMicBox"
+                          Content="Request microphone recording"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Microphone device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingMicDeviceBox"
-                          Margin="0,6,0,10"
-                          Style="{StaticResource GoatComboBox}" />
+                           Margin="0,6,0,10"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Microphone gain" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingMicGainBox" Margin="0,6,0,6" />
+                <TextBox x:Name="RecordingMicGainBox"
+                         Margin="0,6,0,6"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <CheckBox x:Name="RecordingMicMutedBox"
-                          Content="Mute microphone track"
-                          Margin="0,0,0,10" />
-                <CheckBox x:Name="RecordingSystemAudioBox" Content="Request system audio recording" />
+                           Content="Mute microphone track"
+                           Checked="RecordingSummaryInput_Changed"
+                           Unchecked="RecordingSummaryInput_Changed"
+                           Margin="0,0,0,10" />
+                <CheckBox x:Name="RecordingSystemAudioBox"
+                          Content="Request system audio recording"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
                 <TextBlock Text="System audio device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingSystemAudioDeviceBox"
-                          Margin="0,6,0,10"
-                          Style="{StaticResource GoatComboBox}" />
+                           Margin="0,6,0,10"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="System audio gain" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingSystemAudioGainBox" Margin="0,6,0,6" />
+                <TextBox x:Name="RecordingSystemAudioGainBox"
+                         Margin="0,6,0,6"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <CheckBox x:Name="RecordingSystemAudioMutedBox"
-                          Content="Mute system audio track"
-                          Margin="0,0,0,10" />
+                           Content="Mute system audio track"
+                           Checked="RecordingSummaryInput_Changed"
+                           Unchecked="RecordingSummaryInput_Changed"
+                           Margin="0,0,0,10" />
                 <TextBlock Text="Noise gate threshold dB" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingNoiseGateBox" Margin="0,6,0,6" />
+                <TextBox x:Name="RecordingNoiseGateBox"
+                         Margin="0,6,0,6"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Use -96 to disable, or values like -55 for light room-noise gating."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
-                <CheckBox x:Name="RecordingWebcamBox" Content="Request webcam overlay" />
+                <CheckBox x:Name="RecordingWebcamBox"
+                          Content="Request webcam overlay"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Webcam device" Foreground="{StaticResource MutedInkBrush}" Margin="0,6,0,0" />
                 <ComboBox x:Name="RecordingWebcamDeviceBox"
-                          Margin="0,6,0,10"
-                          Style="{StaticResource GoatComboBox}" />
+                           Margin="0,6,0,10"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed" />
                 <Button Content="Refresh recording devices"
                         Click="RefreshRecordingDevices_Click"
                         Style="{StaticResource SecondaryButton}"
@@ -298,14 +332,27 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
-                <CheckBox x:Name="RecordingCountdownBox" Content="Show countdown before recording" />
-                <CheckBox x:Name="RecordingBorderBox" Content="Show recording border" />
-                <CheckBox x:Name="RecordingTimerBox" Content="Show recording timer" />
-                <CheckBox x:Name="RecordingKeystrokeBox" Content="Show keystroke overlay" />
+                <CheckBox x:Name="RecordingCountdownBox"
+                          Content="Show countdown before recording"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
+                <CheckBox x:Name="RecordingBorderBox"
+                          Content="Show recording border"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
+                <CheckBox x:Name="RecordingTimerBox"
+                          Content="Show recording timer"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
+                <CheckBox x:Name="RecordingKeystrokeBox"
+                          Content="Show keystroke overlay"
+                          Checked="RecordingSummaryInput_Changed"
+                          Unchecked="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Timer position" Foreground="{StaticResource MutedInkBrush}" Margin="0,8,0,0" />
                 <ComboBox x:Name="RecordingTimerPositionBox"
-                          Margin="0,6,0,8"
-                          Style="{StaticResource GoatComboBox}">
+                           Margin="0,6,0,8"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -315,8 +362,9 @@
                 </ComboBox>
                 <TextBlock Text="Keystroke position" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="RecordingKeystrokePositionBox"
-                          Margin="0,6,0,8"
-                          Style="{StaticResource GoatComboBox}">
+                           Margin="0,6,0,8"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed">
                     <ComboBoxItem Content="TopLeft" />
                     <ComboBoxItem Content="TopCenter" />
                     <ComboBoxItem Content="TopRight" />
@@ -325,11 +373,14 @@
                     <ComboBoxItem Content="BottomRight" />
                 </ComboBox>
                 <TextBlock Text="Overlay badge size" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="RecordingOverlayBadgeSizeBox" Margin="0,6,0,8" />
+                <TextBox x:Name="RecordingOverlayBadgeSizeBox"
+                         Margin="0,6,0,8"
+                         TextChanged="RecordingSummaryInput_Changed" />
                 <TextBlock Text="Overlay badge style" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="RecordingOverlayStyleBox"
-                          Margin="0,6,0,8"
-                          Style="{StaticResource GoatComboBox}">
+                           Margin="0,6,0,8"
+                           Style="{StaticResource GoatComboBox}"
+                           SelectionChanged="RecordingSummaryInput_Changed">
                     <ComboBoxItem Content="Neon" />
                     <ComboBoxItem Content="HighContrast" />
                     <ComboBoxItem Content="Subtle" />
@@ -1095,7 +1146,10 @@
                 <UniformGrid x:Name="AutomationSummaryGrid"
                              Columns="3"
                              Margin="0,0,0,12" />
-                <CheckBox x:Name="EnableWatchFoldersBox" Content="Enable watch folders while GoatShot is running" />
+                <CheckBox x:Name="EnableWatchFoldersBox"
+                          Content="Enable watch folders while GoatShot is running"
+                          Checked="AutomationSummaryInput_Changed"
+                          Unchecked="AutomationSummaryInput_Changed" />
                 <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
                 <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
                 <CheckBox x:Name="WatchCopyAfterImportBox" Content="Copy imported image to clipboard" />
@@ -1106,7 +1160,8 @@
                          AcceptsReturn="True"
                          Height="82"
                          AutomationProperties.Name="Watch folders"
-                         Margin="0,6,0,14" />
+                         Margin="0,6,0,14"
+                         TextChanged="AutomationSummaryInput_Changed" />
                 <Border Background="#101B23"
                         BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"

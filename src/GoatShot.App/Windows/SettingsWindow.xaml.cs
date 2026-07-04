@@ -21,6 +21,8 @@ public partial class SettingsWindow : Window
     private bool _suppressSectionSelectionSync;
     private bool _automationRuleSelectionUpdating;
     private bool _deferredStartupStarted;
+    private bool _settingsLoading;
+    private bool _summaryTileRefreshReady;
     private string? _selectedAutomationRuleId;
     private string _lastPluginUpdateCliCommand = "goatshot plugins updates --registry \"<registry.json-or-url>\" --json";
 
@@ -31,10 +33,13 @@ public partial class SettingsWindow : Window
         EscapeKeyCloseBehavior.Attach(this);
         InitializeSettingsSectionNavigation();
         LoadSettings();
+        _summaryTileRefreshReady = true;
         _settingsSectionNavigationReady = true;
         RecordingDeviceStatusText.Text = "Settings loaded. Recording devices refresh after the window opens.";
         ContentRendered += SettingsWindow_ContentRendered;
     }
+
+    private bool CanRefreshSummaryTiles => _summaryTileRefreshReady && !_settingsLoading;
 
     private void SettingsWindow_ContentRendered(object? sender, EventArgs e)
     {
@@ -220,6 +225,19 @@ public partial class SettingsWindow : Window
     }
 
     private void LoadSettings()
+    {
+        _settingsLoading = true;
+        try
+        {
+            LoadSettingsCore();
+        }
+        finally
+        {
+            _settingsLoading = false;
+        }
+    }
+
+    private void LoadSettingsCore()
     {
         var settings = _services.Settings;
         LibraryRootBox.Text = settings.LibraryRoot;
@@ -474,6 +492,16 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void RecordingSummaryInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!CanRefreshSummaryTiles)
+        {
+            return;
+        }
+
+        RefreshRecordingSummaryTiles();
+    }
+
     private void RefreshAutomationSummaryTiles()
     {
         var tiles = _automationSummaryTiles.Create(
@@ -485,6 +513,16 @@ public partial class SettingsWindow : Window
         {
             AutomationSummaryGrid.Children.Add(CreateSummaryTileCard(tile.Title, tile.Value, tile.Detail, tile.Tone));
         }
+    }
+
+    private void AutomationSummaryInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!CanRefreshSummaryTiles)
+        {
+            return;
+        }
+
+        RefreshAutomationSummaryTiles();
     }
 
     private MediaBrush CardBrush(string tone)
