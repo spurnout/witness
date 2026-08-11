@@ -42,8 +42,15 @@ public sealed class ReleaseProofBundleScriptTests
 
             Assert.AreEqual(1, root.GetProperty("manifestVersion").GetInt32());
             Assert.AreEqual("GoatShot", root.GetProperty("application").GetString());
-            Assert.IsTrue(root.GetProperty("zipPath").GetString()!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
-            Assert.IsTrue(File.Exists(root.GetProperty("zipPath").GetString()));
+            var publishedZipPath = root.GetProperty("zipPath").GetString()!;
+            Assert.IsTrue(publishedZipPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            var localZipPath = Path.IsPathRooted(publishedZipPath)
+                ? publishedZipPath
+                : Path.Combine(outputRoot, publishedZipPath);
+            Assert.IsTrue(File.Exists(localZipPath));
+            Assert.AreEqual(".", root.GetProperty("repoRoot").GetString());
+            Assert.IsFalse(File.ReadAllText(manifestPath).Contains(repoRoot, StringComparison.OrdinalIgnoreCase));
+            Assert.IsFalse(File.ReadAllText(manifestPath).Contains(tempRoot, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(
                 root.GetProperty("unverifiedLanes")
                     .EnumerateArray()
@@ -66,7 +73,7 @@ public sealed class ReleaseProofBundleScriptTests
                 .ToList();
             Assert.IsTrue(excluded.Any(item => item.Contains("media payloads are excluded", StringComparison.OrdinalIgnoreCase)));
 
-            using var zip = ZipFile.OpenRead(root.GetProperty("zipPath").GetString()!);
+            using var zip = ZipFile.OpenRead(localZipPath);
             Assert.IsTrue(ZipContainsEntry(zip, "manifest.json"));
             Assert.IsTrue(ZipContainsEntry(zip, "additional-artifacts/secret-log.txt"));
             Assert.IsFalse(ZipContainsEntry(zip, "additional-artifacts/private-recording.mp4"));
@@ -109,6 +116,7 @@ public sealed class ReleaseProofBundleScriptTests
         processInfo.ArgumentList.Add("-OutputRoot");
         processInfo.ArgumentList.Add(outputRoot);
         processInfo.ArgumentList.Add("-SkipCommands");
+        processInfo.ArgumentList.Add("-SkipTrancheNotes");
         processInfo.ArgumentList.Add("-AdditionalArtifactPath");
         processInfo.ArgumentList.Add(secretLog + "," + mediaPayload);
 
