@@ -140,7 +140,7 @@ public sealed class VideoMaskQualityEvaluationService
         var ffmpeg = NormalizeInputPath(request.FfmpegPath) ?? RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
         {
-            result.Issues.Add("FFmpeg is required to evaluate mask videos frame-by-frame. Install ffmpeg.exe, add it to PATH, set GOATSHOT_FFMPEG_PATH, or evaluate extracted still frames.");
+            result.Issues.Add("FFmpeg is required to evaluate mask videos frame-by-frame. Install ffmpeg.exe, add it to PATH, set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias), or evaluate extracted still frames.");
             return;
         }
 
@@ -348,7 +348,7 @@ public sealed class VideoMaskQualityEvaluationService
     private static string BuildMarkdown(VideoMaskQualityEvaluationResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Mask Quality Evaluation");
+        builder.AppendLine("# Receipts Mask Quality Evaluation");
         builder.AppendLine();
         builder.AppendLine($"Generated mask: `{EmptyIfMissing(result.GeneratedMaskPath)}`");
         builder.AppendLine($"Reference mask: `{EmptyIfMissing(result.ReferenceMaskPath)}`");

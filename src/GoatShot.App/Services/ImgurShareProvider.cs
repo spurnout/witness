@@ -75,7 +75,7 @@ public sealed class ImgurShareProvider : IShareProvider
         content.Add(fileContent, "image", FileName(request));
         content.Add(new StringContent("file"), "type");
         content.Add(new StringContent(Path.GetFileNameWithoutExtension(FileName(request))), "title");
-        content.Add(new StringContent($"GoatShot capture {MetadataValue(request, "id", string.Empty)}"), "description");
+        content.Add(new StringContent($"Receipts capture {MetadataValue(request, "id", string.Empty)}"), "description");
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {

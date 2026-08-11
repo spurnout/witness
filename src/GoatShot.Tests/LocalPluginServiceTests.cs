@@ -34,6 +34,26 @@ public sealed class LocalPluginServiceTests
     }
 
     [TestMethod]
+    public async Task Discover_AcceptsLegacyGoatShotManifestSchema()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var settings = new AppSettings();
+            await WritePluginManifestAsync(
+                paths,
+                ValidManifest().Replace(
+                    LocalPluginService.CurrentSchemaVersion,
+                    LocalPluginService.LegacySchemaVersion,
+                    StringComparison.Ordinal));
+            var service = new LocalPluginService(paths, settings);
+
+            var plugin = service.Discover().Single();
+
+            Assert.IsTrue(plugin.IsValid, string.Join("; ", plugin.Issues));
+        });
+    }
+
+    [TestMethod]
     public async Task Discover_ReportsInvalidManifestIssues()
     {
         await WithTempPathsAsync(async paths =>
@@ -331,7 +351,7 @@ public sealed class LocalPluginServiceTests
     {
         return """
             {
-              "schemaVersion": "goatshot.plugin.v1",
+              "schemaVersion": "receipts.plugin.v1",
               "id": "sample.redaction-note",
               "name": "Sample Redaction Note",
               "version": "0.1.0",
@@ -377,7 +397,7 @@ public sealed class LocalPluginServiceTests
     {
         return """
             {
-              "schemaVersion": "goatshot.plugin.v1",
+              "schemaVersion": "receipts.plugin.v1",
               "id": "sample.redaction-note",
               "name": "Sample Redaction Note",
               "version": "0.1.0",

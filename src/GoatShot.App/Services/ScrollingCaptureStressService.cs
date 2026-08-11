@@ -34,7 +34,7 @@ public static class ScrollingCaptureStressService
                 DateTimeOffset.Now,
                 fullDirectory,
                 "Synthetic scrolling targets are generated locally and contain no live desktop pixels.",
-                "If simulated wheel scrolling cannot control a real target, capture overlapping frames manually and use `goatshot image stitch` with the matching scroll profile.",
+                "If simulated wheel scrolling cannot control a real target, capture overlapping frames manually and use `receipts image stitch` with the matching scroll profile.",
                 results);
             return report;
         }, cancellationToken);

@@ -177,7 +177,7 @@ public sealed class JiraShareProvider : IShareProvider
     {
         var lines = new List<string>
         {
-            "Created from GoatShot.",
+            "Created from Receipts.",
             string.Empty,
             $"File: {MetadataValue(request, "fileName", Path.GetFileName(request.FilePath))}",
             $"Capture type: {MetadataValue(request, "captureType", request.CaptureType)}",

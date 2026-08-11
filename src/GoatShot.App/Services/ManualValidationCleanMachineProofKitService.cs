@@ -47,11 +47,15 @@ public sealed class ManualValidationCleanMachineProofKitService
             request.PortableZipPath,
             repoRoot,
             Path.Combine("artifacts", "dist"),
+            $"Receipts-{BrandIdentity.ReleaseVersion}-win-x64-portable.zip",
+            "Receipts-*-win-x64-portable.zip",
             "GoatShot-*-win-x64-portable.zip");
         var installerPath = ResolvePackagePath(
             request.InstallerPath,
             repoRoot,
             Path.Combine("artifacts", "dist"),
+            $"Receipts-{BrandIdentity.ReleaseVersion}-win-x64.exe",
+            "Receipts-*-win-x64.exe",
             "GoatShot-Setup-*-win-x64.exe");
 
         var result = new ManualValidationCleanMachineProofKitResult
@@ -167,7 +171,7 @@ public sealed class ManualValidationCleanMachineProofKitService
         string? requestedPath,
         string repoRoot,
         string relativeSearchDirectory,
-        string searchPattern)
+        params string[] searchPatterns)
     {
         if (!string.IsNullOrWhiteSpace(requestedPath))
         {
@@ -180,12 +184,21 @@ public sealed class ManualValidationCleanMachineProofKitService
             return null;
         }
 
-        return Directory.EnumerateFiles(directory, searchPattern, SearchOption.TopDirectoryOnly)
-            .Select(path => new FileInfo(path))
-            .OrderByDescending(info => info.LastWriteTimeUtc)
-            .ThenByDescending(info => info.Length)
-            .Select(info => info.FullName)
-            .FirstOrDefault();
+        foreach (var searchPattern in searchPatterns)
+        {
+            var match = Directory.EnumerateFiles(directory, searchPattern, SearchOption.TopDirectoryOnly)
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(info => info.LastWriteTimeUtc)
+                .ThenByDescending(info => info.Length)
+                .Select(info => info.FullName)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(match))
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static string ResolveRepoRoot(string? requestedRepoRoot, string manualValidationRoot)
@@ -269,7 +282,7 @@ public sealed class ManualValidationCleanMachineProofKitService
         builder.AppendLine();
         builder.AppendLine("- Use a clean Windows user profile or disposable Windows VM.");
         builder.AppendLine("- Stage only safe demo content. Do not expose private files, chats, email, account screens, credentials, or customer data.");
-        builder.AppendLine("- Keep the VM evidence folder separate from real GoatShot user data.");
+        builder.AppendLine("- Keep the VM evidence folder separate from real Receipts user data and any legacy GoatShot state.");
         builder.AppendLine("- Prefer a local-only VM/network-disabled run unless provider or browser-store proof is explicitly scheduled.");
         builder.AppendLine("- Do not mark this lane passed from current-developer-machine evidence.");
         builder.AppendLine();
@@ -278,7 +291,7 @@ public sealed class ManualValidationCleanMachineProofKitService
         builder.AppendLine("1. Copy this kit folder, or at least the portable ZIP and this runbook, into the clean Windows profile or VM.");
         builder.AppendLine("2. Run `Get-FileHash -Algorithm SHA256` against the portable ZIP and compare it to the manifest.");
         builder.AppendLine("3. Run `run-clean-machine-proof.ps1` from PowerShell, passing `-PortableZip` if the ZIP is not inside the kit.");
-        builder.AppendLine("4. Launch `GoatShot.exe` from the extracted portable folder and complete the human GUI click-through with safe content.");
+        builder.AppendLine("4. Launch `Receipts.exe` from the extracted portable folder and complete the human GUI click-through with safe content.");
         builder.AppendLine("5. Save screenshots, notes, diagnostics output, and any installer logs under a clean-machine evidence folder.");
         builder.AppendLine("6. Review the evidence for privacy/redaction before copying it back into the manual-validation folder.");
         builder.AppendLine("7. Use `manual-validation record-lane --lane clean-machine-install` only after the human pass is complete.");
@@ -419,14 +432,18 @@ public sealed class ManualValidationCleanMachineProofKitService
         builder.AppendLine("New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null");
         builder.AppendLine("Expand-Archive -LiteralPath $PortableZip -DestinationPath $extractRoot -Force");
         builder.AppendLine();
-        builder.AppendLine("$cli = Get-ChildItem -LiteralPath $extractRoot -Filter \"GoatShot.Cli.exe\" -Recurse | Select-Object -First 1");
-        builder.AppendLine("$app = Get-ChildItem -LiteralPath $extractRoot -Filter \"GoatShot.exe\" -Recurse | Select-Object -First 1");
-        builder.AppendLine("if ($null -eq $cli) { throw \"GoatShot.Cli.exe was not found after extracting the portable ZIP.\" }");
-        builder.AppendLine("if ($null -eq $app) { throw \"GoatShot.exe was not found after extracting the portable ZIP.\" }");
+        builder.AppendLine("$cli = Get-ChildItem -LiteralPath $extractRoot -Filter \"Receipts.Cli.exe\" -Recurse | Select-Object -First 1");
+        builder.AppendLine("if ($null -eq $cli) { $cli = Get-ChildItem -LiteralPath $extractRoot -Filter \"GoatShot.Cli.exe\" -Recurse | Select-Object -First 1 }");
+        builder.AppendLine("$app = Get-ChildItem -LiteralPath $extractRoot -Filter \"Receipts.exe\" -Recurse | Select-Object -First 1");
+        builder.AppendLine("if ($null -eq $app) { $app = Get-ChildItem -LiteralPath $extractRoot -Filter \"GoatShot.exe\" -Recurse | Select-Object -First 1 }");
+        builder.AppendLine("if ($null -eq $cli) { throw \"Receipts.Cli.exe (or the legacy GoatShot.Cli.exe) was not found after extracting the portable ZIP.\" }");
+        builder.AppendLine("if ($null -eq $app) { throw \"Receipts.exe (or the legacy GoatShot.exe) was not found after extracting the portable ZIP.\" }");
         builder.AppendLine();
-        builder.AppendLine("$env:GOATSHOT_LOCAL_ROOT = Join-Path $OutputRoot \"isolated-local-root\"");
-        builder.AppendLine("$env:GOATSHOT_LIBRARY_ROOT = Join-Path $OutputRoot \"isolated-library-root\"");
-        builder.AppendLine("New-Item -ItemType Directory -Force -Path $env:GOATSHOT_LOCAL_ROOT, $env:GOATSHOT_LIBRARY_ROOT | Out-Null");
+        builder.AppendLine("$env:RECEIPTS_LOCAL_ROOT = Join-Path $OutputRoot \"isolated-local-root\"");
+        builder.AppendLine("$env:RECEIPTS_LIBRARY_ROOT = Join-Path $OutputRoot \"isolated-library-root\"");
+        builder.AppendLine("$env:GOATSHOT_LOCAL_ROOT = $env:RECEIPTS_LOCAL_ROOT");
+        builder.AppendLine("$env:GOATSHOT_LIBRARY_ROOT = $env:RECEIPTS_LIBRARY_ROOT");
+        builder.AppendLine("New-Item -ItemType Directory -Force -Path $env:RECEIPTS_LOCAL_ROOT, $env:RECEIPTS_LIBRARY_ROOT | Out-Null");
         builder.AppendLine();
         builder.AppendLine("$commands = @()");
         builder.AppendLine("$commands += Invoke-ProofCommand -Name \"CLI diagnostics print\" -FilePath $cli.FullName -Arguments @(\"diagnostics\", \"print\") -LogPath (Join-Path $OutputRoot \"diagnostics-print.txt\")");
@@ -466,8 +483,9 @@ public sealed class ManualValidationCleanMachineProofKitService
         builder.AppendLine("    portableZip = $PortableZip");
         builder.AppendLine("    portableSha256 = $portableHash");
         builder.AppendLine("    outputRoot = $OutputRoot");
-        builder.AppendLine("    goatshotLocalRoot = $env:GOATSHOT_LOCAL_ROOT");
-        builder.AppendLine("    goatshotLibraryRoot = $env:GOATSHOT_LIBRARY_ROOT");
+        builder.AppendLine("    receiptsLocalRoot = $env:RECEIPTS_LOCAL_ROOT");
+        builder.AppendLine("    receiptsLibraryRoot = $env:RECEIPTS_LIBRARY_ROOT");
+        builder.AppendLine("    legacyEnvironmentAliasesSet = $true");
         builder.AppendLine("    commands = $commands");
         builder.AppendLine("    installerSmoke = $installerSmoke");
         builder.AppendLine("    boundary = \"Command evidence only. Human GUI click-through and privacy review must be recorded separately.\"");
@@ -514,21 +532,29 @@ public sealed class ManualValidationCleanMachineProofKitService
         var processDirectory = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
         if (!string.IsNullOrWhiteSpace(processDirectory))
         {
-            var packagedCli = Path.Combine(processDirectory, "GoatShot.Cli.exe");
+            var packagedCli = Path.Combine(processDirectory, BrandIdentity.CommandLineExecutableName);
             if (File.Exists(packagedCli))
             {
                 return packagedCli;
             }
+
+            var legacyPackagedCli = Path.Combine(processDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+            if (File.Exists(legacyPackagedCli))
+            {
+                return legacyPackagedCli;
+            }
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.Cli",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.Cli.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.CommandLineExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static async Task<string> Sha256FileAsync(string path, CancellationToken cancellationToken)

@@ -12,12 +12,12 @@ public sealed class BrowserExtensionInstallGuideService
             ? "browser-extension"
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.ExtensionSourceDirectory));
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Install Guide");
+        builder.AppendLine("# Receipts Browser Extension Install Guide");
         builder.AppendLine();
         builder.AppendLine($"Extension source: `{extensionPath}`");
         builder.AppendLine($"Native host: `{BrowserNativeHostRegistrationService.HostName}`");
         builder.AppendLine();
-        builder.AppendLine("GoatShot can generate local extension ZIPs and user-scope native messaging host manifests. Browser extension installation itself is manual or browser-store managed.");
+        builder.AppendLine("Receipts can generate local extension ZIPs and user-scope native messaging host manifests. Browser extension installation itself is manual or browser-store managed.");
         builder.AppendLine();
 
         var entries = new List<BrowserExtensionInstallGuideEntry>();
@@ -79,11 +79,11 @@ public sealed class BrowserExtensionInstallGuideService
         yield return "Use the extension details page to copy the generated extension id.";
         if (string.IsNullOrWhiteSpace(extensionId))
         {
-            yield return "Run `goatshot browser-extension native-host install` again with the copied extension id so the browser can reach `com.goatshot.bridge`.";
+            yield return "Run `receipts browser-extension native-host install` again with the copied extension id so the browser can reach `com.receipts.bridge`; the legacy `com.goatshot.bridge` alias remains available for upgrades.";
         }
         else if (!nativeHostInstalled)
         {
-            yield return $"Run `goatshot browser-extension native-host install --browser {browser.ToString().ToLowerInvariant()} --chrome-extension-id {extensionId}` for Chromium/Edge, or the Firefox id option for Firefox.";
+            yield return $"Run `receipts browser-extension native-host install --browser {browser.ToString().ToLowerInvariant()} --chrome-extension-id {extensionId}` for Chromium/Edge, or the Firefox id option for Firefox.";
         }
         else
         {

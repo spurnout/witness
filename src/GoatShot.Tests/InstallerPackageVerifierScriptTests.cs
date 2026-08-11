@@ -33,6 +33,7 @@ public sealed class InstallerPackageVerifierScriptTests
 
             Assert.IsTrue(root.GetProperty("succeeded").GetBoolean());
             Assert.AreEqual(0, root.GetProperty("issues").GetArrayLength());
+            Assert.AreEqual("Receipts-0.3.0-win-x64.exe", Path.GetFileName(root.GetProperty("installerPath").GetString()));
             Assert.IsTrue(root.GetProperty("scriptChecks").EnumerateArray().All(check => check.GetProperty("passed").GetBoolean()));
             Assert.AreEqual("skipped", root.GetProperty("installSmoke").GetProperty("status").GetString());
             Assert.IsTrue(File.Exists(Path.Combine(outputRoot, "installer-package-verification.md")));

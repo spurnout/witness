@@ -109,7 +109,7 @@ public sealed class BrowserExtensionNativeBridgeService
                 return new BrowserExtensionBridgeResult
                 {
                     Succeeded = false,
-                    Message = "Browser stitch package must be located inside the GoatShot browser bridge folder for native handoff.",
+                    Message = "Browser stitch package must be located inside the Receipts browser bridge folder for native handoff.",
                     RedactedPayloadPath = redactedPath,
                     Warnings = warnings
                 };
@@ -212,7 +212,7 @@ public sealed class BrowserExtensionNativeBridgeService
         if (confineToBridgeRoot && !IsInsideDirectory(_paths.BrowserBridgeRoot, fullPath))
         {
             throw new InvalidOperationException(
-                "Browser extension screenshot must be located inside the GoatShot browser bridge folder for native handoff.");
+                "Browser extension screenshot must be located inside the Receipts browser bridge folder for native handoff.");
         }
 
         if (!File.Exists(fullPath))

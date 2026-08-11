@@ -4,7 +4,7 @@ internal static class StartupTrace
 {
     public static void Write(string message)
     {
-        var path = Environment.GetEnvironmentVariable("GOATSHOT_STARTUP_TRACE");
+        var path = BrandEnvironment.Resolve("STARTUP_TRACE").Value;
         if (string.IsNullOrWhiteSpace(path)) return;
 
         try

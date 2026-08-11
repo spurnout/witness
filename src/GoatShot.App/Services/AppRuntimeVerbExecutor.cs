@@ -98,7 +98,7 @@ public sealed class AppRuntimeVerbExecutor
 
         Console.WriteLine(JsonSerializer.Serialize(new
         {
-            product = "GoatShot",
+            product = BrandIdentity.ProductName,
             version = PersonalInstallService.ProductVersion,
             buildId = BuildIdentity.Current,
             install = _install.GetState(),

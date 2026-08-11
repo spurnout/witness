@@ -81,7 +81,7 @@ public sealed class DiagnosticBundleService
             return Path.GetFullPath(Environment.ExpandEnvironmentVariables(outputPath));
         }
 
-        var fileName = $"goatshot-diagnostics-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip";
+        var fileName = $"receipts-diagnostics-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip";
         return Path.Combine(_paths.LogsRoot, fileName);
     }
 
@@ -92,7 +92,7 @@ public sealed class DiagnosticBundleService
         {
             bundleVersion = 1,
             generatedAt = DateTimeOffset.Now,
-            application = "GoatShot",
+            application = BrandIdentity.ProductName,
             assemblyVersion = assembly.Version?.ToString() ?? "unknown",
             supportBoundary = "Includes diagnostics, provider readiness markers, recording readiness, redacted settings, workspace metadata summary, assembly versions, and redacted logs only.",
             excludedByDefault = new[]
@@ -112,7 +112,7 @@ public sealed class DiagnosticBundleService
         return string.Join(
             Environment.NewLine,
             [
-                "GoatShot diagnostic snapshot",
+                "Receipts diagnostic snapshot",
                 $"Generated at: {DateTimeOffset.Now:O}",
                 string.Empty,
                 $"OS: {snapshot.OsDescription}",
@@ -165,7 +165,7 @@ public sealed class DiagnosticBundleService
     private string BuildPathReport()
     {
         var builder = new StringBuilder();
-        builder.AppendLine("GoatShot paths");
+        builder.AppendLine("Receipts paths");
         builder.AppendLine($"local={_paths.LocalRoot}");
         builder.AppendLine($"library={_paths.LibraryRoot}");
         builder.AppendLine($"images={_paths.ImagesRoot}");
@@ -421,7 +421,7 @@ public sealed class DiagnosticBundleService
                 "This diagnostic bundle is designed for support and local troubleshooting.",
                 "It intentionally excludes capture files, thumbnails, full OCR text, and DPAPI secret files.",
                 "Settings fields that can contain upload credentials or private infrastructure are redacted.",
-                "Log files are included only when present, capped to 256 KB per file, and passed through GoatShot sensitive-text redaction."
+                "Log files are included only when present, capped to 256 KB per file, and passed through Receipts sensitive-text redaction."
             ]);
     }
 

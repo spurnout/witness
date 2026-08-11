@@ -1,7 +1,7 @@
 <Window x:Class="GoatShot.App.Windows.EditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GoatShot Editor"
+        Title="Receipts Editor"
         Width="1200"
         Height="820"
         MinWidth="900"

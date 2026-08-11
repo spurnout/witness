@@ -40,6 +40,8 @@ public sealed record AppStartupOptions(
     public AppStartupMode Mode { get; init; } = AppStartupMode.Interactive;
     public string RuntimeVerb { get; init; } = string.Empty;
     public IReadOnlyList<string> RuntimeArguments { get; init; } = Array.Empty<string>();
+    public bool RenderFrameExplorer { get; init; }
+    public string RenderFrameExplorerOutputPath { get; init; } = string.Empty;
 
     public static AppStartupOptions Parse(
         IEnumerable<string> args,
@@ -122,6 +124,8 @@ public sealed record AppStartupOptions(
             !string.IsNullOrWhiteSpace(auditWpfOutputEnvironment);
         var auditWpfSurface = auditWpfSurfaceEnvironment?.Trim() ?? string.Empty;
         var auditWpfOutputPath = auditWpfOutputEnvironment?.Trim() ?? string.Empty;
+        var renderFrameExplorer = false;
+        var renderFrameExplorerOutputPath = string.Empty;
         var list = args.ToList();
 
         for (var index = 0; index < list.Count; index++)
@@ -173,6 +177,35 @@ public sealed record AppStartupOptions(
                 !list[index + 1].StartsWith("--", StringComparison.Ordinal))
             {
                 renderMainOutputPath = list[++index].Trim();
+                continue;
+            }
+
+            if (arg.Equals("--render-frame-explorer", StringComparison.OrdinalIgnoreCase))
+            {
+                renderFrameExplorer = true;
+                if (index + 1 < list.Count && !list[index + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    renderFrameExplorerOutputPath = list[++index].Trim();
+                }
+
+                continue;
+            }
+
+            if (arg.Equals("--render-frame-explorer-output", StringComparison.OrdinalIgnoreCase) &&
+                index + 1 < list.Count &&
+                !list[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                renderFrameExplorer = true;
+                renderFrameExplorerOutputPath = list[++index].Trim();
+                continue;
+            }
+
+            if (renderFrameExplorer &&
+                arg.Equals("--output", StringComparison.OrdinalIgnoreCase) &&
+                index + 1 < list.Count &&
+                !list[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                renderFrameExplorerOutputPath = list[++index].Trim();
                 continue;
             }
 
@@ -617,7 +650,9 @@ public sealed record AppStartupOptions(
         {
             Mode = mode,
             RuntimeVerb = runtimeVerb,
-            RuntimeArguments = list
+            RuntimeArguments = list,
+            RenderFrameExplorer = renderFrameExplorer,
+            RenderFrameExplorerOutputPath = renderFrameExplorerOutputPath
         };
     }
 

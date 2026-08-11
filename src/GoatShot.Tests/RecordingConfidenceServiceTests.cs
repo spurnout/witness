@@ -244,8 +244,8 @@ public sealed class RecordingConfidenceServiceTests
 
         var sync = report.Signals.Single(signal => signal.Area == "Audio sync proof");
         Assert.AreEqual(RecordingConfidenceLevel.Warning, sync.Level);
-        StringAssert.Contains(sync.Status, "metadata-only");
-        StringAssert.Contains(sync.Status, "duration delta");
+        StringAssert.Contains(sync.Status, "streamed as normalized PCM");
+        StringAssert.Contains(sync.Status, "bounded chunks");
         StringAssert.Contains(sync.RecoveryAction, "diagnostics recording-media");
     }
 

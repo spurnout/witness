@@ -138,7 +138,7 @@ public sealed class ManualValidationDesktopProofService
                 "Clean Machine Portable Installer",
                 [
                     "desktop-proof/environment.md",
-                    "../../dist/GoatShot-0.1.0-win-x64-portable.zip"
+                    "../../dist/Receipts-*-win-x64-portable.zip"
                 ],
                 [
                     "Current-machine environment evidence and portable package path were recorded.",
@@ -304,6 +304,7 @@ public sealed class ManualValidationDesktopProofService
         yield return Cmd("Render Main Window", ["--render-main-output", Path.Combine(screenshotsRoot, "main-window.png")], Path.Combine(screenshotsRoot, "main-window.png"));
         yield return Cmd("Render Settings Sharing", ["--render-settings-section", "Sharing", "--render-settings-output", Path.Combine(screenshotsRoot, "settings-sharing.png")], Path.Combine(screenshotsRoot, "settings-sharing.png"));
         yield return Cmd("Render Settings Recording", ["--render-settings-section", "Recording", "--render-settings-output", Path.Combine(screenshotsRoot, "settings-recording.png")], Path.Combine(screenshotsRoot, "settings-recording.png"));
+        yield return Cmd("Render Settings Replay", ["--render-settings-section", "Replay", "--render-settings-output", Path.Combine(screenshotsRoot, "settings-replay.png")], Path.Combine(screenshotsRoot, "settings-replay.png"));
         yield return Cmd("Render Settings Automation", ["--render-settings-section", "Automation", "--render-settings-output", Path.Combine(screenshotsRoot, "settings-automation.png")], Path.Combine(screenshotsRoot, "settings-automation.png"));
         yield return Cmd("Render Editor", ["--render-editor", "--editor-image", editorSourcePath, "--render-editor-output", Path.Combine(screenshotsRoot, "editor.png")], Path.Combine(screenshotsRoot, "editor.png"));
         yield return Cmd("Render Tray Menu", ["--render-tray-menu-output", Path.Combine(screenshotsRoot, "tray-menu.png")], Path.Combine(screenshotsRoot, "tray-menu.png"));
@@ -313,10 +314,12 @@ public sealed class ManualValidationDesktopProofService
         yield return Cmd("Render AI Review", ["--render-ai-history-output", Path.Combine(screenshotsRoot, "ai-review.png")], Path.Combine(screenshotsRoot, "ai-review.png"));
         yield return Cmd("Render Capture Task", ["--render-capture-task-output", Path.Combine(screenshotsRoot, "capture-task.png")], Path.Combine(screenshotsRoot, "capture-task.png"));
         yield return Cmd("Render Proof Scene", ["--render-proof-scene-output", Path.Combine(screenshotsRoot, "proof-scene.png")], Path.Combine(screenshotsRoot, "proof-scene.png"));
+        yield return Cmd("Render Frame Explorer", ["--render-frame-explorer-output", Path.Combine(screenshotsRoot, "frame-explorer.png")], Path.Combine(screenshotsRoot, "frame-explorer.png"));
         yield return Cmd("Audit WPF Main", ["--audit-wpf-surface", "main", "--audit-wpf-output", Path.Combine(auditsRoot, "main-accessibility.md")], Path.Combine(auditsRoot, "main-accessibility.md"));
         yield return Cmd("Audit WPF Settings", ["--audit-wpf-surface", "settings", "--audit-wpf-output", Path.Combine(auditsRoot, "settings-accessibility.md")], Path.Combine(auditsRoot, "settings-accessibility.md"));
         yield return Cmd("Audit WPF Editor", ["--audit-wpf-surface", "editor", "--audit-wpf-output", Path.Combine(auditsRoot, "editor-accessibility.md")], Path.Combine(auditsRoot, "editor-accessibility.md"));
         yield return Cmd("Audit WPF Recording", ["--audit-wpf-surface", "recording", "--audit-wpf-output", Path.Combine(auditsRoot, "recording-accessibility.md")], Path.Combine(auditsRoot, "recording-accessibility.md"));
+        yield return Cmd("Audit WPF Frame Explorer", ["--audit-wpf-surface", "frame-explorer", "--audit-wpf-output", Path.Combine(auditsRoot, "frame-explorer-accessibility.md")], Path.Combine(auditsRoot, "frame-explorer-accessibility.md"));
         yield return Cmd("Audit WPF Proof Scene", ["--audit-wpf-surface", "proof-scene", "--audit-wpf-output", Path.Combine(auditsRoot, "proof-scene-accessibility.md")], Path.Combine(auditsRoot, "proof-scene-accessibility.md"));
         yield return Cmd("Audit Settings Sharing", ["--audit-settings-section", "Sharing", "--audit-settings-output", Path.Combine(auditsRoot, "settings-sharing-accessibility.md")], Path.Combine(auditsRoot, "settings-sharing-accessibility.md"));
         yield return Cmd("Audit Settings Recording", ["--audit-settings-section", "Recording", "--audit-settings-output", Path.Combine(auditsRoot, "settings-recording-accessibility.md")], Path.Combine(auditsRoot, "settings-recording-accessibility.md"));
@@ -639,9 +642,19 @@ public sealed class ManualValidationDesktopProofService
 
         var directory = Path.GetDirectoryName(path);
         var pattern = Path.GetFileName(path);
-        return !string.IsNullOrWhiteSpace(directory) &&
-            Directory.Exists(directory) &&
-            Directory.EnumerateFileSystemEntries(directory, pattern).Any();
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return false;
+        }
+
+        var exists = Directory.EnumerateFileSystemEntries(directory, pattern).Any();
+        if (exists || !pattern.StartsWith("Receipts-", StringComparison.OrdinalIgnoreCase))
+        {
+            return exists;
+        }
+
+        var legacyPattern = "GoatShot-" + pattern["Receipts-".Length..];
+        return Directory.EnumerateFileSystemEntries(directory, legacyPattern).Any();
     }
 
     private static List<string> BuildEvidenceList(string root, string proofRoot)
@@ -667,21 +680,29 @@ public sealed class ManualValidationDesktopProofService
         var processDirectory = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
         if (!string.IsNullOrWhiteSpace(processDirectory))
         {
-            var packagedApp = Path.Combine(processDirectory, "GoatShot.exe");
+            var packagedApp = Path.Combine(processDirectory, BrandIdentity.DesktopExecutableName);
             if (File.Exists(packagedApp))
             {
                 return packagedApp;
             }
+
+            var legacyPackagedApp = Path.Combine(processDirectory, $"{BrandIdentity.LegacyProductName}.exe");
+            if (File.Exists(legacyPackagedApp))
+            {
+                return legacyPackagedApp;
+            }
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.App",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.DesktopExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static string? ReadRegistryValue(string subKey, string name)
@@ -731,7 +752,7 @@ public sealed class ManualValidationDesktopProofService
         using var mutedBrush = new DrawingSolidBrush(DrawingColor.FromArgb(180, 196, 208));
         using var panelBrush = new DrawingSolidBrush(DrawingColor.FromArgb(31, 45, 58));
         using var linePen = new DrawingPen(DrawingColor.FromArgb(73, 103, 124), 2);
-        graphics.DrawString("GoatShot desktop proof", titleFont, DrawingBrushes.White, 54, 48);
+        graphics.DrawString("Receipts desktop proof", titleFont, DrawingBrushes.White, 54, 48);
         graphics.DrawString("Synthetic source image for editor accessibility screenshots.", bodyFont, mutedBrush, 56, 92);
         graphics.FillRectangle(panelBrush, 56, 148, 390, 285);
         graphics.FillRectangle(panelBrush, 486, 148, 414, 138);

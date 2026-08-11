@@ -129,7 +129,7 @@ public sealed class ShareProviderAdapterTests
             Assert.IsTrue(health.IsHealthy, health.Message);
             Assert.IsTrue(result.Succeeded, result.Message);
             Assert.AreEqual(item.FilePath, surface.Text);
-            StringAssert.StartsWith(surface.MailtoUri, "mailto:?subject=GoatShot%20capture%3A%20email-adapter.png");
+            StringAssert.StartsWith(surface.MailtoUri, "mailto:?subject=Receipts%20capture%3A%20email-adapter.png");
             StringAssert.Contains(surface.MailtoUri, Uri.EscapeDataString(item.FilePath));
         });
     }
@@ -989,7 +989,7 @@ public sealed class ShareProviderAdapterTests
             Assert.AreEqual("Client-ID IMGUR_CLIENT_ID", handler.LastRequest.Headers.Authorization?.ToString());
             StringAssert.Contains(handler.LastContentType, "multipart/form-data");
             StringAssert.Contains(handler.LastBody, "imgur-adapter.png");
-            StringAssert.Contains(handler.LastBody, "GoatShot capture");
+            StringAssert.Contains(handler.LastBody, "Receipts capture");
         });
     }
 
@@ -1119,7 +1119,7 @@ public sealed class ShareProviderAdapterTests
             Assert.AreEqual(HttpMethod.Post, handler.LastRequest.Method);
             Assert.AreEqual("/api/repos/owner/repo/issues", handler.LastRequest.RequestUri!.AbsolutePath);
             Assert.AreEqual("Bearer github-token", handler.LastRequest.Headers.Authorization?.ToString());
-            Assert.AreEqual("GoatShot/0.1", handler.LastRequest.Headers.UserAgent.ToString());
+            Assert.AreEqual("Receipts/0.3.0", handler.LastRequest.Headers.UserAgent.ToString());
             StringAssert.Contains(handler.LastBody, "Bug github adapter.png");
             StringAssert.Contains(handler.LastBody, "goatshot");
             StringAssert.Contains(handler.LastBody, "octocat");

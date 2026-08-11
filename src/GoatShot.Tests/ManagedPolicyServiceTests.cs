@@ -359,6 +359,7 @@ public sealed class ManagedPolicyServiceTests
             Assert.IsTrue(explain.Succeeded, string.Join("; ", explain.Issues));
             Assert.IsTrue(export.Succeeded);
             Assert.IsFalse(exported.Contains("super-secret", StringComparison.Ordinal));
+            StringAssert.Contains(exported, AdminPolicyBundleService.CurrentSchemaVersion);
             StringAssert.Contains(exported, "disableAi");
             return Task.CompletedTask;
         });

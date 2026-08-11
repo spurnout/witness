@@ -13,6 +13,7 @@ public enum CaptureKind
     EditedImage,
     RecordingGif,
     RecordingMp4,
+    ReplayReceipt,
     VideoFrame,
     TrimmedVideo,
     MutedVideo,

@@ -136,15 +136,15 @@ public sealed class BrowserExtensionPublicationPlanService
 
         plan.RequiredEvidence.AddRange(BuildRequiredEvidence(target));
         plan.ManualSteps.AddRange(BuildManualSteps(target, package));
-        plan.Commands.Add($"goatshot browser-extension store-readiness --source browser-extension --target {targetName} --json");
-        plan.Commands.Add($"goatshot browser-extension store-package --source browser-extension --target {targetName} --support-url <reviewed-support-url> --privacy-url <reviewed-privacy-url> --release-notes <reviewed-notes> --json");
-        plan.Commands.Add($"goatshot browser-extension install-plan --browser {targetName} --source browser-extension --store-package-root {Quote(storePackageRoot)} --json");
+        plan.Commands.Add($"receipts browser-extension store-readiness --source browser-extension --target {targetName} --json");
+        plan.Commands.Add($"receipts browser-extension store-package --source browser-extension --target {targetName} --support-url <reviewed-support-url> --privacy-url <reviewed-privacy-url> --release-notes <reviewed-notes> --json");
+        plan.Commands.Add($"receipts browser-extension install-plan --browser {targetName} --source browser-extension --store-package-root {Quote(storePackageRoot)} --json");
 
         plan.Status = plan.Issues.Count == 0
             ? "manual-publication-plan-ready"
             : "blocked-before-manual-publication";
         plan.Message = plan.Status == "manual-publication-plan-ready"
-            ? $"{targetName} package/readiness artifacts are ready for a human browser-store submission flow. GoatShot did not publish or upload anything."
+            ? $"{targetName} package/readiness artifacts are ready for a human browser-store submission flow. Receipts did not publish or upload anything."
             : $"{targetName} publication is blocked until local package/readiness artifacts are complete.";
         return plan;
     }
@@ -161,15 +161,33 @@ public sealed class BrowserExtensionPublicationPlanService
         var targetRoot = Path.Combine(storePackageRoot, target);
         if (Directory.Exists(targetRoot))
         {
-            result.ExtensionPackagePath = Directory.GetFiles(targetRoot, $"goatshot-browser-extension-{target}-v*.zip")
-                .OrderByDescending(File.GetLastWriteTimeUtc)
-                .FirstOrDefault() ?? string.Empty;
+            result.ExtensionPackagePath = FindPreferredArtifact(
+                targetRoot,
+                $"receipts-browser-extension-{target}-v*.zip",
+                $"goatshot-browser-extension-{target}-v*.zip");
         }
 
-        result.SubmissionBundlePath = Directory.GetFiles(storePackageRoot, $"goatshot-browser-extension-{target}-store-submission.zip")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault() ?? string.Empty;
+        result.SubmissionBundlePath = FindPreferredArtifact(
+            storePackageRoot,
+            $"receipts-browser-extension-{target}-store-submission.zip",
+            $"goatshot-browser-extension-{target}-store-submission.zip");
         return result;
+    }
+
+    private static string FindPreferredArtifact(string root, string currentPattern, string legacyPattern)
+    {
+        foreach (var pattern in new[] { currentPattern, legacyPattern })
+        {
+            var match = Directory.GetFiles(root, pattern)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(match))
+            {
+                return match;
+            }
+        }
+
+        return string.Empty;
     }
 
     private static IReadOnlyList<string> BuildRequiredEvidence(BrowserExtensionPublicationTarget target)
@@ -237,9 +255,9 @@ public sealed class BrowserExtensionPublicationPlanService
     private static IReadOnlyList<string> BuildAuthorityBoundaries() => new[]
     {
         "Browser-store submission, review, signing, and availability are owned by each browser vendor's current store flow.",
-        "GoatShot can generate local packages, listing copy, checklists, native-host manifests, and proof commands.",
-        "GoatShot should not claim publication until a human supplies store-side evidence.",
-        "GoatShot should not claim automatic installation unless a later enterprise/browser-policy tranche is explicitly implemented and proven."
+        "Receipts can generate local packages, listing copy, checklists, native-host manifests, and proof commands.",
+        "Receipts should not claim publication until a human supplies store-side evidence.",
+        "Receipts should not claim automatic installation unless a later enterprise/browser-policy tranche is explicitly implemented and proven."
     };
 
     private static IReadOnlyList<string> BuildSourceReferences() => new[]
@@ -255,7 +273,7 @@ public sealed class BrowserExtensionPublicationPlanService
     private static string BuildMarkdown(BrowserExtensionPublicationPlanResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Publication Plan");
+        builder.AppendLine("# Receipts Browser Extension Publication Plan");
         builder.AppendLine();
         builder.AppendLine($"Source: `{result.SourceDirectory}`");
         builder.AppendLine($"Store package root: `{result.StorePackageRoot}`");

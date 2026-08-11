@@ -18,8 +18,8 @@ public sealed class ManualValidationCleanMachineProofKitServiceTests
             await new ManualValidationHarnessService().CreateAsync(new ManualValidationHarnessRequest(OutputPath: root));
             var dist = Path.Combine(repoRoot, "artifacts", "dist");
             Directory.CreateDirectory(dist);
-            var portableZip = Path.Combine(dist, "GoatShot-0.1.0-win-x64-portable.zip");
-            var installer = Path.Combine(dist, "GoatShot-Setup-0.1.0-win-x64.exe");
+            var portableZip = Path.Combine(dist, "Receipts-0.3.0-win-x64-portable.zip");
+            var installer = Path.Combine(dist, "Receipts-0.3.0-win-x64.exe");
             await File.WriteAllBytesAsync(portableZip, Encoding.UTF8.GetBytes("portable package bytes"));
             await File.WriteAllBytesAsync(installer, Encoding.UTF8.GetBytes("installer bytes"));
             var expectedHash = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(portableZip))).ToLowerInvariant();
@@ -29,7 +29,7 @@ public sealed class ManualValidationCleanMachineProofKitServiceTests
                 RootPath = root,
                 RepoRoot = repoRoot,
                 CopyPackage = true,
-                CliPath = @"C:\Tools\GoatShot.Cli.exe"
+                CliPath = @"C:\Tools\Receipts.Cli.exe"
             });
 
             Assert.IsTrue(result.Succeeded, result.Message);
@@ -49,7 +49,10 @@ public sealed class ManualValidationCleanMachineProofKitServiceTests
             StringAssert.Contains(runbook, "clean-machine-install");
 
             var script = await File.ReadAllTextAsync(result.ScriptPath);
+            StringAssert.Contains(script, "RECEIPTS_LOCAL_ROOT");
             StringAssert.Contains(script, "GOATSHOT_LOCAL_ROOT");
+            StringAssert.Contains(script, "Receipts.Cli.exe");
+            StringAssert.Contains(script, "GoatShot.Cli.exe");
             StringAssert.Contains(script, "Expand-Archive");
             StringAssert.Contains(script, "clean-machine-script-result.json");
 
@@ -99,6 +102,39 @@ public sealed class ManualValidationCleanMachineProofKitServiceTests
 
             var script = await File.ReadAllTextAsync(result.ScriptPath);
             StringAssert.Contains(script, "(-not [string]::IsNullOrWhiteSpace($defaultInstaller))");
+        }
+        finally
+        {
+            DeleteDirectory(root);
+            DeleteDirectory(repoRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task CreateAsync_PrefersCurrentReceiptsArtifactOverNewerLegacyPackage()
+    {
+        var root = CreateTempRoot();
+        var repoRoot = CreateTempRoot();
+        try
+        {
+            await new ManualValidationHarnessService().CreateAsync(new ManualValidationHarnessRequest(OutputPath: root));
+            var dist = Path.Combine(repoRoot, "artifacts", "dist");
+            Directory.CreateDirectory(dist);
+            var receiptsZip = Path.Combine(dist, "Receipts-0.3.0-win-x64-portable.zip");
+            var legacyZip = Path.Combine(dist, "GoatShot-9.9.9-win-x64-portable.zip");
+            await File.WriteAllTextAsync(receiptsZip, "current");
+            await File.WriteAllTextAsync(legacyZip, "legacy");
+            File.SetLastWriteTimeUtc(legacyZip, DateTime.UtcNow.AddMinutes(1));
+
+            var result = await new ManualValidationCleanMachineProofKitService().CreateAsync(
+                new ManualValidationCleanMachineProofKitRequest
+                {
+                    RootPath = root,
+                    RepoRoot = repoRoot
+                });
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.AreEqual(receiptsZip, result.PortablePackage.SourcePath);
         }
         finally
         {

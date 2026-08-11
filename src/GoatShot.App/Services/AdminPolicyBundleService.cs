@@ -6,7 +6,8 @@ namespace GoatShot.App.Services;
 
 public sealed class AdminPolicyBundleService
 {
-    public const string CurrentSchemaVersion = "goatshot.admin-policy.v1";
+    public const string CurrentSchemaVersion = "receipts.admin-policy.v1";
+    public const string LegacySchemaVersion = "goatshot.admin-policy.v1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -43,7 +44,7 @@ public sealed class AdminPolicyBundleService
         var path = ResolvePath(outputPath);
         var bundle = new AdminPolicyBundle
         {
-            Name = "GoatShot local admin policy",
+            Name = "Receipts local admin policy",
             Description = "Exported local admin policy bundle. Secrets and DPAPI credentials are not included.",
             ExportedAtUtc = DateTimeOffset.UtcNow,
             ManagedPolicy = ClonePolicy(settings.ManagedPolicy)
@@ -204,9 +205,10 @@ public sealed class AdminPolicyBundleService
 
     private static void ValidateBundle(AdminPolicyBundle bundle, AdminPolicyBundleValidationResult result)
     {
-        if (!bundle.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal))
+        if (!bundle.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal) &&
+            !bundle.SchemaVersion.Equals(LegacySchemaVersion, StringComparison.Ordinal))
         {
-            result.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}.");
+            result.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}; legacy {LegacySchemaVersion} is also accepted.");
         }
 
         if (string.IsNullOrWhiteSpace(bundle.Name))

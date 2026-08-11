@@ -195,7 +195,7 @@ public sealed class BrowserExtensionPublicationEvidenceRecordService
     private static string BuildMarkdown(BrowserExtensionPublicationEvidenceRecordResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Publication Evidence Record");
+        builder.AppendLine("# Receipts Browser Extension Publication Evidence Record");
         builder.AppendLine();
         builder.AppendLine($"Target: `{EmptyIfMissing(result.Target)}`");
         builder.AppendLine($"Status: `{result.Status}`");

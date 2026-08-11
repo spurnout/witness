@@ -20,7 +20,7 @@ internal static class ShareProviderPayloads
     public static string ExpandMessage(string? template, ShareUploadRequest request, string providerName)
     {
         var resolved = string.IsNullOrWhiteSpace(template)
-            ? "GoatShot capture ready: {file} ({bytes} bytes)"
+            ? "Receipts capture ready: {file} ({bytes} bytes)"
             : template.Trim();
 
         return resolved

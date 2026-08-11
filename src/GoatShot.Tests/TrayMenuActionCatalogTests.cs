@@ -8,8 +8,8 @@ public sealed class TrayMenuActionCatalogTests
     [TestMethod]
     public void All_PreservesExpectedTrayMenuShape()
     {
-        Assert.AreEqual(22, TrayMenuActionCatalog.All.Count);
-        Assert.AreEqual(18, TrayMenuActionCatalog.Actions.Count());
+        Assert.AreEqual(24, TrayMenuActionCatalog.All.Count);
+        Assert.AreEqual(20, TrayMenuActionCatalog.Actions.Count());
         Assert.AreEqual(4, TrayMenuActionCatalog.All.Count(item => item.IsSeparator));
         Assert.AreEqual("Capture region", TrayMenuActionCatalog.All.First().Label);
         Assert.AreEqual("Exit", TrayMenuActionCatalog.All.Last().Label);

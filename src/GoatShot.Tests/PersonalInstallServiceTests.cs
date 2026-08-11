@@ -25,8 +25,9 @@ public sealed class PersonalInstallServiceTests
         {
             var service = new PersonalInstallService(localAppData: root, currentExecutable: current);
 
-            Assert.AreEqual(Path.Combine(root, "Programs", "GoatShot", "GoatShot.exe"), service.InstalledExecutablePath);
-            Assert.AreEqual(Path.Combine(root, "GoatShot", "runtime"), service.RuntimeRoot);
+            Assert.AreEqual(Path.Combine(root, "Programs", "Receipts", "Receipts.exe"), service.InstalledExecutablePath);
+            Assert.AreEqual(Path.Combine(root, "Receipts", "runtime"), service.RuntimeRoot);
+            Assert.AreEqual(Path.Combine(root, "Programs", "GoatShot", "GoatShot.exe"), service.LegacyInstalledExecutablePath);
             Assert.IsFalse(service.IsRunningInstalledCopy);
         }
         finally

@@ -1,7 +1,7 @@
 <Window x:Class="GoatShot.App.Windows.AiHistoryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GoatShot AI Review"
+        Title="Receipts AI Review"
         Width="1040"
         Height="680"
         MinWidth="820"

@@ -154,7 +154,7 @@ public sealed class WorkflowProfileService
     {
         return new WorkflowProfile
         {
-            Name = string.IsNullOrWhiteSpace(name) ? "GoatShot workflow profile" : name.Trim(),
+            Name = string.IsNullOrWhiteSpace(name) ? "Receipts workflow profile" : name.Trim(),
             ExportedAt = DateTimeOffset.Now,
             IncludesSensitiveValues = includeSensitiveValues,
             Sharing = new WorkflowProfileSharing
@@ -286,7 +286,7 @@ public sealed class WorkflowProfileService
             : profile.Sharing.S3Region;
         _settings.S3Bucket = profile.Sharing.S3Bucket;
         _settings.S3KeyPrefix = string.IsNullOrWhiteSpace(profile.Sharing.S3KeyPrefix)
-            ? "goatshot/"
+            ? "receipts/"
             : profile.Sharing.S3KeyPrefix;
         _settings.S3PublicBaseUrl = profile.Sharing.S3PublicBaseUrl;
         _settings.ImgurApiEndpoint = string.IsNullOrWhiteSpace(profile.Sharing.ImgurApiEndpoint)
@@ -332,7 +332,7 @@ public sealed class WorkflowProfileService
             ? "https://api.dropboxapi.com"
             : profile.Sharing.DropboxApiBaseUrl;
         _settings.DropboxRemoteFolder = string.IsNullOrWhiteSpace(profile.Sharing.DropboxRemoteFolder)
-            ? "/GoatShot"
+            ? "/Receipts"
             : profile.Sharing.DropboxRemoteFolder;
         _settings.GoogleDriveUploadApiBaseUrl = string.IsNullOrWhiteSpace(profile.Sharing.GoogleDriveUploadApiBaseUrl)
             ? "https://www.googleapis.com/upload/drive/v3"
@@ -350,23 +350,23 @@ public sealed class WorkflowProfileService
             : profile.Sharing.GooglePhotosApiBaseUrl;
         _settings.GooglePhotosAlbumId = profile.Sharing.GooglePhotosAlbumId;
         _settings.GooglePhotosDescriptionTemplate = string.IsNullOrWhiteSpace(profile.Sharing.GooglePhotosDescriptionTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.GooglePhotosDescriptionTemplate;
         _settings.OneDriveGraphApiBaseUrl = string.IsNullOrWhiteSpace(profile.Sharing.OneDriveGraphApiBaseUrl)
             ? "https://graph.microsoft.com/v1.0"
             : profile.Sharing.OneDriveGraphApiBaseUrl;
         _settings.OneDriveRemoteFolder = string.IsNullOrWhiteSpace(profile.Sharing.OneDriveRemoteFolder)
-            ? "/GoatShot"
+            ? "/Receipts"
             : profile.Sharing.OneDriveRemoteFolder;
         _settings.OneDriveCreateAnonymousViewLink = profile.Sharing.OneDriveCreateAnonymousViewLink;
         _settings.YouTubeUploadApiBaseUrl = string.IsNullOrWhiteSpace(profile.Sharing.YouTubeUploadApiBaseUrl)
             ? "https://www.googleapis.com/upload/youtube/v3"
             : profile.Sharing.YouTubeUploadApiBaseUrl;
         _settings.YouTubeTitleTemplate = string.IsNullOrWhiteSpace(profile.Sharing.YouTubeTitleTemplate)
-            ? "GoatShot recording: {file}"
+            ? "Receipts recording: {file}"
             : profile.Sharing.YouTubeTitleTemplate;
         _settings.YouTubeDescriptionTemplate = string.IsNullOrWhiteSpace(profile.Sharing.YouTubeDescriptionTemplate)
-            ? "Uploaded from GoatShot capture {id}."
+            ? "Uploaded from Receipts capture {id}."
             : profile.Sharing.YouTubeDescriptionTemplate;
         _settings.YouTubePrivacyStatus = string.IsNullOrWhiteSpace(profile.Sharing.YouTubePrivacyStatus)
             ? "unlisted"
@@ -379,7 +379,7 @@ public sealed class WorkflowProfileService
             : profile.Sharing.OneNoteGraphApiBaseUrl;
         _settings.OneNoteSectionId = profile.Sharing.OneNoteSectionId;
         _settings.OneNotePageTitleTemplate = string.IsNullOrWhiteSpace(profile.Sharing.OneNotePageTitleTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.OneNotePageTitleTemplate;
         _settings.LinearGraphqlEndpoint = string.IsNullOrWhiteSpace(profile.Sharing.LinearGraphqlEndpoint)
             ? "https://api.linear.app/graphql"
@@ -387,7 +387,7 @@ public sealed class WorkflowProfileService
         _settings.LinearTeamId = profile.Sharing.LinearTeamId;
         _settings.LinearIssueId = profile.Sharing.LinearIssueId;
         _settings.LinearIssueTitleTemplate = string.IsNullOrWhiteSpace(profile.Sharing.LinearIssueTitleTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.LinearIssueTitleTemplate;
         _settings.LinearCreateAttachment = profile.Sharing.LinearCreateAttachment;
         _settings.LinearUseOAuthBearerToken = profile.Sharing.LinearUseOAuthBearerToken;
@@ -396,7 +396,7 @@ public sealed class WorkflowProfileService
             : profile.Sharing.GitHubApiBaseUrl;
         _settings.GitHubRepository = profile.Sharing.GitHubRepository;
         _settings.GitHubIssueTitleTemplate = string.IsNullOrWhiteSpace(profile.Sharing.GitHubIssueTitleTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.GitHubIssueTitleTemplate;
         _settings.GitHubLabels = profile.Sharing.GitHubLabels;
         _settings.GitHubAssignees = profile.Sharing.GitHubAssignees;
@@ -406,7 +406,7 @@ public sealed class WorkflowProfileService
             ? "Bug"
             : profile.Sharing.JiraIssueType;
         _settings.JiraSummaryTemplate = string.IsNullOrWhiteSpace(profile.Sharing.JiraSummaryTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.JiraSummaryTemplate;
         _settings.JiraLabels = profile.Sharing.JiraLabels;
         _settings.JiraAccountEmail = profile.Sharing.JiraAccountEmail;
@@ -419,7 +419,7 @@ public sealed class WorkflowProfileService
             ? "Bug"
             : profile.Sharing.AzureDevOpsWorkItemType;
         _settings.AzureDevOpsTitleTemplate = string.IsNullOrWhiteSpace(profile.Sharing.AzureDevOpsTitleTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.AzureDevOpsTitleTemplate;
         _settings.AzureDevOpsTags = profile.Sharing.AzureDevOpsTags;
         _settings.AzureDevOpsAssignedTo = profile.Sharing.AzureDevOpsAssignedTo;
@@ -438,13 +438,13 @@ public sealed class WorkflowProfileService
         }
 
         _settings.SlackMessageTemplate = string.IsNullOrWhiteSpace(profile.Sharing.SlackMessageTemplate)
-            ? "GoatShot capture ready: {file} ({bytes} bytes)"
+            ? "Receipts capture ready: {file} ({bytes} bytes)"
             : profile.Sharing.SlackMessageTemplate;
         _settings.DiscordMessageTemplate = string.IsNullOrWhiteSpace(profile.Sharing.DiscordMessageTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : profile.Sharing.DiscordMessageTemplate;
         _settings.TeamsMessageTemplate = string.IsNullOrWhiteSpace(profile.Sharing.TeamsMessageTemplate)
-            ? "GoatShot capture ready: {file} ({bytes} bytes)"
+            ? "Receipts capture ready: {file} ({bytes} bytes)"
             : profile.Sharing.TeamsMessageTemplate;
 
         if (profile.Recording is not null)

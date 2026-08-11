@@ -33,6 +33,7 @@ public static class AudioSampleProcessor
 
     public static bool CanProcess(WaveFormat format)
     {
+        format = NormalizeWaveFormat(format);
         return format.Encoding == WaveFormatEncoding.Pcm && format.BitsPerSample == 16 ||
             format.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32;
     }
@@ -74,6 +75,7 @@ public static class AudioSampleProcessor
         ArgumentNullException.ThrowIfNull(format);
 
         var normalized = Normalize(settings);
+        format = NormalizeWaveFormat(format);
         var safeBytes = Math.Clamp(bytesRecorded, 0, buffer.Length);
         if (safeBytes == 0 || !HasProcessing(normalized))
         {
@@ -98,6 +100,11 @@ public static class AudioSampleProcessor
 
         return 0;
     }
+
+    private static WaveFormat NormalizeWaveFormat(WaveFormat format) =>
+        format is WaveFormatExtensible extensible
+            ? extensible.ToStandardWaveFormat()
+            : format;
 
     private static int ApplyPcm16(
         byte[] buffer,

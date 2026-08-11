@@ -7,6 +7,8 @@ public enum HotkeyAction
     WindowCapture,
     LastRegionCapture,
     ToggleRecording,
+    ToggleReplay,
+    SaveReplay,
     OcrRegion,
     ColorPicker,
     PixelRuler

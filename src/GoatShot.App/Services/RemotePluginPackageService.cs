@@ -12,7 +12,12 @@ namespace GoatShot.App.Services;
 
 public sealed class RemotePluginPackageService
 {
-    public const string CurrentRegistrySchemaVersion = "goatshot.plugin-registry.v1";
+    public const string CurrentRegistrySchemaVersion = "receipts.plugin-registry.v1";
+    public const string LegacyRegistrySchemaVersion = "goatshot.plugin-registry.v1";
+    public const string CurrentStageSchemaVersion = "receipts.plugin-stage.v1";
+    public const string LegacyStageSchemaVersion = "goatshot.plugin-stage.v1";
+    public const string CurrentInstallSchemaVersion = "receipts.plugin-install.v1";
+    public const string LegacyInstallSchemaVersion = "goatshot.plugin-install.v1";
     public const long DefaultMaxPackageBytes = 50L * 1024L * 1024L;
 
     private static readonly Regex IdPattern = new("^[a-z0-9][a-z0-9._-]{2,63}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -167,7 +172,7 @@ public sealed class RemotePluginPackageService
 
         var stageManifest = new RemotePluginStageManifest
         {
-            SchemaVersion = "goatshot.plugin-stage.v1",
+            SchemaVersion = CurrentStageSchemaVersion,
             PluginId = entry.Id,
             Version = entry.Version,
             Name = entry.Name,
@@ -185,7 +190,7 @@ public sealed class RemotePluginPackageService
             Notes =
             [
                 "Package is staged only.",
-                "GoatShot did not trust, enable, allowlist, or execute plugin code.",
+                "Receipts did not trust, enable, allowlist, or execute plugin code.",
                 "Operator review is still required before copying a plugin into the active plugins folder."
             ]
         };
@@ -299,10 +304,10 @@ public sealed class RemotePluginPackageService
         result.IncompatibleCount = result.Plugins.Count(plugin => plugin.Incompatible);
         result.Succeeded = result.Issues.Count == 0;
         result.Message = BuildUpdateSummaryMessage(result);
-        result.NextActions.Add("Use `goatshot plugins stage <plugin-id> --registry <registry>` to download a package into staging after review.");
-        result.NextActions.Add("Use `goatshot plugins install-staged <plugin-id>` only after reviewing the staged package.");
+        result.NextActions.Add("Use `receipts plugins stage <plugin-id> --registry <registry>` to download a package into staging after review.");
+        result.NextActions.Add("Use `receipts plugins install-staged <plugin-id>` only after reviewing the staged package.");
         result.NextActions.Add("Trust, enable, allowlist, and run plugin actions through separate explicit operator steps.");
-        result.NextActions.Add("GoatShot does not install plugin updates automatically and does not execute plugin code during update checks.");
+        result.NextActions.Add("Receipts does not install plugin updates automatically and does not execute plugin code during update checks.");
         return result;
     }
 
@@ -351,7 +356,7 @@ public sealed class RemotePluginPackageService
                     StagedVersion = plugin.StagedVersion,
                     Message = plugin.PolicyBlocked
                         ? "Skipped because managed policy blocks this plugin."
-                        : "Skipped because this registry version is incompatible with this GoatShot build.",
+                        : "Skipped because this registry version is incompatible with this Receipts build.",
                     Issues = plugin.PolicyBlocked
                         ? plugin.PolicyBlockReasons.ToList()
                         : plugin.CompatibilityIssues.ToList()
@@ -542,8 +547,8 @@ public sealed class RemotePluginPackageService
         result.Succeeded = result.Issues.Count == 0;
         result.Message = BuildMarketplacePlanMessage(result);
         result.NextActions.Add("Review registry metadata, package provenance, permissions, and policy status before staging anything.");
-        result.NextActions.Add("Use `goatshot plugins stage <plugin-id> --registry <registry>` only for a package you choose to review locally.");
-        result.NextActions.Add("Use `goatshot plugins install-staged <plugin-id>` only after staged package review.");
+        result.NextActions.Add("Use `receipts plugins stage <plugin-id> --registry <registry>` only for a package you choose to review locally.");
+        result.NextActions.Add("Use `receipts plugins install-staged <plugin-id>` only after staged package review.");
         result.NextActions.Add("Trust, enable, action allowlists, and execution remain separate explicit operator steps.");
         result.NextActions.Add("Hosted marketplace accounts, ratings, payments, publication, remote execution, and automatic self-registering updater services remain later-scope.");
         return result;
@@ -645,7 +650,8 @@ public sealed class RemotePluginPackageService
             return result;
         }
 
-        if (!stageManifest.SchemaVersion.Equals("goatshot.plugin-stage.v1", StringComparison.Ordinal))
+        if (!stageManifest.SchemaVersion.Equals(CurrentStageSchemaVersion, StringComparison.Ordinal) &&
+            !stageManifest.SchemaVersion.Equals(LegacyStageSchemaVersion, StringComparison.Ordinal))
         {
             result.Issues.Add("Unsupported stage manifest schemaVersion.");
         }
@@ -823,7 +829,7 @@ public sealed class RemotePluginPackageService
         summary.NextAction = NextActionFor(summary);
         summary.Message = summary.Status switch
         {
-            "incompatible" => $"Plugin {summary.PluginId} {summary.RegistryVersion} is incompatible with this GoatShot build.",
+            "incompatible" => $"Plugin {summary.PluginId} {summary.RegistryVersion} is incompatible with this Receipts build.",
             "blocked" => $"Plugin {summary.PluginId} is blocked by managed policy.",
             "staged" => $"Plugin {summary.PluginId} {summary.StagedVersion} is staged for operator review. It was not installed, trusted, enabled, allowlisted, or executed.",
             "available" => $"Update available for {summary.PluginId}: {summary.InstalledVersion} -> {summary.RegistryVersion}. No update was installed automatically.",
@@ -840,13 +846,13 @@ public sealed class RemotePluginPackageService
         if (!string.IsNullOrWhiteSpace(entry.MinGoatShotVersion) &&
             CompareVersions(appVersion, entry.MinGoatShotVersion) < 0)
         {
-            issues.Add($"Plugin requires GoatShot {entry.MinGoatShotVersion} or newer. Current version is {appVersion}.");
+            issues.Add($"Plugin requires Receipts {entry.MinGoatShotVersion} or newer. Current version is {appVersion}.");
         }
 
         if (!string.IsNullOrWhiteSpace(entry.MaxGoatShotVersion) &&
             CompareVersions(appVersion, entry.MaxGoatShotVersion) > 0)
         {
-            issues.Add($"Plugin supports GoatShot up to {entry.MaxGoatShotVersion}. Current version is {appVersion}.");
+            issues.Add($"Plugin supports Receipts up to {entry.MaxGoatShotVersion}. Current version is {appVersion}.");
         }
 
         return issues;
@@ -981,10 +987,10 @@ public sealed class RemotePluginPackageService
         {
             "incompatible" => "Do not stage or install until compatibility is resolved.",
             "blocked" => "Review managed policy before staging or installing this plugin.",
-            "staged" => "Review the staged package, then run `goatshot plugins install-staged` if you choose to activate it locally.",
-            "available" => "Run `goatshot plugins stage` to download the update for review; no automatic install will occur.",
+            "staged" => "Review the staged package, then run `receipts plugins install-staged` if you choose to activate it locally.",
+            "available" => "Run `receipts plugins stage` to download the update for review; no automatic install will occur.",
             "installed" => "No update action is needed.",
-            _ => "Run `goatshot plugins stage` only if you want to review and install this registry plugin locally."
+            _ => "Run `receipts plugins stage` only if you want to review and install this registry plugin locally."
         };
     }
 
@@ -1181,7 +1187,8 @@ public sealed class RemotePluginPackageService
         RemotePluginRegistryManifest registry,
         RemotePluginRegistryValidationResult validation)
     {
-        if (!registry.SchemaVersion.Equals(CurrentRegistrySchemaVersion, StringComparison.Ordinal))
+        if (!registry.SchemaVersion.Equals(CurrentRegistrySchemaVersion, StringComparison.Ordinal) &&
+            !registry.SchemaVersion.Equals(LegacyRegistrySchemaVersion, StringComparison.Ordinal))
         {
             validation.Issues.Add($"Unsupported schemaVersion. Expected {CurrentRegistrySchemaVersion}.");
         }
@@ -1395,13 +1402,13 @@ public sealed class RemotePluginPackageService
         if (!string.IsNullOrWhiteSpace(entry.MinGoatShotVersion) &&
             CompareVersions(appVersion, entry.MinGoatShotVersion) < 0)
         {
-            result.Issues.Add($"Plugin requires GoatShot {entry.MinGoatShotVersion} or newer. Current version is {appVersion}.");
+            result.Issues.Add($"Plugin requires Receipts {entry.MinGoatShotVersion} or newer. Current version is {appVersion}.");
         }
 
         if (!string.IsNullOrWhiteSpace(entry.MaxGoatShotVersion) &&
             CompareVersions(appVersion, entry.MaxGoatShotVersion) > 0)
         {
-            result.Issues.Add($"Plugin supports GoatShot up to {entry.MaxGoatShotVersion}. Current version is {appVersion}.");
+            result.Issues.Add($"Plugin supports Receipts up to {entry.MaxGoatShotVersion}. Current version is {appVersion}.");
         }
     }
 
@@ -1536,9 +1543,9 @@ public sealed class RemotePluginPackageService
                 return;
             }
 
-            if (!manifest.SchemaVersion.Equals(LocalPluginService.CurrentSchemaVersion, StringComparison.Ordinal))
+            if (!LocalPluginService.IsSupportedSchemaVersion(manifest.SchemaVersion))
             {
-                result.Issues.Add($"Packaged plugin manifest must use {LocalPluginService.CurrentSchemaVersion}.");
+                result.Issues.Add($"Packaged plugin manifest must use {LocalPluginService.CurrentSchemaVersion}; legacy {LocalPluginService.LegacySchemaVersion} is also accepted.");
             }
 
             if (!manifest.Id.Equals(registryEntry.Id, StringComparison.OrdinalIgnoreCase))
@@ -1740,9 +1747,9 @@ public sealed class RemotePluginPackageService
             return null;
         }
 
-        if (!manifest.SchemaVersion.Equals(LocalPluginService.CurrentSchemaVersion, StringComparison.Ordinal))
+        if (!LocalPluginService.IsSupportedSchemaVersion(manifest.SchemaVersion))
         {
-            result.Issues.Add($"Extracted plugin manifest must use {LocalPluginService.CurrentSchemaVersion}.");
+            result.Issues.Add($"Extracted plugin manifest must use {LocalPluginService.CurrentSchemaVersion}; legacy {LocalPluginService.LegacySchemaVersion} is also accepted.");
         }
 
         if (!manifest.Id.Equals(stageManifest.PluginId, StringComparison.OrdinalIgnoreCase))
@@ -1794,7 +1801,7 @@ public sealed class RemotePluginPackageService
     {
         var installManifest = new RemotePluginInstallManifest
         {
-            SchemaVersion = "goatshot.plugin-install.v1",
+            SchemaVersion = CurrentInstallSchemaVersion,
             PluginId = stageManifest.PluginId,
             Version = stageManifest.Version,
             Name = stageManifest.Name,
@@ -1811,12 +1818,12 @@ public sealed class RemotePluginPackageService
             Notes =
             [
                 "Installed from a staged package.",
-                "GoatShot did not trust, enable, allowlist, or execute plugin code during installation.",
+                "Receipts did not trust, enable, allowlist, or execute plugin code during installation.",
                 "Operator review is required before any plugin action can run."
             ]
         };
         File.WriteAllText(
-            Path.Combine(targetDirectory, "goatshot-plugin-install.json"),
+            Path.Combine(targetDirectory, "receipts-plugin-install.json"),
             JsonSerializer.Serialize(installManifest, new JsonSerializerOptions(JsonOptions) { WriteIndented = true }));
     }
 
@@ -2362,7 +2369,7 @@ public sealed class RemotePluginActiveInstallResult
 
 public sealed class RemotePluginInstallManifest
 {
-    public string SchemaVersion { get; set; } = "goatshot.plugin-install.v1";
+    public string SchemaVersion { get; set; } = RemotePluginPackageService.CurrentInstallSchemaVersion;
     public string PluginId { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -2381,7 +2388,7 @@ public sealed class RemotePluginInstallManifest
 
 public sealed class RemotePluginStageManifest
 {
-    public string SchemaVersion { get; set; } = "goatshot.plugin-stage.v1";
+    public string SchemaVersion { get; set; } = RemotePluginPackageService.CurrentStageSchemaVersion;
     public string PluginId { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;

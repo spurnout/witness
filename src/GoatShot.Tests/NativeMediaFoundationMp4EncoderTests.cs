@@ -1,6 +1,5 @@
 using GoatShot.App.Models;
 using GoatShot.App.Services;
-using NAudio.Wave;
 
 namespace GoatShot.Tests;
 
@@ -38,42 +37,10 @@ public sealed class NativeMediaFoundationMp4EncoderTests
         var requested = new RecordingSettings { IncludeMicrophone = true };
         var plan = BuildProductionPlan(requested, productionAudioMixingImplemented: true);
         var settings = RecordingSettingsNormalizer.Normalize(requested);
-        var inputs = new[]
-        {
-            new NativeMediaFoundationMp4Encoder.NativeMp4AudioInput(AudioCaptureSource.Microphone, "microphone.wav")
-        };
-
-        var canEncode = NativeMediaFoundationMp4Encoder.CanEncodeProduction(plan, settings, inputs, out var reason);
+        var canEncode = NativeMediaFoundationMp4Encoder.CanEncodeProduction(plan, settings, 1, out var reason);
 
         Assert.IsTrue(canEncode);
         StringAssert.Contains(reason, "AAC audio");
-    }
-
-    [TestMethod]
-    public void BuildNativeAudioPayload_MixesMonoWavToStereoPcm()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "GoatShot.Tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        var wav = Path.Combine(root, "tone.wav");
-        try
-        {
-            WriteMonoPcm16Wav(wav);
-
-            var payload = NativeMediaFoundationMp4Encoder.BuildNativeAudioPayload(
-                [new NativeMediaFoundationMp4Encoder.NativeMp4AudioInput(AudioCaptureSource.Microphone, wav)]);
-
-            Assert.IsNotNull(payload);
-            Assert.AreEqual(48_000, payload.SampleRate);
-            Assert.AreEqual(2, payload.Channels);
-            Assert.AreEqual(16, payload.BitsPerSample);
-            Assert.AreEqual(1, payload.SourceCount);
-            Assert.IsTrue(payload.Pcm16.Length > 0);
-            Assert.AreEqual(0, payload.Pcm16.Length % 4);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
     }
 
     [TestMethod]
@@ -96,10 +63,45 @@ public sealed class NativeMediaFoundationMp4EncoderTests
         var plan = BuildProductionPlan(requested, productionWebcamCompositorImplemented: true);
         var settings = RecordingSettingsNormalizer.Normalize(requested);
 
-        var canEncode = NativeMediaFoundationMp4Encoder.CanEncodeProduction(plan, settings, [], out var reason);
+        var canEncode = NativeMediaFoundationMp4Encoder.CanEncodeProduction(plan, settings, 0, out var reason);
 
         Assert.IsTrue(canEncode);
         StringAssert.Contains(reason, "precomposited webcam");
+    }
+
+    [TestMethod]
+    public void ProductionMp4Route_WithAudioAndWebcam_StreamsWithoutImageFrameSpool()
+    {
+        var requested = new RecordingSettings
+        {
+            IncludeMicrophone = true,
+            IncludeSystemAudio = true,
+            EnableWebcamOverlay = true
+        };
+        var plan = BuildProductionPlan(
+            requested,
+            productionAudioMixingImplemented: true,
+            productionWebcamCompositorImplemented: true);
+        var normalized = RecordingSettingsNormalizer.Normalize(requested);
+
+        var architecture = RecordingService.SelectMp4CaptureArchitecture(plan);
+        var features = RecordingService.BuildProductionFeatureRouting(normalized);
+
+        Assert.AreEqual(RecordingService.Mp4CaptureArchitecture.StreamingMediaFoundation, architecture);
+        Assert.IsTrue(features.ReserveAudioStream, "Requested microphone/system audio must reserve the streaming AAC lane.");
+        Assert.IsTrue(features.PrecomposeWebcam, "Requested webcam frames must be composited before each streamed video frame.");
+        Assert.IsFalse(features.UsesTemporaryImageFrameSpool, "The production route must not create PNG frame batches.");
+    }
+
+    [TestMethod]
+    public void FfmpegFallbackMp4Route_UsesIncrementalRawVideoLane()
+    {
+        var productionPlan = BuildProductionPlan(new RecordingSettings());
+        var fallbackPlan = productionPlan with { Choice = RecordingEngineChoice.FfmpegFallback };
+
+        var architecture = RecordingService.SelectMp4CaptureArchitecture(fallbackPlan);
+
+        Assert.AreEqual(RecordingService.Mp4CaptureArchitecture.StreamingRawVideoFfmpeg, architecture);
     }
 
     private static RecordingEnginePlan BuildProductionPlan(
@@ -124,14 +126,4 @@ public sealed class NativeMediaFoundationMp4EncoderTests
             productionWebcamCompositorImplemented: productionWebcamCompositorImplemented);
     }
 
-    private static void WriteMonoPcm16Wav(string path)
-    {
-        using var writer = new WaveFileWriter(path, new WaveFormat(48_000, 16, 1));
-        for (var i = 0; i < 480; i++)
-        {
-            var sample = (short)(Math.Sin(i / 12d) * short.MaxValue * 0.25);
-            writer.WriteByte((byte)(sample & 0xFF));
-            writer.WriteByte((byte)((sample >> 8) & 0xFF));
-        }
-    }
 }

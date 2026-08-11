@@ -838,6 +838,10 @@ public partial class EditorWindow : Window
 
         SaveRenderedImage(target);
         var saved = await _services.WorkspaceStore.AddImageFileAsync(target, CaptureKind.EditedImage);
+        saved = await _services.WorkspaceStore.LinkReceiptDerivativeAsync(
+            _item,
+            saved,
+            "edited-image");
         CaptureSaved?.Invoke(this, saved);
         ToolStatus.Text = $"Saved edited copy: {System.IO.Path.GetFileName(target)}";
     }
@@ -887,7 +891,7 @@ public partial class EditorWindow : Window
         };
         image.Measure(new WpfSize(dialog.PrintableAreaWidth, dialog.PrintableAreaHeight));
         image.Arrange(new Rect(new WpfSize(dialog.PrintableAreaWidth, dialog.PrintableAreaHeight)));
-        dialog.PrintVisual(image, "GoatShot edited capture");
+        dialog.PrintVisual(image, "Receipts edited capture");
         ToolStatus.Text = "Sent edited capture to printer.";
     }
 
@@ -956,6 +960,10 @@ public partial class EditorWindow : Window
             result.OutputImagePath,
             CaptureKind.EditedImage,
             $"Gemini edit from prompt: {prompt}");
+        saved = await _services.WorkspaceStore.LinkReceiptDerivativeAsync(
+            _item,
+            saved,
+            "ai-edited-image");
         CaptureSaved?.Invoke(this, saved);
         await _services.Automation.ProcessAiActionCompletedAsync(saved);
         ToolStatus.Text = result.Message;

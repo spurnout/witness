@@ -84,8 +84,8 @@ public sealed class RecordingDeviceDiagnosticsTests
         StringAssert.Contains(summary, "microphone requested and endpoint available");
         StringAssert.Contains(summary, "system-audio loopback requested and endpoint available");
         StringAssert.Contains(summary, "WASAPI peak meters are available for 2 endpoint");
-        StringAssert.Contains(summary, "Short WAV proof capture is available");
-        StringAssert.Contains(summary, "captured WAV payloads can be mixed and muxed as AAC");
-        StringAssert.Contains(summary, "FFmpeg still available as fallback");
+        StringAssert.Contains(summary, "Short standalone WAV proof capture is available");
+        StringAssert.Contains(summary, "event-driven normalized PCM");
+        StringAssert.Contains(summary, "raw-video/raw-PCM FFmpeg fallback");
     }
 }

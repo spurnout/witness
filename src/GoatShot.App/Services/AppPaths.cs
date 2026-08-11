@@ -10,6 +10,7 @@ public sealed class AppPaths
         LibraryRoot = libraryRoot;
         ImagesRoot = Path.Combine(libraryRoot, "Images");
         VideosRoot = Path.Combine(libraryRoot, "Videos");
+        ReceiptsRoot = Path.Combine(libraryRoot, "Receipts");
         DocumentsRoot = Path.Combine(libraryRoot, "Documents");
         ProjectsRoot = Path.Combine(libraryRoot, "Projects");
         PluginsRoot = Path.Combine(localRoot, "plugins");
@@ -19,6 +20,7 @@ public sealed class AppPaths
         BrowserBridgeRoot = Path.Combine(localRoot, "browser-bridge");
         ThumbnailRoot = Path.Combine(localRoot, "thumbnails");
         TempRoot = Path.Combine(localRoot, "temp");
+        ReplayBufferRoot = Path.Combine(localRoot, "replay-buffer");
         LogsRoot = Path.Combine(localRoot, "logs");
         AiOutputRoot = Path.Combine(localRoot, "ai-output");
         SecretsRoot = Path.Combine(localRoot, "secrets");
@@ -34,6 +36,7 @@ public sealed class AppPaths
     public string LibraryRoot { get; }
     public string ImagesRoot { get; }
     public string VideosRoot { get; }
+    public string ReceiptsRoot { get; }
     public string DocumentsRoot { get; }
     public string ProjectsRoot { get; }
     public string PluginsRoot { get; }
@@ -43,6 +46,7 @@ public sealed class AppPaths
     public string BrowserBridgeRoot { get; }
     public string ThumbnailRoot { get; }
     public string TempRoot { get; }
+    public string ReplayBufferRoot { get; }
     public string LogsRoot { get; }
     public string AiOutputRoot { get; }
     public string SecretsRoot { get; }
@@ -53,11 +57,23 @@ public sealed class AppPaths
     public string ShareHistoryPath { get; }
     public string UploadQueuePath { get; }
 
-    public static AppPaths Create(AppSettings settings)
+    public static AppPaths Create(AppSettings settings, string? localRootOverride = null)
     {
-        var localRoot = DefaultLocalRoot();
+        var localResolution = BrandEnvironment.ResolveLocalRoot();
+        var localRoot = string.IsNullOrWhiteSpace(localRootOverride)
+            ? localResolution.Value
+            : Path.GetFullPath(localRootOverride);
+        if (string.IsNullOrWhiteSpace(localRootOverride) && localResolution.UsedLegacyFallback)
+        {
+            StartupTrace.Write($"Legacy environment alias in use: {localResolution.SourceVariable}; prefer {BrandIdentity.EnvironmentVariable(BrandEnvironment.LocalRootSuffix)}.");
+        }
 
-        var defaultLibrary = DefaultLibraryRoot();
+        var libraryResolution = BrandEnvironment.ResolveLibraryRoot();
+        var defaultLibrary = libraryResolution.Value;
+        if (libraryResolution.UsedLegacyFallback)
+        {
+            StartupTrace.Write($"Legacy environment alias in use: {libraryResolution.SourceVariable}; prefer {BrandIdentity.EnvironmentVariable(BrandEnvironment.LibraryRootSuffix)}.");
+        }
 
         var libraryRoot = string.IsNullOrWhiteSpace(settings.LibraryRoot)
             ? defaultLibrary
@@ -75,6 +91,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(LibraryRoot);
         Directory.CreateDirectory(ImagesRoot);
         Directory.CreateDirectory(VideosRoot);
+        Directory.CreateDirectory(ReceiptsRoot);
         Directory.CreateDirectory(DocumentsRoot);
         Directory.CreateDirectory(ProjectsRoot);
         Directory.CreateDirectory(PluginsRoot);
@@ -84,6 +101,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(BrowserBridgeRoot);
         Directory.CreateDirectory(ThumbnailRoot);
         Directory.CreateDirectory(TempRoot);
+        Directory.CreateDirectory(ReplayBufferRoot);
         Directory.CreateDirectory(LogsRoot);
         Directory.CreateDirectory(AiOutputRoot);
         Directory.CreateDirectory(SecretsRoot);
@@ -91,17 +109,11 @@ public sealed class AppPaths
 
     public static string DefaultLocalRoot()
     {
-        var overridePath = Environment.GetEnvironmentVariable("GOATSHOT_LOCAL_ROOT");
-        return string.IsNullOrWhiteSpace(overridePath)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GoatShot")
-            : Environment.ExpandEnvironmentVariables(overridePath);
+        return BrandEnvironment.ResolveLocalRoot().Value;
     }
 
     public static string DefaultLibraryRoot()
     {
-        var overridePath = Environment.GetEnvironmentVariable("GOATSHOT_LIBRARY_ROOT");
-        return string.IsNullOrWhiteSpace(overridePath)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "GoatShot")
-            : Environment.ExpandEnvironmentVariables(overridePath);
+        return BrandEnvironment.ResolveLibraryRoot().Value;
     }
 }

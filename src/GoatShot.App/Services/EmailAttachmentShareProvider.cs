@@ -42,7 +42,7 @@ public sealed class EmailAttachmentShareProvider : IShareProvider
         }
 
         _surface.SetText(request.FilePath);
-        var subject = Uri.EscapeDataString($"GoatShot capture: {Path.GetFileName(request.FilePath)}");
+        var subject = Uri.EscapeDataString($"Receipts capture: {Path.GetFileName(request.FilePath)}");
         var body = Uri.EscapeDataString($"Capture path copied to clipboard:%0D%0A{request.FilePath}");
         _surface.OpenMailto($"mailto:?subject={subject}&body={body}");
         return Task.FromResult(new ShareUploadResult(

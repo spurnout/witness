@@ -221,11 +221,11 @@ public sealed class ManualValidationHarnessService
                 "Use only `browser-extension/samples/safe-fixture.html` unless another safe page is explicitly staged.",
                 "Prefer the generated isolated Chrome/Edge launch script when available; otherwise load the unpacked extension from the local `browser-extension/` folder in the target browser.",
                 "Copy the generated extension id and install the user-scope native host for that browser.",
-                "Run `goatshot browser-extension diagnostics --source <browser-extension-folder>` and save text and JSON output.",
-                "Run `goatshot browser-extension live-fixture --browser <browser> --source <browser-extension-folder>` to generate helper commands, proof notes, safe-fixture server script, isolated launch script, and browser launch plan for this lane.",
+                "Run `receipts browser-extension diagnostics --source <browser-extension-folder>` and save text and JSON output.",
+                "Run `receipts browser-extension live-fixture --browser <browser> --source <browser-extension-folder>` to generate helper commands, proof notes, safe-fixture server script, isolated launch script, and browser launch plan for this lane.",
                 "Capture safe screenshots of loaded extension details, popup consent defaults, options consent defaults, Host Status result, selected-element mode, package-export toggle, and last handoff result.",
                 "Run a consented fixture capture with screenshot consent and package export enabled.",
-                "Import the downloaded `GoatShot/<correlationId>/` stitch package with `goatshot browser-extension live-fixture --payload <payload.json> --stitch-package <package-folder>` or `goatshot browser-extension receive --stitch-package`.",
+                "Import the downloaded `Receipts/<correlationId>/` stitch package with `receipts browser-extension live-fixture --payload <payload.json> --stitch-package <package-folder>` or `receipts browser-extension receive --stitch-package`.",
                 "Save redacted payload/import JSON and record browser name/version, extension id, package folder, pass/fail result, and limitations.",
                 "Do not claim browser-store publication, automatic installation, or cross-browser parity unless separately proven."
             ]),
@@ -238,12 +238,12 @@ public sealed class ManualValidationHarnessService
             "Validate Android screenshot/video/preview behavior only with staged safe phone content.",
             [
                 "Stage safe phone content with no private notifications, chats, email, credentials, photos, or account data visible.",
-                "Run `goatshot diagnostics android --json` and save output.",
+                "Run `receipts diagnostics android --json` and save output.",
                 "If multiple ready devices are connected, record the selected serial and use `--device`.",
-                "Run `goatshot capture android --output <safe-output.png> --device <serial> --json` only after the safe content check.",
-                "Run bounded `goatshot capture android-video --duration <seconds> --output <safe-output.mp4> --device <serial> --json` only when safe motion/content is staged.",
-                "Run `goatshot capture android-preview --strategy screencap-polling --duration 5 --device <serial> --json` as a dry-run preview plan and confirm it does not import streamed media.",
-                "Optionally run guarded `goatshot capture android-preview --execute --safe-content-confirmed --strategy h264-stream --duration 5 --device <serial> --output-dir <safe-preview-folder> --json` only after staging safe phone content, then verify the raw H.264 stream/remux output contains only safe content.",
+                "Run `receipts capture android --output <safe-output.png> --device <serial> --json` only after the safe content check.",
+                "Run bounded `receipts capture android-video --duration <seconds> --output <safe-output.mp4> --device <serial> --json` only when safe motion/content is staged.",
+                "Run `receipts capture android-preview --strategy screencap-polling --duration 5 --device <serial> --json` as a dry-run preview plan and confirm it does not import streamed media.",
+                "Optionally run guarded `receipts capture android-preview --execute --safe-content-confirmed --strategy h264-stream --duration 5 --device <serial> --output-dir <safe-preview-folder> --json` only after staging safe phone content, then verify the raw H.264 stream/remux output contains only safe content.",
                 "Verify outputs contain only safe content and record ADB path, device authorization state, duration, cleanup behavior, and any disconnect/timeout warnings.",
                 "Do not claim production Android live streaming from screenshot import, bounded screenrecord import, dry-run preview planning, guarded screencap preview execution, or guarded H.264 preview execution."
             ])
@@ -289,7 +289,7 @@ public sealed class ManualValidationHarnessService
             }
             else
             {
-                diagnosticsBundlePath = Path.Combine(root, DiagnosticsDirectoryName, "goatshot-diagnostics.zip");
+                diagnosticsBundlePath = Path.Combine(root, DiagnosticsDirectoryName, ManualValidationBaselineService.DiagnosticsBundleFileName);
                 var bundle = await createDiagnosticBundle(diagnosticsBundlePath, cancellationToken);
                 if (!bundle.Succeeded || string.IsNullOrWhiteSpace(bundle.Path))
                 {
@@ -395,7 +395,7 @@ public sealed class ManualValidationHarnessService
         return string.Join(
             Environment.NewLine,
             [
-                "# GoatShot Manual Validation Evidence",
+                "# Receipts Manual Validation Evidence",
                 string.Empty,
                 $"Date: {date:yyyy-MM-dd}",
                 $"Generated at: {generatedAt:O}",
@@ -426,23 +426,23 @@ public sealed class ManualValidationHarnessService
             [
                 "# Manual Validation Command Reference",
                 string.Empty,
-                "Run from the GoatShot workspace root unless noted.",
+                "Run from the Receipts repository root unless noted.",
                 string.Empty,
                 "```powershell",
                 "dotnet build .\\GoatShot.slnx -c Release *> .\\diagnostics\\build-release.txt",
                 "dotnet test .\\GoatShot.slnx -c Release *> .\\diagnostics\\test-release.txt",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics print *> .\\diagnostics\\diagnostics-print.txt",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics bundle --output .\\diagnostics\\goatshot-diagnostics.zip",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics recording --json *> .\\diagnostics\\recording-readiness.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe record devices --json *> .\\diagnostics\\recording-devices.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics capture-engine --engine wgc --json *> .\\diagnostics\\capture-engine-wgc.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics providers --json *> .\\diagnostics\\providers.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe browser-extension diagnostics --source .\\browser-extension --json *> .\\diagnostics\\browser-extension-diagnostics.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe browser-extension live-fixture --browser chrome --source .\\browser-extension --output . --json *> .\\diagnostics\\browser-extension-live-fixture.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe diagnostics android --json *> .\\diagnostics\\android-diagnostics.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe capture android-preview --strategy screencap-polling --duration 5 --json *> .\\diagnostics\\android-preview-plan.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe manual-validation hardware-proof --folder . --run-commands --json *> .\\hardware-proof-cli.json",
-                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\GoatShot.Cli.exe manual-validation summarize --folder . --json *> .\\manual-validation-summary-cli.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics print *> .\\diagnostics\\diagnostics-print.txt",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics bundle --output .\\diagnostics\\receipts-diagnostics.zip",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics recording --json *> .\\diagnostics\\recording-readiness.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe record devices --json *> .\\diagnostics\\recording-devices.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics capture-engine --engine wgc --json *> .\\diagnostics\\capture-engine-wgc.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics providers --json *> .\\diagnostics\\providers.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe browser-extension diagnostics --source .\\browser-extension --json *> .\\diagnostics\\browser-extension-diagnostics.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe browser-extension live-fixture --browser chrome --source .\\browser-extension --output . --json *> .\\diagnostics\\browser-extension-live-fixture.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe diagnostics android --json *> .\\diagnostics\\android-diagnostics.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe capture android-preview --strategy screencap-polling --duration 5 --json *> .\\diagnostics\\android-preview-plan.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe manual-validation hardware-proof --folder . --run-commands --json *> .\\hardware-proof-cli.json",
+                ".\\src\\GoatShot.Cli\\bin\\Release\\net10.0-windows10.0.19041.0\\Receipts.Cli.exe manual-validation summarize --folder . --json *> .\\manual-validation-summary-cli.json",
                 "```",
                 string.Empty,
                 "Privacy reminder: diagnostic bundles are designed to exclude capture media, thumbnails, full OCR text, AI payloads, DPAPI secret files, raw tokens, and private desktop recordings. Review before sharing externally anyway."
@@ -500,7 +500,7 @@ public sealed class ManualValidationHarnessService
         builder.AppendLine();
         builder.AppendLine("## Environment");
         builder.AppendLine();
-        builder.AppendLine("- GoatShot build/package:");
+        builder.AppendLine("- Receipts build/package:");
         builder.AppendLine("- Windows version:");
         builder.AppendLine("- Display/monitor setup:");
         builder.AppendLine("- Input/audio/camera devices:");
@@ -550,7 +550,7 @@ public sealed class ManualValidationHarnessService
         return string.Join(
             Environment.NewLine,
             [
-                "# GoatShot Manual Validation Summary",
+                "# Receipts Manual Validation Summary",
                 string.Empty,
                 $"Date: {date:yyyy-MM-dd}",
                 $"Generated at: {generatedAt:O}",

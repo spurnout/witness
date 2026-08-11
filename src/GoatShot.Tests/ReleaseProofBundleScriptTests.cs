@@ -14,7 +14,7 @@ public sealed class ReleaseProofBundleScriptTests
         var scriptPath = Path.Combine(repoRoot, "scripts", "create-release-proof-bundle.ps1");
         Assert.IsTrue(File.Exists(scriptPath), $"Script missing: {scriptPath}");
 
-        var tempRoot = Path.Combine(Path.GetTempPath(), "goatshot-release-proof-test-" + Guid.NewGuid().ToString("N"));
+        var tempRoot = Path.Combine(Path.GetTempPath(), "receipts-release-proof-test-" + Guid.NewGuid().ToString("N"));
         var outputRoot = Path.Combine(tempRoot, "proof");
         var secretLog = Path.Combine(tempRoot, "secret-log.txt");
         var mediaPayload = Path.Combine(tempRoot, "private-recording.mp4");
@@ -41,8 +41,10 @@ public sealed class ReleaseProofBundleScriptTests
             var root = manifest.RootElement;
 
             Assert.AreEqual(1, root.GetProperty("manifestVersion").GetInt32());
-            Assert.AreEqual("GoatShot", root.GetProperty("application").GetString());
+            Assert.AreEqual("Receipts", root.GetProperty("application").GetString());
+            Assert.AreEqual("0.3.0", root.GetProperty("version").GetString());
             var publishedZipPath = root.GetProperty("zipPath").GetString()!;
+            StringAssert.StartsWith(publishedZipPath, "Receipts-release-proof-0.3.0-");
             Assert.IsTrue(publishedZipPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
             var localZipPath = Path.IsPathRooted(publishedZipPath)
                 ? publishedZipPath
@@ -85,6 +87,40 @@ public sealed class ReleaseProofBundleScriptTests
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
+    }
+
+    [TestMethod]
+    public void ReleaseAutomation_UsesCurrentReceiptsArtifactContract()
+    {
+        var repoRoot = FindRepoRoot();
+        var workflow = File.ReadAllText(Path.Combine(repoRoot, ".github", "workflows", "personal-release.yml"));
+        var proofScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "create-release-proof-bundle.ps1"));
+
+        StringAssert.Contains(workflow, "default: 0.3.0");
+        StringAssert.Contains(workflow, "Receipts-${{ steps.version.outputs.value }}-win-x64-portable.zip");
+        StringAssert.Contains(workflow, "Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe");
+        StringAssert.Contains(workflow, "Receipts-${{ steps.version.outputs.value }}-win-x64.exe");
+        StringAssert.Contains(workflow, "Receipts-release-proof-*.zip");
+        StringAssert.Contains(workflow, "verify-portable-package.ps1");
+        StringAssert.Contains(workflow, "verify-single-exe-package.ps1");
+        StringAssert.Contains(workflow, "verify-installer-package.ps1");
+        Assert.IsFalse(workflow.Contains("artifacts/dist/GoatShot-", StringComparison.Ordinal));
+        Assert.IsFalse(workflow.Contains("artifacts\\dist\\GoatShot-", StringComparison.Ordinal));
+        Assert.IsFalse(workflow.Contains("GoatShot-release-proof-", StringComparison.Ordinal));
+        Assert.IsFalse(workflow.Contains("default: 0.2.0", StringComparison.Ordinal));
+
+        StringAssert.Contains(proofScript, "[string] $Version = \"0.3.0\"");
+        StringAssert.Contains(proofScript, "Receipts.Cli.exe");
+        StringAssert.Contains(proofScript, "$env:RECEIPTS_LOCAL_ROOT");
+        StringAssert.Contains(proofScript, "$env:RECEIPTS_LIBRARY_ROOT");
+        StringAssert.Contains(proofScript, "Receipts-$Version-$Runtime-single-exe.exe");
+        StringAssert.Contains(proofScript, "application = \"Receipts\"");
+        StringAssert.Contains(proofScript, "Receipts-release-proof-");
+        Assert.IsFalse(proofScript.Contains("GoatShot.Cli.exe", StringComparison.Ordinal));
+        Assert.IsFalse(proofScript.Contains("$env:GOATSHOT_LOCAL_ROOT", StringComparison.Ordinal));
+        Assert.IsFalse(proofScript.Contains("$env:GOATSHOT_LIBRARY_ROOT", StringComparison.Ordinal));
+        Assert.IsFalse(proofScript.Contains("GoatShot-release-proof-", StringComparison.Ordinal));
+        Assert.IsFalse(proofScript.Contains("\"0.2.0\"", StringComparison.Ordinal));
     }
 
     private static bool ZipContainsEntry(ZipArchive zip, string normalizedPath)

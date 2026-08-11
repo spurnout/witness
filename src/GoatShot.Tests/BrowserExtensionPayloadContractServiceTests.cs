@@ -24,6 +24,17 @@ public sealed class BrowserExtensionPayloadContractServiceTests
     }
 
     [TestMethod]
+    public void Validate_AcceptsLegacyGoatShotSchema()
+    {
+        var payload = CreateValidPayload();
+        payload.SchemaVersion = BrowserExtensionPayloadContractService.LegacySchemaVersion;
+
+        var result = BrowserExtensionPayloadContractService.Validate(payload);
+
+        Assert.IsTrue(result.IsValid, string.Join(Environment.NewLine, result.Issues));
+    }
+
+    [TestMethod]
     public void Validate_RequiresScreenshotConsentSupportedUrlAndDimensions()
     {
         var payload = CreateValidPayload();

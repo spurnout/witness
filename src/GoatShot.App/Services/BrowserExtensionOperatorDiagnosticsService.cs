@@ -71,7 +71,7 @@ public sealed class BrowserExtensionOperatorDiagnosticsService
                 Code = "extension-package-incomplete",
                 Status = "blocked",
                 Message = "The extension source folder is missing required manifest or service-worker files.",
-                RecoveryAction = "Run `goatshot browser-extension package --source <folder>` to validate the local extension package."
+                RecoveryAction = "Run `receipts browser-extension package --source <folder>` to validate the local extension package."
             });
             diagnostics.Issues.Add("Browser extension manifest or service worker is missing.");
         }
@@ -123,7 +123,7 @@ public sealed class BrowserExtensionOperatorDiagnosticsService
                 Code = "native-host-status-unavailable",
                 Status = "warning",
                 Message = "Native host registration state was not supplied.",
-                RecoveryAction = "Run `goatshot browser-extension native-host status --json`."
+                RecoveryAction = "Run `receipts browser-extension native-host status --json`."
             });
             diagnostics.Warnings.Add("Native host registration state was not supplied.");
             return;
@@ -191,7 +191,7 @@ public sealed class BrowserExtensionOperatorDiagnosticsService
             Code = "browser-download-package-boundary",
             Status = "manual",
             Message = "Browser downloads expose only a relative package folder hint to the extension; the operator still chooses the local package folder for native import.",
-            RecoveryAction = "Record the downloaded `GoatShot/<correlationId>/` folder path in live fixture notes."
+            RecoveryAction = "Record the downloaded `Receipts/<correlationId>/` folder path in live fixture notes (legacy exports may still use `GoatShot/`)."
         });
     }
 
@@ -210,7 +210,7 @@ public sealed class BrowserExtensionOperatorDiagnosticsService
 
         diagnostics.NextActions.Add("Open browser-extension/samples/safe-fixture.html in the target browser.");
         diagnostics.NextActions.Add("Use the extension popup Host Status button and save the diagnostic result.");
-        diagnostics.NextActions.Add("Run a consented fixture capture and import the downloaded stitch package with `goatshot browser-extension receive --stitch-package`.");
+        diagnostics.NextActions.Add("Run a consented fixture capture and import the downloaded stitch package with `receipts browser-extension receive --stitch-package`.");
     }
 
     private static string ResolveExtensionSourceDirectory(string? sourceDirectory)

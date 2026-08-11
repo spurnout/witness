@@ -6,7 +6,7 @@ using Windows.Media.Devices;
 
 namespace GoatShot.App.Services;
 
-public sealed class WindowsAudioCaptureService : IAudioCaptureService
+public sealed class WindowsAudioCaptureService : IAudioCaptureService, IStreamingAudioCaptureService
 {
     public async Task<IReadOnlyList<AudioCaptureDevice>> ListInputDevicesAsync(CancellationToken cancellationToken)
     {
@@ -155,6 +155,48 @@ public sealed class WindowsAudioCaptureService : IAudioCaptureService
                 Duration: stopwatch.Elapsed,
                 BytesWritten: bytesWritten,
                 Device: deviceRecord);
+        }
+    }
+
+    /// <summary>
+    /// Starts event-driven WASAPI capture and normalizes each callback to the shared
+    /// recording PCM contract. No WAV or whole-recording memory buffer is created.
+    /// </summary>
+    public IStreamingAudioCaptureSession StartStreaming(
+        StreamingAudioCaptureRequest request,
+        Action<StreamingAudioChunk> onChunk,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(onChunk);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var enumerator = new MMDeviceEnumerator();
+        var device = ResolveWasapiDevice(enumerator, request.Source, request.DeviceId);
+        try
+        {
+            WasapiCapture capture = request.Source == AudioCaptureSource.SystemAudio
+                ? new WasapiLoopbackCapture(device)
+                : new WasapiCapture(device);
+            try
+            {
+                var session = new WasapiStreamingAudioCaptureSession(
+                    request,
+                    device,
+                    capture,
+                    onChunk);
+                device = null!;
+                return session;
+            }
+            catch
+            {
+                capture.Dispose();
+                throw;
+            }
+        }
+        finally
+        {
+            device?.Dispose();
         }
     }
 
@@ -358,5 +400,191 @@ public sealed class WindowsAudioCaptureService : IAudioCaptureService
             Duration: request.Duration,
             BytesWritten: 0,
             Device: null);
+    }
+
+    private sealed class WasapiStreamingAudioCaptureSession : IStreamingAudioCaptureSession
+    {
+        private readonly object _gate = new();
+        private readonly MMDevice _device;
+        private readonly WasapiCapture _capture;
+        private readonly Action<StreamingAudioChunk> _onChunk;
+        private readonly StreamingPcmNormalizer _normalizer;
+        private readonly AudioCaptureProcessingSettings _processing;
+        private readonly bool _processingSupported;
+        private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+        private readonly TaskCompletionSource<Exception?> _stopped =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private StreamingAudioCaptureResult? _result;
+        private Exception? _callbackException;
+        private long _bytesProduced;
+        private long _processedSamples;
+        private int _stopRequested;
+        private bool _disposed;
+
+        public WasapiStreamingAudioCaptureSession(
+            StreamingAudioCaptureRequest request,
+            MMDevice device,
+            WasapiCapture capture,
+            Action<StreamingAudioChunk> onChunk)
+        {
+            Source = request.Source;
+            _device = device;
+            _capture = capture;
+            _onChunk = onChunk;
+            _normalizer = new StreamingPcmNormalizer(capture.WaveFormat);
+            _processing = AudioSampleProcessor.Normalize(request.Processing);
+            _processingSupported = AudioSampleProcessor.CanProcess(capture.WaveFormat) || _processing.Muted;
+
+            _capture.DataAvailable += OnDataAvailable;
+            _capture.RecordingStopped += OnRecordingStopped;
+            try
+            {
+                _capture.StartRecording();
+            }
+            catch
+            {
+                _capture.DataAvailable -= OnDataAvailable;
+                _capture.RecordingStopped -= OnRecordingStopped;
+                throw;
+            }
+        }
+
+        public AudioCaptureSource Source { get; }
+
+        public async Task<StreamingAudioCaptureResult> StopAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                if (_result is not null)
+                {
+                    return _result;
+                }
+            }
+
+            if (Interlocked.Exchange(ref _stopRequested, 1) == 0)
+            {
+                SafeStop(_capture);
+            }
+
+            Exception? stopException;
+            try
+            {
+                stopException = await _stopped.Task
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException ex)
+            {
+                stopException = ex;
+            }
+
+            lock (_gate)
+            {
+                if (_result is not null)
+                {
+                    return _result;
+                }
+
+                try
+                {
+                    Emit(_normalizer.Flush());
+                }
+                catch (Exception ex)
+                {
+                    _callbackException ??= ex;
+                }
+
+                _stopwatch.Stop();
+                var device = CreateDeviceRecord(
+                    _device,
+                    Source == AudioCaptureSource.SystemAudio);
+                var failure = _callbackException ?? stopException;
+                var processing = AudioSampleProcessor.HasProcessing(_processing)
+                    ? _processingSupported
+                        ? $" Processing: {AudioSampleProcessor.Describe(_processing)} ({_processedSamples} sample(s) touched)."
+                        : $" Processing requested but unsupported by {_capture.WaveFormat.Encoding}/{_capture.WaveFormat.BitsPerSample}-bit input; raw samples were normalized."
+                    : " Processing: disabled.";
+                var partial = _bytesProduced > 0 ? " Captured PCM remains usable as a partial segment." : string.Empty;
+                _result = new StreamingAudioCaptureResult(
+                    failure is null,
+                    failure is null
+                        ? $"Streamed {FormatAudioSource(Source)} from {device.DisplayName} ({_bytesProduced} PCM byte(s)).{processing}"
+                        : $"Streaming {FormatAudioSource(Source)} stopped with {failure.GetType().Name}: {failure.Message}.{partial}",
+                    _stopwatch.Elapsed,
+                    _bytesProduced,
+                    device);
+                return _result;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                await StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            finally
+            {
+                _capture.DataAvailable -= OnDataAvailable;
+                _capture.RecordingStopped -= OnRecordingStopped;
+                _capture.Dispose();
+                _device.Dispose();
+                _disposed = true;
+            }
+        }
+
+        private void OnDataAvailable(object? sender, WaveInEventArgs args)
+        {
+            if (args.BytesRecorded <= 0 || Volatile.Read(ref _stopRequested) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var processed = AudioSampleProcessor.ApplyInPlace(
+                    args.Buffer,
+                    args.BytesRecorded,
+                    _capture.WaveFormat,
+                    _processing);
+                var chunks = _normalizer.Push(args.Buffer, args.BytesRecorded);
+                lock (_gate)
+                {
+                    _processedSamples += processed;
+                    Emit(chunks);
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (_gate)
+                {
+                    _callbackException ??= ex;
+                }
+
+                if (Interlocked.Exchange(ref _stopRequested, 1) == 0)
+                {
+                    SafeStop(_capture);
+                }
+            }
+        }
+
+        private void Emit(IReadOnlyList<StreamingAudioChunk> chunks)
+        {
+            foreach (var chunk in chunks)
+            {
+                _onChunk(chunk);
+                _bytesProduced += chunk.Pcm16.Length;
+            }
+        }
+
+        private void OnRecordingStopped(object? sender, StoppedEventArgs args) =>
+            _stopped.TrySetResult(args.Exception);
     }
 }

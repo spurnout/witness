@@ -7,6 +7,27 @@ namespace GoatShot.Tests;
 public sealed class SettingsMigrationServiceTests
 {
     [TestMethod]
+    public void Migrate_RebrandsOnlyKnownLegacyDefaults()
+    {
+        var settings = new AppSettings
+        {
+            SlackMessageTemplate = "GoatShot capture ready: {file} ({bytes} bytes)",
+            DiscordMessageTemplate = "My custom GoatShot archive: {file}",
+            S3KeyPrefix = "goatshot/",
+            DropboxRemoteFolder = "/GoatShot",
+            OneDriveRemoteFolder = "/GoatShot"
+        };
+
+        SettingsMigrationService.Migrate(settings);
+
+        Assert.AreEqual("Receipts capture ready: {file} ({bytes} bytes)", settings.SlackMessageTemplate);
+        Assert.AreEqual("My custom GoatShot archive: {file}", settings.DiscordMessageTemplate);
+        Assert.AreEqual("receipts/", settings.S3KeyPrefix);
+        Assert.AreEqual("/Receipts", settings.DropboxRemoteFolder);
+        Assert.AreEqual("/Receipts", settings.OneDriveRemoteFolder);
+    }
+
+    [TestMethod]
     public void Migrate_AddsCurrentVersionAndDefaultRoadmapSettings()
     {
         var settings = new AppSettings
@@ -77,17 +98,17 @@ public sealed class SettingsMigrationServiceTests
         Assert.IsTrue(settings.UploadQueue.RetryFailedUploads);
         Assert.AreEqual("https://dev.azure.com", settings.AzureDevOpsBaseUrl);
         Assert.AreEqual("Bug", settings.AzureDevOpsWorkItemType);
-        Assert.AreEqual("GoatShot capture: {file}", settings.AzureDevOpsTitleTemplate);
+        Assert.AreEqual("Receipts capture: {file}", settings.AzureDevOpsTitleTemplate);
         Assert.AreEqual("https://www.googleapis.com/upload/youtube/v3", settings.YouTubeUploadApiBaseUrl);
-        Assert.AreEqual("GoatShot recording: {file}", settings.YouTubeTitleTemplate);
-        Assert.AreEqual("Uploaded from GoatShot capture {id}.", settings.YouTubeDescriptionTemplate);
+        Assert.AreEqual("Receipts recording: {file}", settings.YouTubeTitleTemplate);
+        Assert.AreEqual("Uploaded from Receipts capture {id}.", settings.YouTubeDescriptionTemplate);
         Assert.AreEqual("unlisted", settings.YouTubePrivacyStatus);
         Assert.AreEqual("22", settings.YouTubeCategoryId);
         Assert.AreEqual("https://photoslibrary.googleapis.com/v1/uploads", settings.GooglePhotosUploadApiBaseUrl);
         Assert.AreEqual("https://photoslibrary.googleapis.com/v1", settings.GooglePhotosApiBaseUrl);
-        Assert.AreEqual("GoatShot capture: {file}", settings.GooglePhotosDescriptionTemplate);
+        Assert.AreEqual("Receipts capture: {file}", settings.GooglePhotosDescriptionTemplate);
         Assert.AreEqual("https://graph.microsoft.com/v1.0", settings.OneNoteGraphApiBaseUrl);
-        Assert.AreEqual("GoatShot capture: {file}", settings.OneNotePageTitleTemplate);
+        Assert.AreEqual("Receipts capture: {file}", settings.OneNotePageTitleTemplate);
         CollectionAssert.Contains(settings.OAuth.Providers.Select(provider => provider.ProviderName).ToList(), "Google Photos");
         CollectionAssert.Contains(settings.OAuth.Providers.Select(provider => provider.ProviderName).ToList(), "YouTube");
         CollectionAssert.Contains(settings.OAuth.Providers.Select(provider => provider.ProviderName).ToList(), "OneNote");

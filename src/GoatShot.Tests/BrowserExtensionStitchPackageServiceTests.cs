@@ -15,9 +15,9 @@ public sealed class BrowserExtensionStitchPackageServiceTests
             WriteSamplePng(Path.Combine(packageRoot, "stitched.png"));
             Directory.CreateDirectory(Path.Combine(packageRoot, "tiles"));
             WriteSamplePng(Path.Combine(packageRoot, "tiles", "tile-0000.png"));
-            File.WriteAllText(Path.Combine(packageRoot, "goatshot-stitch-package.json"), """
+            File.WriteAllText(Path.Combine(packageRoot, "receipts-stitch-package.json"), """
                 {
-                  "schemaVersion": "goatshot.browser-stitch-package.v1",
+                  "schemaVersion": "receipts.browser-stitch-package.v1",
                   "correlationId": "sample-contract-fixture",
                   "source": "extension-storage-export",
                   "stitchedImagePath": "stitched.png",

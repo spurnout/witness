@@ -8,7 +8,8 @@ namespace GoatShot.App.Services;
 
 public sealed class LocalPluginService
 {
-    public const string CurrentSchemaVersion = "goatshot.plugin.v1";
+    public const string CurrentSchemaVersion = "receipts.plugin.v1";
+    public const string LegacySchemaVersion = "goatshot.plugin.v1";
 
     private static readonly Regex IdPattern = new("^[a-z0-9][a-z0-9._-]{2,63}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -482,9 +483,9 @@ public sealed class LocalPluginService
 
     private static void Validate(LocalPluginManifest manifest, LocalPluginRecord record)
     {
-        if (!manifest.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal))
+        if (!IsSupportedSchemaVersion(manifest.SchemaVersion))
         {
-            record.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}.");
+            record.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}; legacy {LegacySchemaVersion} is also accepted.");
         }
 
         if (!IsValidId(manifest.Id))
@@ -535,6 +536,10 @@ public sealed class LocalPluginService
             }
         }
     }
+
+    public static bool IsSupportedSchemaVersion(string? schemaVersion) =>
+        string.Equals(schemaVersion, CurrentSchemaVersion, StringComparison.Ordinal) ||
+        string.Equals(schemaVersion, LegacySchemaVersion, StringComparison.Ordinal);
 
     private List<LocalPluginActionStatus> BuildActionStatuses(LocalPluginManifest manifest, LocalPluginRecord record)
     {

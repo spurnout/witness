@@ -44,6 +44,10 @@ public static class SettingsWindowRenderer
             {
                 window.SelectAutomationImageEffectRuleFields();
             }
+            else if (IsReplaySection(sectionKey))
+            {
+                window.SelectReplaySettings();
+            }
             else if (IsAutomationAdvancedSection(sectionKey))
             {
                 window.SelectAutomationAdvancedRuleFields();
@@ -80,6 +84,13 @@ public static class SettingsWindowRenderer
             (value.Equals("AutomationAdvanced", StringComparison.OrdinalIgnoreCase) ||
              value.Equals("AutomationRules", StringComparison.OrdinalIgnoreCase) ||
              value.Equals("WorkflowRules", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsReplaySection(string? sectionKey)
+    {
+        return sectionKey?.Trim() is { } value &&
+            (value.Equals("Replay", StringComparison.OrdinalIgnoreCase) ||
+             value.Equals("ReplayRecording", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsAutomationImageEffectSection(string? sectionKey)

@@ -53,6 +53,7 @@ public sealed class PluginUpdateScheduleServiceTests
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             Assert.IsNotNull(manifest);
             Assert.AreEqual(PluginUpdateScheduleService.CurrentSchemaVersion, manifest!.SchemaVersion);
+            Assert.AreEqual("receipts.plugin-update-schedule.v1", manifest.SchemaVersion);
             Assert.AreEqual("stage-only", manifest.Mode);
             Assert.AreEqual(6, manifest.IntervalHours);
             Assert.IsFalse(manifest.WouldInstall);
@@ -138,6 +139,34 @@ public sealed class PluginUpdateScheduleServiceTests
             Assert.IsFalse(result.WouldEnable);
             Assert.IsFalse(result.WouldAllowlist);
             Assert.IsFalse(result.WouldExecute);
+            return Task.CompletedTask;
+        });
+    }
+
+    [TestMethod]
+    public async Task RunTaskCommand_AcceptsLegacyGoatShotManifestSchema()
+    {
+        await WithTempPathsAsync(paths =>
+        {
+            var output = Path.Combine(paths.LocalRoot, "schedule-output");
+            var service = new PluginUpdateScheduleService(paths);
+            var plan = service.CreatePlan(new PluginUpdateSchedulePlanRequest
+            {
+                RegistryLocation = "samples\\local-plugins\\registry.json",
+                OutputPath = output
+            });
+            var manifestText = File.ReadAllText(plan.ManifestPath)
+                .Replace(PluginUpdateScheduleService.CurrentSchemaVersion, PluginUpdateScheduleService.LegacySchemaVersion, StringComparison.Ordinal);
+            File.WriteAllText(plan.ManifestPath, manifestText);
+
+            var result = service.RunTaskCommand(new PluginUpdateTaskSchedulerCommandRequest
+            {
+                Command = "status",
+                ManifestPath = plan.ManifestPath,
+                DryRun = true
+            });
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Issues));
             return Task.CompletedTask;
         });
     }

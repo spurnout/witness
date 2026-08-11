@@ -101,7 +101,7 @@ public sealed class WorkflowRunLogService
     private static string BuildMarkdown(AutomationRunResult result, CaptureItem item)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Workflow Run");
+        builder.AppendLine("# Receipts Workflow Run");
         builder.AppendLine();
         builder.AppendLine($"- Trigger: `{result.Trigger}`");
         builder.AppendLine($"- Dry run: `{result.DryRun}`");

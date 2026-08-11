@@ -193,7 +193,7 @@ public sealed class BrowserExtensionStoreReadinessService
                 readiness.Status = readiness.Issues.Count == 0
                     ? "local-package-ready"
                     : "blocked";
-                readiness.ManualSteps.Add("Run `goatshot browser-extension package --source browser-extension` and load the ZIP or unpacked folder manually.");
+                readiness.ManualSteps.Add("Run `receipts browser-extension package --source browser-extension` and load the ZIP or unpacked folder manually.");
                 readiness.ManualSteps.Add("Use the popup Host Status button in the browser to prove native-host reachability.");
                 readiness.Warnings.Add("Local package readiness does not prove browser-store publication, signing, or review.");
                 break;
@@ -255,7 +255,7 @@ public sealed class BrowserExtensionStoreReadinessService
                 "nativeMessaging" => new BrowserExtensionPermissionRationale
                 {
                     Permission = permission,
-                    Purpose = "Connect the extension to GoatShot's local native host `com.goatshot.bridge`.",
+                    Purpose = "Connect the extension to Receipts' local native host `com.receipts.bridge` (with `com.goatshot.bridge` retained as an upgrade alias).",
                     UserBenefit = "Lets the browser hand off validated capture payloads and Host Status diagnostics to the native desktop app.",
                     DataBoundary = "Native payloads are validated and redacted before persistence; browser-store publication is not implied.",
                     ConsentBoundary = "Native handoff is driven by explicit extension actions and the local native-host installation."
@@ -297,7 +297,7 @@ public sealed class BrowserExtensionStoreReadinessService
     private static string BuildStoreReadinessMarkdown(BrowserExtensionStoreReadinessResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Store Readiness");
+        builder.AppendLine("# Receipts Browser Extension Store Readiness");
         builder.AppendLine();
         builder.AppendLine($"Source: `{result.SourceDirectory}`");
         builder.AppendLine($"Generated artifacts: `{result.OutputPath}`");
@@ -368,7 +368,7 @@ public sealed class BrowserExtensionStoreReadinessService
         builder.AppendLine();
         builder.AppendLine("## Summary");
         builder.AppendLine();
-        builder.AppendLine("GoatShot's browser extension is an optional companion for local page capture. It collects page geometry and optional bounded telemetry only after visible operator consent, then hands data to the local GoatShot desktop app for validation and redaction.");
+        builder.AppendLine("Receipts' browser extension is an optional companion for local page capture. It collects page geometry and optional bounded telemetry only after visible operator consent, then hands data to the local Receipts desktop app for validation and redaction.");
         builder.AppendLine();
         builder.AppendLine("## Collected With Screenshot Consent");
         builder.AppendLine();
@@ -415,8 +415,8 @@ public sealed class BrowserExtensionStoreReadinessService
         builder.AppendLine("- Host Status failure or diagnostic state for recovery copy.");
         builder.AppendLine("- Safe fixture full-page capture setup showing tall-page and horizontal-scroll coverage.");
         builder.AppendLine("- Safe fixture selected-element capture state.");
-        builder.AppendLine("- Browser downloads folder showing a local GoatShot stitch package from the safe fixture.");
-        builder.AppendLine("- GoatShot native import result for the downloaded package.");
+        builder.AppendLine("- Browser downloads folder showing a local Receipts stitch package from the safe fixture.");
+        builder.AppendLine("- Receipts native import result for the downloaded package.");
         builder.AppendLine("- Browser extension details page showing the extension id used for native-host registration.");
         builder.AppendLine();
         builder.AppendLine("Keep native-host and import proof in the manual validation folder; store screenshots are listing/review assets only.");

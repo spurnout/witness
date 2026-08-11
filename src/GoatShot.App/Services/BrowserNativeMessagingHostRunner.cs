@@ -72,7 +72,7 @@ public sealed class BrowserNativeMessagingHostRunner
             return new BrowserNativeHostMessageResult
             {
                 Succeeded = true,
-                Message = "GoatShot native host is reachable.",
+                Message = "Receipts native host is reachable.",
                 NativeHostVersion = typeof(BrowserNativeMessagingHostRunner).Assembly.GetName().Version?.ToString() ?? string.Empty
             };
         }

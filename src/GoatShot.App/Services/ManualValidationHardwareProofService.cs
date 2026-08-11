@@ -340,7 +340,7 @@ public sealed class ManualValidationHardwareProofService
         builder.AppendLine();
         builder.AppendLine("## Environment");
         builder.AppendLine();
-        builder.AppendLine($"- GoatShot build/package: see baseline lane and release proof bundle.");
+        builder.AppendLine($"- Receipts build/package: see baseline lane and release proof bundle.");
         builder.AppendLine($"- Windows version: {environment.WindowsVersion}");
         builder.AppendLine($"- Display/monitor setup: {environment.ScreenCount.ToString(CultureInfo.InvariantCulture)} display(s) detected.");
         builder.AppendLine("- Input/audio/camera devices: see `hardware-proof/recording-devices.json` and `hardware-proof/diagnostics-devices.json`.");
@@ -612,19 +612,22 @@ public sealed class ManualValidationHardwareProofService
         }
 
         if (!string.IsNullOrWhiteSpace(Environment.ProcessPath) &&
-            Path.GetFileName(Environment.ProcessPath).Equals("GoatShot.Cli.exe", StringComparison.OrdinalIgnoreCase))
+            (Path.GetFileName(Environment.ProcessPath).Equals(BrandIdentity.CommandLineExecutableName, StringComparison.OrdinalIgnoreCase) ||
+             Path.GetFileName(Environment.ProcessPath).Equals($"{BrandIdentity.LegacyProductName}.Cli.exe", StringComparison.OrdinalIgnoreCase)))
         {
             return Environment.ProcessPath!;
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.Cli",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.Cli.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.CommandLineExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static string FindOnPath(string executable)

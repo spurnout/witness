@@ -44,7 +44,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video frame export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video frame export.");
         }
 
         at = at < TimeSpan.Zero ? TimeSpan.Zero : at;
@@ -118,7 +118,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video trimming.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video trimming.");
         }
 
         start = start < TimeSpan.Zero ? TimeSpan.Zero : start;
@@ -197,7 +197,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video mute export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video mute export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -271,7 +271,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video speed export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video speed export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -484,7 +484,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video conversion.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video conversion.");
         }
 
         outputPath = ResolveOutputPath(
@@ -559,7 +559,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video volume export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video volume export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -646,7 +646,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable audio denoise export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable audio denoise export.");
         }
 
         var hasAudio = await HasAudioStreamAsync(ffmpeg, item.FilePath, cancellationToken);
@@ -742,7 +742,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video resize/export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video resize/export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -846,7 +846,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable middle-cut export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable middle-cut export.");
         }
 
         var end = start + duration;
@@ -926,7 +926,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable reviewed cut-plan export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable reviewed cut-plan export.");
         }
 
         var durationSeconds = await GetVideoDurationSecondsAsync(ffmpeg, item.FilePath, cancellationToken);
@@ -1047,7 +1047,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable composite layout export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable composite layout export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -1148,7 +1148,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable webcam background export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable webcam background export.");
         }
 
         var dimensions = await GetVideoDimensionsAsync(ffmpeg, item.FilePath, cancellationToken);
@@ -1220,7 +1220,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable foreground mask generation.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable foreground mask generation.");
         }
 
         options ??= new WebcamMaskGenerationOptions();
@@ -1286,7 +1286,7 @@ public sealed class VideoToolService
         var runnerPath = ResolvePersonSegmentationRunnerPath(options.RunnerPath);
         if (string.IsNullOrWhiteSpace(runnerPath))
         {
-            return Failed("Person-segmentation runner was not found. Pass --runner <exe> or set GOATSHOT_PERSON_SEGMENTER_EXE.");
+            return Failed("Person-segmentation runner was not found. Pass --runner <exe> or set RECEIPTS_PERSON_SEGMENTER_EXE (GOATSHOT_PERSON_SEGMENTER_EXE remains a compatibility alias).");
         }
 
         var argumentsTemplate = string.IsNullOrWhiteSpace(options.ArgumentsTemplate)
@@ -2045,7 +2045,7 @@ public sealed class VideoToolService
     private static string? ResolvePersonSegmentationRunnerPath(string? runnerPath)
     {
         runnerPath = string.IsNullOrWhiteSpace(runnerPath)
-            ? Environment.GetEnvironmentVariable("GOATSHOT_PERSON_SEGMENTER_EXE")
+            ? BrandEnvironment.Resolve("PERSON_SEGMENTER_EXE").Value
             : runnerPath;
         if (string.IsNullOrWhiteSpace(runnerPath))
         {
@@ -2205,7 +2205,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video merge.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video merge.");
         }
 
         outputPath = ResolveOutputPath(
@@ -2290,7 +2290,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable intro/outro export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable intro/outro export.");
         }
 
         outputPath = ResolveOutputPath(
@@ -2400,7 +2400,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable subtitle burn-in.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable subtitle burn-in.");
         }
 
         outputPath = ResolveOutputPath(
@@ -2511,7 +2511,7 @@ public sealed class VideoToolService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable video crop export.");
+            return Failed("FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) to enable video crop export.");
         }
 
         outputPath = ResolveOutputPath(outputPath, _paths.VideosRoot, defaultFileName);

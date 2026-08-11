@@ -11,6 +11,8 @@ public sealed class ManualValidationBaselineService
 {
     public const string BaselineFileName = "01-baseline-setup.md";
     public const string CommandResultsFileName = "baseline-command-results.json";
+    public const string DiagnosticsBundleFileName = "receipts-diagnostics.zip";
+    public const string LegacyDiagnosticsBundleFileName = "goatshot-diagnostics.zip";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -176,7 +178,7 @@ public sealed class ManualValidationBaselineService
         yield return new ManualValidationBaselineCommandSpec(
             "CLI diagnostics bundle",
             cliPath,
-            new[] { "diagnostics", "bundle", "--output", Path.Combine(diagnosticsRoot, "goatshot-diagnostics.zip") },
+            new[] { "diagnostics", "bundle", "--output", Path.Combine(diagnosticsRoot, DiagnosticsBundleFileName) },
             repoRoot,
             Path.Combine(diagnosticsRoot, "diagnostics-bundle.txt"),
             timeoutSeconds);
@@ -222,31 +224,33 @@ public sealed class ManualValidationBaselineService
             return Environment.ProcessPath!;
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.Cli",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.Cli.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.CommandLineExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static List<ManualValidationBaselineEvidenceItem> BuildEvidence(string root, string diagnosticsRoot)
     {
         var distRoot = Path.GetFullPath(Path.Combine(root, "..", "..", "dist"));
-        var distZip = Directory.Exists(distRoot)
-            ? Directory.EnumerateFiles(distRoot, "GoatShot-*-portable.zip", SearchOption.TopDirectoryOnly)
-                .OrderByDescending(File.GetLastWriteTimeUtc)
-                .FirstOrDefault()
-            : null;
+        var distZip = FindPreferredPackage(distRoot);
 
         return new List<ManualValidationBaselineEvidenceItem>
         {
             Item(diagnosticsRoot, "build-release.txt", true),
             Item(diagnosticsRoot, "test-release.txt", true),
             Item(diagnosticsRoot, "diagnostics-print.txt", true),
-            Item(diagnosticsRoot, "goatshot-diagnostics.zip", true),
+            CompatibleItem(
+                diagnosticsRoot,
+                DiagnosticsBundleFileName,
+                LegacyDiagnosticsBundleFileName,
+                required: true),
             Item(diagnosticsRoot, "recording-readiness.json", true),
             Item(diagnosticsRoot, "recording-devices.json", true),
             Item(diagnosticsRoot, "capture-engine-wgc.json", true),
@@ -255,7 +259,7 @@ public sealed class ManualValidationBaselineService
             new()
             {
                 RelativePath = string.IsNullOrWhiteSpace(distZip)
-                    ? "artifacts/dist/GoatShot-*-portable.zip"
+                    ? $"artifacts/dist/Receipts-{BrandIdentity.ReleaseVersion}-win-x64-portable.zip"
                     : Path.GetRelativePath(root, distZip).Replace('\\', '/'),
                 Path = distZip ?? string.Empty,
                 Exists = !string.IsNullOrWhiteSpace(distZip) && File.Exists(distZip),
@@ -274,6 +278,45 @@ public sealed class ManualValidationBaselineService
             Exists = File.Exists(path),
             Required = required
         };
+    }
+
+    private static ManualValidationBaselineEvidenceItem CompatibleItem(
+        string diagnosticsRoot,
+        string currentFileName,
+        string legacyFileName,
+        bool required)
+    {
+        var selectedFileName = File.Exists(Path.Combine(diagnosticsRoot, currentFileName)) ||
+            !File.Exists(Path.Combine(diagnosticsRoot, legacyFileName))
+                ? currentFileName
+                : legacyFileName;
+        return Item(diagnosticsRoot, selectedFileName, required);
+    }
+
+    private static string? FindPreferredPackage(string distRoot)
+    {
+        if (!Directory.Exists(distRoot))
+        {
+            return null;
+        }
+
+        foreach (var pattern in new[]
+                 {
+                     $"Receipts-{BrandIdentity.ReleaseVersion}-win-x64-portable.zip",
+                     "Receipts-*-win-x64-portable.zip",
+                     "GoatShot-*-portable.zip"
+                 })
+        {
+            var match = Directory.EnumerateFiles(distRoot, pattern, SearchOption.TopDirectoryOnly)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(match))
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static string BuildBaselineMarkdown(
@@ -316,7 +359,7 @@ public sealed class ManualValidationBaselineService
         builder.AppendLine();
         builder.AppendLine("## Environment");
         builder.AppendLine();
-        builder.AppendLine($"- GoatShot build/package: {(commands.Any(command => command.Name.Equals("Release build", StringComparison.OrdinalIgnoreCase) && command.ExitCode == 0) ? "Release build passed" : "see diagnostics/build-release.txt")}.");
+        builder.AppendLine($"- Receipts build/package: {(commands.Any(command => command.Name.Equals("Release build", StringComparison.OrdinalIgnoreCase) && command.ExitCode == 0) ? "Release build passed" : "see diagnostics/build-release.txt")}.");
         builder.AppendLine($"- Windows version: {Environment.OSVersion.VersionString}");
         builder.AppendLine($"- Display/monitor setup: {Forms.Screen.AllScreens.Length.ToString(CultureInfo.InvariantCulture)} display(s) detected by Windows Forms.");
         builder.AppendLine("- Input/audio/camera devices: see `diagnostics/recording-devices.json`.");

@@ -55,7 +55,7 @@ public static class ShareHistoryActions
         }
 
         var label = string.IsNullOrWhiteSpace(entry.FileName)
-            ? "GoatShot upload"
+            ? "Receipts upload"
             : Path.GetFileNameWithoutExtension(entry.FileName);
         var escapedLabel = label.Replace("[", "\\[", StringComparison.Ordinal).Replace("]", "\\]", StringComparison.Ordinal);
         return $"![{escapedLabel}]({entry.Url})";

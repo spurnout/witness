@@ -99,14 +99,46 @@ public sealed class SingleExePackageVerifierScriptTests
         }
     }
 
+    [TestMethod]
+    public void VerifySingleExePackage_LegacyGoatShotLayoutStillPasses()
+    {
+        var repoRoot = FindRepoRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "goatshot-single-exe-verify-test-" + Guid.NewGuid().ToString("N"));
+        var distDir = Path.Combine(tempRoot, "dist");
+        var publishDir = Path.Combine(tempRoot, "publish");
+        var outputRoot = Path.Combine(tempRoot, "out");
+        Directory.CreateDirectory(distDir);
+        Directory.CreateDirectory(publishDir);
+
+        try
+        {
+            var exeBytes = new byte[4096];
+            File.WriteAllBytes(Path.Combine(distDir, "GoatShot-0.2.0-win-x64.exe"), exeBytes);
+            File.WriteAllBytes(Path.Combine(publishDir, "GoatShot.exe"), exeBytes);
+
+            var result = RunPowerShell(repoRoot, distDir, publishDir, outputRoot);
+
+            Assert.AreEqual(0, result.ExitCode, result.Output);
+            using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputRoot, "single-exe-package-verification.json")));
+            Assert.AreEqual("GoatShot compatibility", json.RootElement.GetProperty("packageBrand").GetString());
+            Assert.IsTrue(json.RootElement.GetProperty("warnings").EnumerateArray()
+                .Any(warning => warning.GetString()!.Contains("legacy GoatShot", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            DeleteIfExists(tempRoot);
+        }
+    }
+
     private static void CreateSingleExeLayout(string distDir, string publishDir, bool includeLooseNativeLibrary)
     {
         Directory.CreateDirectory(distDir);
         Directory.CreateDirectory(publishDir);
 
         var exeBytes = new byte[4096];
-        File.WriteAllBytes(Path.Combine(distDir, "GoatShot-0.2.0-win-x64.exe"), exeBytes);
-        File.WriteAllBytes(Path.Combine(publishDir, "GoatShot.exe"), exeBytes);
+        File.WriteAllBytes(Path.Combine(distDir, "Receipts-0.3.0-win-x64-single-exe.exe"), exeBytes);
+        File.WriteAllBytes(Path.Combine(distDir, "Receipts-0.3.0-win-x64.exe"), exeBytes);
+        File.WriteAllBytes(Path.Combine(publishDir, "Receipts.exe"), exeBytes);
 
         if (includeLooseNativeLibrary)
         {
@@ -158,21 +190,22 @@ public sealed class SingleExePackageVerifierScriptTests
 
     private static void CreateReleaseCompanions(string distDir, string notices)
     {
-        var exeName = "GoatShot-0.2.0-win-x64.exe";
+        var exeName = "Receipts-0.3.0-win-x64-single-exe.exe";
         var exePath = Path.Combine(distDir, exeName);
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(exePath))).ToLowerInvariant();
         File.WriteAllText(exePath + ".sha256", $"{hash}  {exeName}");
         File.WriteAllText(
-            Path.Combine(distDir, "GoatShot-0.2.0-win-x64.build.json"),
+            Path.Combine(distDir, "Receipts-0.3.0-win-x64.build.json"),
             JsonSerializer.Serialize(new
             {
-                version = "0.2.0",
+                product = "Receipts",
+                version = "0.3.0",
                 executableSha256 = hash,
                 buildId = "test-build",
                 embeddedAssetManifestSha256 = "test-manifest"
             }));
-        File.WriteAllText(Path.Combine(distDir, "GoatShot-0.2.0-THIRD-PARTY-NOTICES.txt"), notices);
-        File.WriteAllText(Path.Combine(distDir, "GoatShot-0.2.0-win-x64.spdx.json"), "{}");
+        File.WriteAllText(Path.Combine(distDir, "Receipts-0.3.0-THIRD-PARTY-NOTICES.txt"), notices);
+        File.WriteAllText(Path.Combine(distDir, "Receipts-0.3.0-win-x64.spdx.json"), "{}");
     }
 
     private static string FindRepoRoot()

@@ -1,6 +1,9 @@
 # Windows Screenshot + Screen Recording App Specification
 
-**Working name:** GoatShot / ScreenForge / TBD
+**Product name:** Receipts
+
+**Compatibility note:** Source project paths and `GoatShot.*` namespaces remain unchanged during the Receipts rebrand. New manifests emit `receipts.*.v1` schemas while readers continue to accept their `goatshot.*.v1` predecessors; compatibility-bound browser message types and storage keys remain unchanged.
+
 **Owner:** Matt
 **Date:** 2026-06-11
 **Primary platform:** Windows desktop installer
@@ -12,9 +15,9 @@
 
 **Current browser optional-lane closure update, 2026-06-27:** Browser Extension Live Fixture in `artifacts/manual-validation/2026-06-27-current-required-proof/` is recorded as `NotApplicable` for the current V1 claim set, with decision evidence at `browser-extension-live-fixture/chrome-firefox-current-v1-decision.md` and tranche proof under `artifacts/tranche-browser-optional-lane-closure-2026-06-27/`. Edge live proof plus local multi-target browser-extension artifacts carry the current browser-extension claim; Chrome/Firefox live fixture proof must be reopened before advertising Chrome/Firefox live behavior.
 
-**OAuth provider-proof-plan update, 2026-06-27/2026-06-28:** `goatshot oauth live-proof-plan` now emits provider-specific Google Drive, Google Photos, OneDrive, Dropbox, YouTube, and OneNote proof guidance for scope review, consent screenshots, account diagnostics, upload command hints, cleanup boundaries, and false mutation flags. Local proof is saved under `artifacts/tranche-oauth-provider-specific-proof-plan/` and the current focused source/test lane. This remains planning evidence only; real consent screens, live refresh-token recovery, live upload/cleanup proof, and redacted account evidence remain manual/parked.
+**OAuth provider-proof-plan update, 2026-06-27/2026-06-28:** `Receipts.Cli.exe oauth live-proof-plan` now emits provider-specific Google Drive, Google Photos, OneDrive, Dropbox, YouTube, and OneNote proof guidance for scope review, consent screenshots, account diagnostics, upload command hints, cleanup boundaries, and false mutation flags. Local proof is saved under `artifacts/tranche-oauth-provider-specific-proof-plan/` and the current focused source/test lane. This remains planning evidence only; real consent screens, live refresh-token recovery, live upload/cleanup proof, and redacted account evidence remain manual/parked.
 
-**OAuth evidence-recorder update, 2026-06-27:** `goatshot oauth record-live-evidence` now records reviewed live OAuth evidence references for configured providers without opening a browser, contacting providers, exchanging codes, storing tokens, refreshing tokens, uploading files, or deleting remote files. A passed record requires consent, exchange, refresh, upload, cleanup, and account evidence categories. Local proof is saved under `artifacts/tranche-oauth-live-evidence-recorder/`; actual real-account proof remains manual/parked until an operator runs and reviews it.
+**OAuth evidence-recorder update, 2026-06-27:** `Receipts.Cli.exe oauth record-live-evidence` now records reviewed live OAuth evidence references for configured providers without opening a browser, contacting providers, exchanging codes, storing tokens, refreshing tokens, uploading files, or deleting remote files. A passed record requires consent, exchange, refresh, upload, cleanup, and account evidence categories. Local proof is saved under `artifacts/tranche-oauth-live-evidence-recorder/`; actual real-account proof remains manual/parked until an operator runs and reviews it.
 
 **Companion portal self-hosted preview update, 2026-06-27:** `companion-portal serve` remains read-only and loopback-only by default, but can now be explicitly opened as a self-hosted shared-token preview with `--self-hosted --accept-remote-clients --auth-token-env <name>`. This is not hosted portal accounts, account login, team sync, hosted media, or remote admin; those remain later modules.
 
@@ -24,19 +27,19 @@
 
 **Plugin update task lifecycle update, 2026-06-27:** `plugins update-task <status|register|unregister> --manifest <plugin-update-schedule.json>` now provides an explicit Task Scheduler lifecycle for generated plugin update schedules. `status` queries Task Scheduler, `register` requires `--accept-task-registration`, `unregister` requires `--accept-task-removal`, `--dry-run` proves register/unregister wiring without mutating Task Scheduler, and reported process arguments/output are redacted. Local proof is saved under `artifacts/tranche-plugin-update-task-lifecycle/`. This still does not install, trust, enable, allowlist, or execute plugin code and does not provide hosted marketplace or automatic trust/execute update behavior.
 
-**Person segmentation runner update, 2026-06-27:** `video person-mask` now provides a governed local external-runner contract for person-segmentation mask generation. It requires a local runner executable, `{input}` and `{output}` placeholders in the runner argument template, explicit `--accept-external-runner`, optional local `--model`, timeout bounds, output verification, and workspace indexing as `PersonSegmentationMaskVideo`. GoatShot still does not bundle, trust, enable, register, run, host, or broadly quality-certify a segmentation model.
+**Person segmentation runner update, 2026-06-27:** `video person-mask` now provides a governed local external-runner contract for person-segmentation mask generation. It requires a local runner executable, `{input}` and `{output}` placeholders in the runner argument template, explicit `--accept-external-runner`, optional local `--model`, timeout bounds, output verification, and workspace indexing as `PersonSegmentationMaskVideo`. Receipts still does not bundle, trust, enable, register, run, host, or broadly quality-certify a segmentation model.
 
 **Hosted person segmentation service update, 2026-06-27:** `video hosted-person-mask <video> --endpoint <url> --accept-hosted-service [--api-key-env NAME]` now provides a governed hosted service handoff for mask generation. It requires explicit source-upload acceptance, posts multipart source media to an operator-supplied HTTP(S) endpoint, supports token lookup from an environment variable, writes the binary mask-video response, and can index the result as `PersonSegmentationMaskVideo`. Local proof is saved under `artifacts/tranche-hosted-person-segmentation-service/`. This is not a first-party hosted account, provider certification, bundled model inference, or broad model-quality guarantee.
 
-**Person segmentation model package staging update, 2026-06-27:** `video person-model validate|stage --manifest <manifest.json> [--accept-download]` now validates `goatshot.person-segmentation-model.v1` manifests and stages local or explicitly accepted remote model files after schema, id, URI, size, and SHA-256 checks. Local proof is saved under `artifacts/tranche-person-segmentation-model-package-staging/`. This is stage-only acquisition: it does not run inference, trust, enable, register a runner, contact a hosted segmentation service, or certify a model.
+**Person segmentation model package staging update, 2026-06-27:** `video person-model validate|stage --manifest <manifest.json> [--accept-download]` now validates current `receipts.person-segmentation-model.v1` and legacy `goatshot.person-segmentation-model.v1` manifests and stages local or explicitly accepted remote model files after schema, id, URI, size, and SHA-256 checks. Local proof is saved under `artifacts/tranche-person-segmentation-model-package-staging/`. This is stage-only acquisition: it does not run inference, trust, enable, register a runner, contact a hosted segmentation service, or certify a model.
 
 **Mask quality evaluator update, 2026-06-27:** `video mask-quality` now compares generated still masks or generated mask videos against reviewed reference masks/videos and writes Markdown/JSON evidence with IoU, Dice, precision, recall, accuracy, threshold settings, frame counts, per-frame metrics for videos, and explicit false mutation/model-download/service-contact flags. Still-image proof is saved under `artifacts/tranche-video-mask-quality-evaluator/`; mask-video frame proof is saved under `artifacts/tranche-video-mask-quality-video-evaluator/`. This is a supplied-evidence evaluator, not bundled model inference, hosted segmentation service, automatic model inference, or whole-model certification.
 
 **Clean-machine proof-kit update, 2026-06-27:** `manual-validation clean-machine-kit --folder <evidence-folder>` now writes a clean Windows VM/profile proof kit with portable-package discovery, SHA-256 manifest, operator runbook, evidence checklist, and optional `--copy-package` transfer bundle. Local proof is saved under `artifacts/tranche-clean-machine-proof-kit/`. This is still a proof helper only; actual clean-machine GUI proof, compiled installer creation, and installer install/uninstall proof remain manual until an operator runs and records them.
 
-**Clean-machine evidence-recorder update, 2026-06-27:** `manual-validation record-clean-machine-evidence --folder <evidence-folder> --status passed|failed|blocked|pending` now records reviewed clean-machine/installer evidence references without launching GoatShot, running installers, installing or uninstalling software, mutating user profiles, capturing screens, certifying a clean machine, or updating the manual lane. A passed record requires machine/profile, package, hash, diagnostics, paths, first-launch, settings, capture/export, installer, and privacy-review evidence categories; helper-script output is recommended evidence. Local proof is saved under `artifacts/tranche-clean-machine-evidence-recorder/`; the actual clean Windows VM/profile run, human GUI click-through, compiled installer creation, and installer install/uninstall proof remain manual until an operator runs, reviews, and records the lane.
+**Clean-machine evidence-recorder update, 2026-06-27:** `manual-validation record-clean-machine-evidence --folder <evidence-folder> --status passed|failed|blocked|pending` now records reviewed clean-machine/installer evidence references without launching Receipts, running installers, installing or uninstalling software, mutating user profiles, capturing screens, certifying a clean machine, or updating the manual lane. A passed record requires machine/profile, package, hash, diagnostics, paths, first-launch, settings, capture/export, installer, and privacy-review evidence categories; helper-script output is recommended evidence. Local proof is saved under `artifacts/tranche-clean-machine-evidence-recorder/`; the actual clean Windows VM/profile run, human GUI click-through, compiled installer creation, and installer install/uninstall proof remain manual until an operator runs, reviews, and records the lane.
 
-**Required desktop evidence-recorder update, 2026-06-27:** `manual-validation record-desktop-evidence --folder <evidence-folder> --lane keyboard|screen-reader|text-scaling|high-contrast|live-region-drag --status passed|failed|blocked|pending` now records reviewed required-desktop evidence references without launching GoatShot, changing Windows settings, capturing or recording the screen, mutating the user profile, certifying accessibility, or updating manual lane files. A passed record requires lane-specific categories for keyboard traversal, screen-reader output, text scaling, high contrast, or live region drag. Local proof is saved under `artifacts/tranche-required-desktop-evidence-recorder/`; the actual human keyboard traversal, Narrator/NVDA observation, text-scaling, high-contrast, and live drag proof remain manual until an operator runs, reviews, and records the lane.
+**Required desktop evidence-recorder update, 2026-06-27:** `manual-validation record-desktop-evidence --folder <evidence-folder> --lane keyboard|screen-reader|text-scaling|high-contrast|live-region-drag --status passed|failed|blocked|pending` now records reviewed required-desktop evidence references without launching Receipts, changing Windows settings, capturing or recording the screen, mutating the user profile, certifying accessibility, or updating manual lane files. A passed record requires lane-specific categories for keyboard traversal, screen-reader output, text scaling, high contrast, or live region drag. Local proof is saved under `artifacts/tranche-required-desktop-evidence-recorder/`; the actual human keyboard traversal, Narrator/NVDA observation, text-scaling, high-contrast, and live drag proof remain manual until an operator runs, reviews, and records the lane.
 
 **Hardware evidence-recorder update, 2026-06-27:** `manual-validation record-hardware-evidence --folder <evidence-folder> --lane multi-monitor-capture|multi-monitor-recording|long-recording|android-safe-device-proof --status passed|failed|blocked|pending` now records reviewed hardware/device evidence references without capturing or recording the desktop, contacting Android devices, importing phone media, changing device settings, certifying hardware, mutating the user profile, or updating manual lane files. A passed record requires lane-specific categories for multi-monitor capture, multi-monitor recording, long-run recording, or Android safe-device proof. Local proof is saved under `artifacts/tranche-hardware-evidence-recorder/`; actual live multi-monitor capture, multi-monitor recording, long-run recording, Android device proof, and safe-content review remain manual until an operator runs, reviews, and records the lane.
 
@@ -44,7 +47,7 @@
 
 **Manual validation baseline update, 2026-06-15:** `manual-validation baseline --folder <evidence-folder> --run-commands` is implemented and locally proven under `artifacts/tranche-manual-baseline-proof/`. The earlier June 15 manual folder has command-backed Release build/test, CLI diagnostics, diagnostics bundle, recording/device/provider/capture-engine probes, and raw JSON evidence for the baseline lane; it reports `Baseline Setup` as passed. Keyboard traversal, screen-reader, text-scaling, high-contrast, live region drag, clean-machine GUI proof, hardware/device proof, and OAuth/live-provider proof remain separate manual or parked lanes. Chrome/Firefox live fixture proof must be reopened before advertising Chrome/Firefox live proof.
 
-**Manual desktop-proof update, 2026-06-15:** `manual-validation desktop-proof --folder <evidence-folder> --run-commands` is implemented and locally proven under `artifacts/tranche-manual-desktop-accessibility-proof/`. The earlier June 15 manual folder includes app-owned screenshots, WPF focus/name audits, current-machine environment evidence, command logs, and blocked notes for the six required desktop lanes. The safe proof scene is implemented as an app-owned WPF staging surface: `GoatShot.exe --proof-scene` opens it for operators, `--render-proof-scene-output <png>` captures it for evidence, and `--audit-wpf-surface proof-scene` records focus/name evidence. Product Design/WPF proof for the new surface is saved under `artifacts/product-design-audit/2026-06-15/safe-proof-scene/`, and tranche evidence is saved under `artifacts/tranche-safe-proof-scene/`. The refreshed summary was redaction-clean with no issues, but the proof plan still reported six required open lanes because automation does not replace human keyboard traversal, Narrator/NVDA observation, Windows text-scaling/high-contrast checks, live region drag, or clean-machine GUI proof.
+**Manual desktop-proof update, 2026-06-15:** `manual-validation desktop-proof --folder <evidence-folder> --run-commands` is implemented and locally proven under `artifacts/tranche-manual-desktop-accessibility-proof/`. The earlier June 15 manual folder includes app-owned screenshots, WPF focus/name audits, current-machine environment evidence, command logs, and blocked notes for the six required desktop lanes. The safe proof scene is implemented as an app-owned WPF staging surface: `Receipts.exe --proof-scene` opens it for operators, `--render-proof-scene-output <png>` captures it for evidence, and `--audit-wpf-surface proof-scene` records focus/name evidence. Product Design/WPF proof for the new surface is saved under `artifacts/product-design-audit/2026-06-15/safe-proof-scene/`, and tranche evidence is saved under `artifacts/tranche-safe-proof-scene/`. The refreshed summary was redaction-clean with no issues, but the proof plan still reported six required open lanes because automation does not replace human keyboard traversal, Narrator/NVDA observation, Windows text-scaling/high-contrast checks, live region drag, or clean-machine GUI proof.
 
 **Manual desktop-proof summary update, 2026-06-27:** `manual-validation desktop-proof` now also writes `desktop-proof/desktop-proof-summary.md` and `desktop-proof/desktop-proof-summary.json`; local proof is saved under `artifacts/tranche-manual-desktop-proof-summary/`. The summary consolidates command counts, failed commands, expected/missing evidence, current-machine accessibility environment fields, remaining human lanes, next operator steps, and the explicit claim boundary that the packet is preparation evidence only. This closes a local reporting/handoff gap; it still does not perform keyboard traversal, Narrator/NVDA observation, Windows text-scaling/high-contrast checks, live region drag, clean-machine GUI proof, or accessibility certification.
 
@@ -54,7 +57,7 @@
 
 **Manual hardware-proof summary update, 2026-06-27:** `manual-validation hardware-proof` now also writes `hardware-proof/hardware-proof-summary.md` and `hardware-proof/hardware-proof-summary.json`; local proof is saved under `artifacts/tranche-manual-hardware-proof-summary/`. The summary consolidates command counts, nonzero diagnostics, expected/missing evidence, current display/FFmpeg environment fields, remaining hardware-gated lanes, next operator steps, and the explicit claim boundary that the packet is readiness evidence only. This closes a local reporting/handoff gap; it still does not perform live multi-monitor capture, multi-monitor recording, long-run recording stability, Android safe-device media proof, or safe-content review.
 
-**Proof-scene recording smoke update, 2026-06-15:** `GoatShot.exe --record-proof-scene-output <mp4> [--record-proof-scene-duration <seconds>]` is implemented and locally proven under `artifacts/tranche-proof-scene-recording-smoke/`. It opens the app-owned proof-scene WPF window, records explicit window bounds with microphone/system-audio/webcam disabled, writes a `.proof.json` sidecar, and verifies the retained MP4 through `diagnostics recording-media`. The MP4 recording service now paces slower WGC/frame-composition delivery by duplicating the last good frame into missed constant-FPS slots, preventing shortened output duration. This is a private-safe bounded recording smoke only; live multi-monitor, long-run, audio-sync, webcam-permission, clean-machine, Android, and OAuth proof remain separate lanes.
+**Proof-scene recording smoke update, 2026-06-15:** `Receipts.exe --record-proof-scene-output <mp4> [--record-proof-scene-duration <seconds>]` is implemented and locally proven under `artifacts/tranche-proof-scene-recording-smoke/`. It opens the app-owned proof-scene WPF window, records explicit window bounds with microphone/system-audio/webcam disabled, writes a `.proof.json` sidecar, and verifies the retained MP4 through `diagnostics recording-media`. The MP4 recording service now paces slower WGC/frame-composition delivery by duplicating the last good frame into missed constant-FPS slots, preventing shortened output duration. This is a private-safe bounded recording smoke only; live multi-monitor, long-run, audio-sync, webcam-permission, clean-machine, Android, and OAuth proof remain separate lanes.
 
 **Manual validation findings update, 2026-06-27:** `manual-validation findings --folder <evidence-folder> [--output <folder>]` is implemented and locally proven under `artifacts/tranche-manual-validation-findings/`, with current findings regenerated under `artifacts/manual-validation/2026-06-27-current-required-proof/manual-validation-findings.md`. It refreshes the manual-validation summary, writes `manual-validation-findings.md` and `.json`, and sorts release-blocking required proof gaps, hardware-gated claim boundaries, optional compatibility gaps, redaction risks, and parked OAuth/live-provider scope. The current required-proof folder reports six required human/clean-machine proof findings, four hardware-gated boundaries, zero optional compatibility findings, one parked OAuth/live-provider lane, and zero redaction findings.
 
@@ -1080,7 +1083,22 @@ Required:
 - Enable Do Not Disturb / Focus Assist while recording if possible.
 - Draw arrows/shapes while recording later.
 
-## 12.6 Video editor
+## 12.6 Replay buffer and receipts
+
+Replay is an opt-in mode inside Screen Recording, not a separate product surface.
+
+- Keep a duration- and byte-bounded rolling history in finalized two-second MP4 segments.
+- Default to 60 seconds, Balanced H.264, 30fps, cursor enabled, audio/microphone/webcam disabled, and a 512 MB total cap.
+- Support chosen monitor, follow-cursor monitor, all-monitor composite, synchronized per-monitor tracks, chosen/followed window, and fixed/selected region strategies.
+- Saving a replay must preserve the selected interval without stopping the live buffer.
+- Unsaved segments remain ephemeral and outside the capture library.
+- Saved replay originals are grouped as one receipt with ordered tracks, source transitions, hashes, a chained manifest, and a device signature.
+- Frame Explorer must provide scrubbing, frame stepping, source selection, scene markers, before/after comparison, still extraction, unique-frame extraction, contact sheets, video export, and step-guide creation.
+- Local post-save OCR may suggest `Possible addition`, `Possible edit`, or `Possible deletion`; every suggestion requires human review and must retain its supporting before/after frames.
+- Original receipt artifacts are never edited in place. Exports and edits are linked derivatives.
+- Verification proves integrity since local signing only. It does not independently attest the device clock, remote-service state, message author, operator identity, or legal/forensic authenticity.
+
+## 12.7 Video editor
 
 MVP:
 
@@ -1516,12 +1534,12 @@ Actions:
 Provide a CLI for automation:
 
 ```powershell
-goatshot capture region --output "C:\Temp\shot.png"
-goatshot capture window --process chrome --copy
-goatshot record region --duration 30 --output "demo.mp4"
-goatshot ocr "shot.png"
-goatshot upload "shot.png" --provider s3 --profile personal
-goatshot ai-edit "shot.png" --prompt "remove personal info"
+Receipts.Cli.exe capture region --output "C:\Temp\shot.png"
+Receipts.Cli.exe capture window --process chrome --copy
+Receipts.Cli.exe record region --duration 30 --output "demo.mp4"
+Receipts.Cli.exe ocr "shot.png"
+Receipts.Cli.exe upload "shot.png" --provider s3 --profile personal
+Receipts.Cli.exe ai-edit "shot.png" --prompt "remove personal info"
 ```
 
 ## 17.3 Watch folders
@@ -1659,12 +1677,14 @@ Example:
 | OCR | Windows.Media.Ocr + Windows App SDK Text Recognition where available |
 | AI | Gemini API adapter first; provider interface for future |
 | Sharing | Provider adapter system |
-| Installer | WiX/MSI + EXE bootstrapper; optional MSIX |
+| Installer | Inno Setup per-user EXE with stable upgrade AppId; future MSI/MSIX only if separately justified |
 | Updates | Squirrel.Windows, Velopack, or custom updater |
 | Config | JSON settings + encrypted secret store |
 | CLI | .NET console entry point or app subcommand |
 
 ## 21.2 Modules
+
+The existing `GoatShot.*` source namespaces remain in place to avoid a high-risk mechanical rewrite during the product rename.
 
 ```text
 GoatShot.App
@@ -1783,14 +1803,14 @@ Open editor
 Default per-user paths:
 
 ```text
-%LOCALAPPDATA%\GoatShot\
+%LOCALAPPDATA%\Receipts\
   app.db
   logs\
   cache\
   thumbnails\
   temp\
 
-%USERPROFILE%\Pictures\GoatShot\
+%USERPROFILE%\Pictures\Receipts\
   Images\
   Videos\
   Documents\
@@ -1803,6 +1823,8 @@ Configurable:
 - Temp folder.
 - Export folder.
 - Cloud sync-safe location.
+
+Upgrades copy only small durable local state into the Receipts root without overwriting existing files. Existing media libraries remain at their configured path and are never silently moved.
 
 ---
 
@@ -1944,7 +1966,7 @@ Configurable:
 
 These are not blockers, just things to decide during review.
 
-1. App name: GoatShot, ScreenForge, CaptureForge, something else?
+1. Evidence export interoperability: should a later release add an independently documented verification package format beyond the signed local receipt manifest?
 2. Minimum Windows version: Windows 11 only, or Windows 10 support?
 3. UI stack preference: WPF stability vs WinUI 3 modern feel?
 4. Should the editor use SkiaSharp, Win2D, or Direct2D?

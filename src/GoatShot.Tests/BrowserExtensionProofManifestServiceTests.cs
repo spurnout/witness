@@ -47,7 +47,7 @@ public sealed class BrowserExtensionProofManifestServiceTests
             Assert.IsTrue(File.Exists(result.ManifestPath));
             Assert.IsTrue(File.Exists(result.ValidationPath));
             Assert.AreEqual(0, result.MissingEvidence.Count);
-            Assert.AreEqual("goatshot.browser-proof.v1", result.Manifest.SchemaVersion);
+            Assert.AreEqual("receipts.browser-proof.v1", result.Manifest.SchemaVersion);
             Assert.AreEqual("chrome", result.Manifest.Browser.Name);
             Assert.IsFalse(string.IsNullOrWhiteSpace(result.Manifest.Extension.SourceSha256));
             Assert.IsFalse(string.IsNullOrWhiteSpace(result.Manifest.Extension.PackageSha256));
@@ -151,9 +151,9 @@ public sealed class BrowserExtensionProofManifestServiceTests
 
     private static string CreateStitchPackage(string root)
     {
-        var stitchPackage = Path.Combine(root, "GoatShot", "sample-correlation");
+        var stitchPackage = Path.Combine(root, "Receipts", "sample-correlation");
         Directory.CreateDirectory(stitchPackage);
-        File.WriteAllText(Path.Combine(stitchPackage, "goatshot-stitch-package.json"), "{}");
+        File.WriteAllText(Path.Combine(stitchPackage, "receipts-stitch-package.json"), "{}");
         return stitchPackage;
     }
 
@@ -230,7 +230,7 @@ public sealed class BrowserExtensionProofManifestServiceTests
     {
         return """
             {
-              "schemaVersion": "goatshot.browser-capture.v1",
+              "schemaVersion": "receipts.browser-capture.v1",
               "page": {
                 "url": "https://example.test/safe-fixture",
                 "title": "Safe Fixture"

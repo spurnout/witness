@@ -86,6 +86,11 @@ public sealed class VisualRedactionService
                 target,
                 CaptureKind.EditedImage,
                 $"Flattened {mode.ToString().ToLowerInvariant()} redaction from OCR sensitive scan. {scan.Summary}");
+            saved = await _workspaceStore.LinkReceiptDerivativeAsync(
+                item,
+                saved,
+                "ocr-redacted-image",
+                cancellationToken);
             saved.OcrText = scan.RedactedText;
             saved.OcrLanguageTag = item.OcrLanguageTag;
             saved.OcrRecognizedAt = item.OcrRecognizedAt;

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
         xmlns:local="clr-namespace:GoatShot.App"
-        Title="GoatShot"
+        Title="Receipts"
         Width="1440"
         Height="900"
         MinWidth="1080"
@@ -385,6 +385,23 @@
                                     <TextBlock Text="Video" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="ReplayStateButton"
+                                    Click="ReplayState_Click"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Arm, pause, or resume Replay"
+                                    ToolTip="Replay keeps only a bounded local rolling buffer until you save it">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse x:Name="ReplayStateDot" Width="8" Height="8" Fill="#52666B" Margin="0,0,8,0" />
+                                    <TextBlock x:Name="ReplayStateButtonText" Text="Replay off" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="SaveReplayButton"
+                                    Content="Save replay"
+                                    Click="SaveReplay_Click"
+                                    IsEnabled="False"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Save preceding Replay buffer"
+                                    ToolTip="Save the configured preceding interval (Ctrl+Shift+PrintScreen)" />
                             <Button Content="GIF"
                                     Click="Recording_Click"
                                     Style="{StaticResource CaptureModeButton}"
@@ -671,19 +688,28 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Click="CopyImage_Click" Style="{StaticResource PrimaryActionButton}"
+                            <Button x:Name="CopySelectedButton" Grid.Column="0" Click="CopyImage_Click" Style="{StaticResource PrimaryActionButton}"
                                     AutomationProperties.Name="Copy selected capture" ToolTip="Copy the selected image">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8C8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Margin="0,0,8,0" />
                                     <TextBlock Text="Copy" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="1" Content="Save copy" Click="SaveCopy_Click" Style="{StaticResource WorkspaceButton}"
+                            <Button x:Name="SaveCopyButton" Grid.Column="1" Content="Save copy" Click="SaveCopy_Click" Style="{StaticResource WorkspaceButton}"
                                     Margin="12,0,0,0" AutomationProperties.Name="Save a copy of the selected capture" />
-                            <Button Grid.Column="2" Content="Share" Click="QuickShare_Click" Style="{StaticResource WorkspaceButton}"
+                            <Button x:Name="QuickShareButton" Grid.Column="2" Content="Share" Click="QuickShare_Click" Style="{StaticResource WorkspaceButton}"
                                     Margin="12,0,0,0" AutomationProperties.Name="Share selected capture" />
-                            <Button Grid.Column="3" Content="Extract text" Click="RunOcr_Click" Style="{StaticResource WorkspaceButton}"
+                            <Button x:Name="ExtractTextButton" Grid.Column="3" Content="Extract text" Click="RunOcr_Click" Style="{StaticResource WorkspaceButton}"
                                     Margin="12,0,0,0" AutomationProperties.Name="Extract text from selected capture" />
+                            <Button x:Name="OpenReceiptButton"
+                                    Grid.Column="4"
+                                    Content="Open Frame Explorer"
+                                    Click="OpenReceipt_Click"
+                                    Style="{StaticResource WorkspaceButton}"
+                                    Margin="12,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    Visibility="Collapsed"
+                                    AutomationProperties.Name="Open selected replay receipt in Frame Explorer" />
                             <Button Grid.Column="5" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}"
                                     AutomationProperties.Name="Delete selected local capture" />
                         </Grid>
@@ -702,6 +728,7 @@
                                      Foreground="{StaticResource InkBrush}"
                                      SelectionMode="Extended"
                                      SelectionChanged="CaptureList_SelectionChanged"
+                                     MouseDoubleClick="CaptureList_MouseDoubleClick"
                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                      ItemContainerStyle="{StaticResource FilmstripItem}">
@@ -930,20 +957,29 @@
                                VerticalAlignment="Center"
                                AutomationProperties.Name="Application status"
                                AutomationProperties.LiveSetting="Polite" />
-                    <TextBlock x:Name="FooterSummaryText"
-                               Grid.Column="2"
-                               Text="Local-only mode · AI off · 0 captures"
-                               Foreground="{StaticResource WorkspaceMutedTextBrush}"
-                               FontSize="11"
-                               VerticalAlignment="Center"
-                               AutomationProperties.Name="Workspace summary" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="ReplayFooterText"
+                                   Text="Replay: Off"
+                                   Margin="0,0,14,0"
+                                   Foreground="{StaticResource WorkspaceAccentBrush}"
+                                   FontSize="11"
+                                   AutomationProperties.Name="Replay status"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <TextBlock x:Name="FooterSummaryText"
+                                   Text="Local-only mode · AI off · 0 captures"
+                                   Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                   FontSize="11"
+                                   AutomationProperties.Name="Workspace summary" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
             <!-- These configuration controls retain the existing recording/capture contracts.
                  Their operator-facing home is Settings; the redesigned workspace uses direct
                  mode buttons and Ctrl+K for the longer command catalog. -->
-            <Grid Visibility="Collapsed" IsHitTestVisible="False">
+            <Grid x:Name="RecordingControlsAuditContainer"
+                  Visibility="Collapsed"
+                  IsHitTestVisible="False">
                 <ComboBox x:Name="ScreenCaptureTypeBox" SelectedIndex="0">
                     <ComboBoxItem Content="Area / region" Tag="Region" />
                     <ComboBoxItem Content="Window" Tag="ActiveWindow" />
@@ -970,28 +1006,62 @@
                 <Border x:Name="RecordingControlsAuditSection">
                     <StackPanel>
                         <Button x:Name="WebcamPreviewButton" Content="Start preview" Click="ToggleWebcamPreview_Click" />
-                        <TextBlock x:Name="WebcamPreviewStatusText" Text="Preview stopped." />
+                        <TextBlock x:Name="WebcamPreviewStatusText"
+                                   Text="Preview stopped."
+                                   AutomationProperties.Name="Webcam preview status"
+                                   AutomationProperties.LiveSetting="Polite" />
                         <Image x:Name="WebcamPreviewImage" />
-                        <TextBlock x:Name="RecordingSetupText" />
-                        <ComboBox x:Name="RecordingProfileBox" />
+                        <TextBlock x:Name="RecordingSetupText"
+                                   AutomationProperties.Name="Recording setup status"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <ComboBox x:Name="RecordingProfileBox"
+                                  AutomationProperties.Name="Recording profile" />
                         <Button Content="Apply recording profile" Click="ApplyRecordingProfile_Click" />
-                        <ComboBox x:Name="RecordingQualityBox" SelectionChanged="RecordingControl_Changed">
+                        <ComboBox x:Name="RecordingQualityBox"
+                                  AutomationProperties.Name="Recording quality"
+                                  SelectionChanged="RecordingControl_Changed">
                             <ComboBoxItem Content="Low" />
                             <ComboBoxItem Content="Balanced" />
                             <ComboBoxItem Content="High" />
                             <ComboBoxItem Content="Lossless" />
                         </ComboBox>
-                        <TextBox x:Name="RecordingFpsBox" />
-                        <TextBox x:Name="RecordingSizeBox" />
-                        <TextBox x:Name="RecordingBitrateBox" />
-                        <TextBlock x:Name="RecordingValidationText" />
-                        <CheckBox x:Name="RecordingMicBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingSystemAudioBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingWebcamBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingCountdownBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingBorderBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingTimerBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                        <CheckBox x:Name="RecordingKeystrokeBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <TextBox x:Name="RecordingFpsBox"
+                                 AutomationProperties.Name="Recording frames per second" />
+                        <TextBox x:Name="RecordingSizeBox"
+                                 AutomationProperties.Name="Recording output size" />
+                        <TextBox x:Name="RecordingBitrateBox"
+                                 AutomationProperties.Name="Recording bitrate" />
+                        <TextBlock x:Name="RecordingValidationText"
+                                   AutomationProperties.Name="Recording validation status"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <CheckBox x:Name="RecordingMicBox"
+                                  AutomationProperties.Name="Include microphone"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingSystemAudioBox"
+                                  AutomationProperties.Name="Include system audio"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingWebcamBox"
+                                  AutomationProperties.Name="Include webcam"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingCountdownBox"
+                                  AutomationProperties.Name="Show recording countdown"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingBorderBox"
+                                  AutomationProperties.Name="Show recording border"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingTimerBox"
+                                  AutomationProperties.Name="Show recording timer"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingKeystrokeBox"
+                                  AutomationProperties.Name="Show keystrokes"
+                                  Checked="RecordingControl_Changed"
+                                  Unchecked="RecordingControl_Changed" />
                     </StackPanel>
                 </Border>
             </Grid>

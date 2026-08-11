@@ -228,7 +228,7 @@ public sealed class ManualValidationOperatorPackService
         IReadOnlyList<ManualValidationOperatorPackLane> lanes)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot manual-validation command reference");
+        builder.AppendLine("# Receipts manual-validation command reference");
         builder.AppendLine("# This script prints command templates. It does not execute record-lane commands.");
         builder.AppendLine("# Edit the --note value and run one printed command only after a human/operator pass.");
         builder.AppendLine();
@@ -323,21 +323,29 @@ public sealed class ManualValidationOperatorPackService
         var processDirectory = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
         if (!string.IsNullOrWhiteSpace(processDirectory))
         {
-            var packagedCli = Path.Combine(processDirectory, "GoatShot.Cli.exe");
+            var packagedCli = Path.Combine(processDirectory, BrandIdentity.CommandLineExecutableName);
             if (File.Exists(packagedCli))
             {
                 return packagedCli;
             }
+
+            var legacyPackagedCli = Path.Combine(processDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+            if (File.Exists(legacyPackagedCli))
+            {
+                return legacyPackagedCli;
+            }
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.Cli",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.Cli.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.CommandLineExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static string ResolveAppPath(string? requestedAppPath)
@@ -350,21 +358,29 @@ public sealed class ManualValidationOperatorPackService
         var processDirectory = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
         if (!string.IsNullOrWhiteSpace(processDirectory))
         {
-            var packagedApp = Path.Combine(processDirectory, "GoatShot.exe");
+            var packagedApp = Path.Combine(processDirectory, BrandIdentity.DesktopExecutableName);
             if (File.Exists(packagedApp))
             {
                 return packagedApp;
             }
+
+            var legacyPackagedApp = Path.Combine(processDirectory, $"{BrandIdentity.LegacyProductName}.exe");
+            if (File.Exists(legacyPackagedApp))
+            {
+                return legacyPackagedApp;
+            }
         }
 
-        return Path.Combine(
+        var buildDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "src",
             "GoatShot.App",
             "bin",
             "Release",
-            "net10.0-windows10.0.19041.0",
-            "GoatShot.exe");
+            "net10.0-windows10.0.19041.0");
+        var currentPath = Path.Combine(buildDirectory, BrandIdentity.DesktopExecutableName);
+        var legacyPath = Path.Combine(buildDirectory, $"{BrandIdentity.LegacyProductName}.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static string PsQuote(string value) =>

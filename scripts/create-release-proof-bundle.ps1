@@ -1,7 +1,7 @@
 param(
     [string] $Configuration = "Release",
     [string] $Runtime = "win-x64",
-    [string] $Version = "0.2.0",
+    [string] $Version = "0.3.0",
     [string] $OutputRoot = "",
     [switch] $SkipCommands,
     [switch] $SkipTrancheNotes,
@@ -22,7 +22,7 @@ function Get-Sha256Hex([string] $PathValue) {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repoRoot "artifacts\tranche-release-proof-admin"
+    $OutputRoot = Join-Path $repoRoot "artifacts\release-proof"
 }
 elseif ([System.IO.Path]::IsPathRooted($OutputRoot)) {
     $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
@@ -32,7 +32,7 @@ else {
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = "0.2.0"
+    $Version = "0.3.0"
 }
 
 $bundleContentRoot = Join-Path $OutputRoot "bundle-content"
@@ -42,7 +42,7 @@ $trancheNoteRoot = Join-Path $bundleContentRoot "tranche-notes"
 $diagnosticsRoot = Join-Path $bundleContentRoot "diagnostics"
 $additionalRoot = Join-Path $bundleContentRoot "additional-artifacts"
 $manifestPath = Join-Path $OutputRoot "manifest.json"
-$zipPath = Join-Path $OutputRoot ("GoatShot-release-proof-{0}-{1}.zip" -f $Version, (Get-Date -Format "yyyyMMdd-HHmmss"))
+$zipPath = Join-Path $OutputRoot ("Receipts-release-proof-{0}-{1}.zip" -f $Version, (Get-Date -Format "yyyyMMdd-HHmmss"))
 
 if (Test-Path $bundleContentRoot) {
     Remove-Item -LiteralPath $bundleContentRoot -Recurse -Force
@@ -311,19 +311,21 @@ Invoke-ProofCommand -Name "Release build" -FileName "dotnet" -Arguments @("build
 $testLog = Join-Path $commandLogRoot "test-release.txt"
 Invoke-ProofCommand -Name "Release tests" -FileName "dotnet" -Arguments @("test", ".\GoatShot.slnx", "-c", $Configuration, "--logger", "console;verbosity=normal") -LogFile $testLog
 
-$cliPath = Join-Path $repoRoot "src\GoatShot.Cli\bin\$Configuration\net10.0-windows10.0.19041.0\GoatShot.Cli.exe"
-$env:GOATSHOT_LOCAL_ROOT = Join-Path $OutputRoot "cli-local"
-$env:GOATSHOT_LIBRARY_ROOT = Join-Path $OutputRoot "cli-library"
-New-Item -ItemType Directory -Force -Path $env:GOATSHOT_LOCAL_ROOT, $env:GOATSHOT_LIBRARY_ROOT | Out-Null
+$cliPath = Join-Path $repoRoot "src\GoatShot.Cli\bin\$Configuration\net10.0-windows10.0.19041.0\Receipts.Cli.exe"
+$env:RECEIPTS_LOCAL_ROOT = Join-Path $OutputRoot "cli-local"
+$env:RECEIPTS_LIBRARY_ROOT = Join-Path $OutputRoot "cli-library"
+New-Item -ItemType Directory -Force -Path $env:RECEIPTS_LOCAL_ROOT, $env:RECEIPTS_LIBRARY_ROOT | Out-Null
 
 Invoke-ProofCommand -Name "CLI help" -FileName $cliPath -Arguments @("--help") -LogFile (Join-Path $commandLogRoot "cli-help.txt")
 Invoke-ProofCommand -Name "CLI diagnostics print" -FileName $cliPath -Arguments @("diagnostics", "print") -LogFile (Join-Path $commandLogRoot "diagnostics-print.txt")
-Invoke-ProofCommand -Name "CLI diagnostics bundle" -FileName $cliPath -Arguments @("diagnostics", "bundle", "--output", (Join-Path $diagnosticsRoot "goatshot-diagnostics.zip")) -LogFile (Join-Path $commandLogRoot "diagnostics-bundle.txt")
+Invoke-ProofCommand -Name "CLI diagnostics bundle" -FileName $cliPath -Arguments @("diagnostics", "bundle", "--output", (Join-Path $diagnosticsRoot "receipts-diagnostics.zip")) -LogFile (Join-Path $commandLogRoot "diagnostics-bundle.txt")
 
-Invoke-ProofCommand -Name "Personal single-exe package" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\package-release.ps1", "-Configuration", $Configuration, "-Runtime", $Runtime, "-Version", $Version) -LogFile (Join-Path $commandLogRoot "package-release.txt")
-Invoke-ProofCommand -Name "Personal single-exe verification" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\verify-single-exe-package.ps1", "-Version", $Version, "-Runtime", $Runtime) -LogFile (Join-Path $commandLogRoot "verify-single-exe-package.txt")
+Invoke-ProofCommand -Name "Receipts release package" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\package-release.ps1", "-Configuration", $Configuration, "-Runtime", $Runtime, "-Version", $Version) -LogFile (Join-Path $commandLogRoot "package-release.txt")
+Invoke-ProofCommand -Name "Receipts portable verification" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\verify-portable-package.ps1", "-PackagePath", ".\artifacts\dist\Receipts-$Version-$Runtime-portable.zip", "-RunCliSmoke") -LogFile (Join-Path $commandLogRoot "verify-portable-package.txt")
+Invoke-ProofCommand -Name "Receipts single-exe verification" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\verify-single-exe-package.ps1", "-Version", $Version, "-Runtime", $Runtime) -LogFile (Join-Path $commandLogRoot "verify-single-exe-package.txt")
+Invoke-ProofCommand -Name "Receipts installer verification" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\verify-installer-package.ps1", "-Version", $Version) -LogFile (Join-Path $commandLogRoot "verify-installer-package.txt")
 
-$distExe = Join-Path $repoRoot "artifacts\dist\GoatShot-$Version-$Runtime.exe"
+$distExe = Join-Path $repoRoot "artifacts\dist\Receipts-$Version-$Runtime-single-exe.exe"
 if (Test-Path $distExe) {
     $packageInfoPath = Join-Path $bundleContentRoot "package.json"
     $packageFile = Get-Item -LiteralPath $distExe
@@ -355,12 +357,12 @@ Add-IncludedFile -Path $bundleManifestPath
 $manifest = [pscustomobject]@{
     manifestVersion = 1
     generatedAt = Get-Date -Format o
-    application = "GoatShot"
+    application = "Receipts"
     version = $Version
     configuration = $Configuration
     runtime = $Runtime
     repoRoot = "."
-    outputRoot = "artifacts/release-proof"
+    outputRoot = "."
     zipPath = [System.IO.Path]::GetFileName($zipPath)
     commands = $commands
     includedFiles = @($includedFiles)

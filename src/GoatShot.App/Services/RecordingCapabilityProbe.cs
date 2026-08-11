@@ -504,7 +504,8 @@ public static class RecordingCapabilityProbe
 
     private static FfmpegEncoderProbe ProbeFfmpeg()
     {
-        var configured = Environment.GetEnvironmentVariable("GOATSHOT_FFMPEG_PATH");
+        var configuredResolution = BrandEnvironment.Resolve("FFMPEG_PATH");
+        var configured = configuredResolution.Value;
         if (!string.IsNullOrWhiteSpace(configured))
         {
             configured = Environment.ExpandEnvironmentVariables(configured);
@@ -517,7 +518,7 @@ public static class RecordingCapabilityProbe
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return new FfmpegEncoderProbe(null, [], [], "FFmpeg fallback encoder probe: ffmpeg.exe was not found on PATH and GOATSHOT_FFMPEG_PATH is not set.");
+            return new FfmpegEncoderProbe(null, [], [], "FFmpeg fallback encoder probe: ffmpeg.exe was not found on PATH and RECEIPTS_FFMPEG_PATH is not set (GOATSHOT_FFMPEG_PATH remains a compatibility alias).");
         }
 
         try

@@ -24,7 +24,7 @@ public partial class SettingsWindow : Window
     private bool _settingsLoading;
     private bool _summaryTileRefreshReady;
     private string? _selectedAutomationRuleId;
-    private string _lastPluginUpdateCliCommand = "goatshot plugins updates --registry \"<registry.json-or-url>\" --json";
+    private string _lastPluginUpdateCliCommand = "receipts plugins updates --registry \"<registry.json-or-url>\" --json";
 
     public SettingsWindow(AppServices services)
     {
@@ -108,6 +108,19 @@ public partial class SettingsWindow : Window
             var top = RuleCaptureKindBox.TransformToAncestor(SettingsScroll).Transform(new System.Windows.Point(0, 0)).Y +
                 SettingsScroll.VerticalOffset;
             SettingsScroll.ScrollToVerticalOffset(Math.Max(0, top - 170));
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    public void SelectReplaySettings()
+    {
+        SelectSection("Recording", alignSectionToTop: true);
+        Dispatcher.BeginInvoke(() =>
+        {
+            ReplaySettingsSection.BringIntoView();
+            ReplaySettingsSection.UpdateLayout();
+            var top = ReplaySettingsSection.TransformToAncestor(SettingsScroll).Transform(new System.Windows.Point(0, 0)).Y +
+                SettingsScroll.VerticalOffset;
+            SettingsScroll.ScrollToVerticalOffset(Math.Max(0, top - 10));
         }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
@@ -264,6 +277,7 @@ public partial class SettingsWindow : Window
         ManagedPolicyStatusText.Text = ManagedPolicyService.LoadEffective(settings).Summary;
         OcrLanguageBox.Text = settings.OcrLanguageTag;
         LoadRecordingSettings(settings.Recording ??= new RecordingSettings());
+        LoadReplaySettings(settings.Replay ??= new ReplayBufferSettings());
         ConfirmUploadBox.IsChecked = settings.ConfirmBeforeUpload;
         QueueBackgroundProcessingBox.IsChecked = settings.UploadQueue.EnableBackgroundProcessing;
         QueuePollSecondsBox.Text = settings.UploadQueue.BackgroundPollSeconds.ToString();
@@ -618,7 +632,7 @@ public partial class SettingsWindow : Window
             PluginUpdateCountsText.Text = "Available 0 | Staged 0 | Installed 0 | Blocked 0 | Incompatible 0";
             PluginUpdateSummaryList.Items.Clear();
             PluginUpdateSummaryList.Items.Add("Update summary unavailable.");
-            PluginUpdateNextActionsText.Text = "Validate the registry path or URL with `goatshot plugins registry validate` before retrying.";
+            PluginUpdateNextActionsText.Text = "Validate the registry path or URL with `receipts plugins registry validate` before retrying.";
         }
     }
 
@@ -735,7 +749,7 @@ public partial class SettingsWindow : Window
         RefreshPersonalInstallStatus();
         System.Windows.MessageBox.Show(
             $"{install.Message}{Environment.NewLine}{runtime.Message}",
-            "GoatShot install and repair",
+            "Receipts install and repair",
             MessageBoxButton.OK,
             install.Succeeded && runtime.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
@@ -745,15 +759,15 @@ public partial class SettingsWindow : Window
         var result = _services.PersonalInstall.DisableStartup();
         RunAtStartupBox.IsChecked = false;
         RefreshPersonalInstallStatus();
-        System.Windows.MessageBox.Show(result.Message, "GoatShot startup", MessageBoxButton.OK,
+        System.Windows.MessageBox.Show(result.Message, "Receipts startup", MessageBoxButton.OK,
             result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private void Uninstall_Click(object sender, RoutedEventArgs e)
     {
         var confirmation = System.Windows.MessageBox.Show(
-            "Remove the installed GoatShot program, startup registration, extracted runtime tools, and browser native-host registrations? Captures and settings will be preserved.",
-            "Uninstall GoatShot",
+            "Remove the installed Receipts program, startup registration, extracted runtime tools, and browser native-host registrations? Captures and settings will be preserved.",
+            "Uninstall Receipts",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (confirmation != MessageBoxResult.Yes)
@@ -763,7 +777,7 @@ public partial class SettingsWindow : Window
 
         _services.BrowserNativeHosts.Uninstall();
         var result = _services.PersonalInstall.BeginUninstall();
-        System.Windows.MessageBox.Show(result.Message, "Uninstall GoatShot", MessageBoxButton.OK,
+        System.Windows.MessageBox.Show(result.Message, "Uninstall Receipts", MessageBoxButton.OK,
             result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
         if (result.Succeeded)
         {
@@ -1229,11 +1243,11 @@ public partial class SettingsWindow : Window
         ApplyCurrentSettingsFromControls();
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Export GoatShot workflow profile",
-            Filter = "GoatShot workflow profile (*.goatshot-workflow.json)|*.goatshot-workflow.json|JSON files (*.json)|*.json",
-            FileName = "goatshot-workflow.goatshot-workflow.json",
+            Title = "Export Receipts workflow profile",
+            Filter = "Receipts workflow profile (*.receipts-workflow.json)|*.receipts-workflow.json|Legacy GoatShot workflow profile (*.goatshot-workflow.json)|*.goatshot-workflow.json|JSON files (*.json)|*.json",
+            FileName = "receipts-workflow.receipts-workflow.json",
             AddExtension = true,
-            DefaultExt = ".goatshot-workflow.json"
+            DefaultExt = ".receipts-workflow.json"
         };
 
         if (dialog.ShowDialog(this) != true)
@@ -1243,7 +1257,7 @@ public partial class SettingsWindow : Window
 
         var result = await _services.WorkflowProfiles.ExportAsync(
             dialog.FileName,
-            "GoatShot workflow profile",
+            "Receipts workflow profile",
             includeSensitiveValues: false);
         System.Windows.MessageBox.Show(
             result.Message,
@@ -1256,8 +1270,8 @@ public partial class SettingsWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Import GoatShot workflow profile",
-            Filter = "GoatShot workflow profile (*.goatshot-workflow.json)|*.goatshot-workflow.json|JSON files (*.json)|*.json"
+            Title = "Import Receipts workflow profile",
+            Filter = "Receipts workflow profile (*.receipts-workflow.json)|*.receipts-workflow.json|Legacy GoatShot workflow profile (*.goatshot-workflow.json)|*.goatshot-workflow.json|JSON files (*.json)|*.json"
         };
 
         if (dialog.ShowDialog(this) != true)
@@ -1300,6 +1314,7 @@ public partial class SettingsWindow : Window
         settings.RunAtStartup = RunAtStartupBox.IsChecked == true;
         settings.OcrLanguageTag = OcrLanguageBox.Text.Trim();
         ApplyRecordingSettings(settings.Recording ??= new RecordingSettings());
+        ApplyReplaySettings(settings);
         settings.ConfirmBeforeUpload = ConfirmUploadBox.IsChecked == true;
         settings.UploadQueue.EnableBackgroundProcessing = QueueBackgroundProcessingBox.IsChecked == true;
         settings.UploadQueue.BackgroundPollSeconds = int.TryParse(QueuePollSecondsBox.Text.Trim(), out var queuePollSeconds)
@@ -1328,15 +1343,15 @@ public partial class SettingsWindow : Window
         settings.CustomWebhookUrl = CustomWebhookBox.Text.Trim();
         settings.SlackWebhookUrl = SlackWebhookBox.Text.Trim();
         settings.SlackMessageTemplate = string.IsNullOrWhiteSpace(SlackMessageTemplateBox.Text)
-            ? "GoatShot capture ready: {file} ({bytes} bytes)"
+            ? "Receipts capture ready: {file} ({bytes} bytes)"
             : SlackMessageTemplateBox.Text.Trim();
         settings.DiscordWebhookUrl = DiscordWebhookBox.Text.Trim();
         settings.DiscordMessageTemplate = string.IsNullOrWhiteSpace(DiscordMessageTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : DiscordMessageTemplateBox.Text.Trim();
         settings.TeamsWebhookUrl = TeamsWebhookBox.Text.Trim();
         settings.TeamsMessageTemplate = string.IsNullOrWhiteSpace(TeamsMessageTemplateBox.Text)
-            ? "GoatShot capture ready: {file} ({bytes} bytes)"
+            ? "Receipts capture ready: {file} ({bytes} bytes)"
             : TeamsMessageTemplateBox.Text.Trim();
         settings.S3Endpoint = S3EndpointBox.Text.Trim();
         settings.S3Bucket = S3BucketBox.Text.Trim();
@@ -1391,7 +1406,7 @@ public partial class SettingsWindow : Window
             ? "https://api.dropboxapi.com"
             : DropboxApiBaseUrlBox.Text.Trim();
         settings.DropboxRemoteFolder = string.IsNullOrWhiteSpace(DropboxRemoteFolderBox.Text)
-            ? "/GoatShot"
+            ? "/Receipts"
             : DropboxRemoteFolderBox.Text.Trim();
         SetOAuthClientId("Dropbox", DropboxOAuthClientIdBox.Text);
         settings.GoogleDriveUploadApiBaseUrl = string.IsNullOrWhiteSpace(GoogleDriveUploadApiBaseUrlBox.Text)
@@ -1411,14 +1426,14 @@ public partial class SettingsWindow : Window
             : GooglePhotosApiBaseUrlBox.Text.Trim();
         settings.GooglePhotosAlbumId = GooglePhotosAlbumIdBox.Text.Trim();
         settings.GooglePhotosDescriptionTemplate = string.IsNullOrWhiteSpace(GooglePhotosDescriptionTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : GooglePhotosDescriptionTemplateBox.Text.Trim();
         SetOAuthClientId("Google Photos", GooglePhotosOAuthClientIdBox.Text);
         settings.OneDriveGraphApiBaseUrl = string.IsNullOrWhiteSpace(OneDriveGraphApiBaseUrlBox.Text)
             ? "https://graph.microsoft.com/v1.0"
             : OneDriveGraphApiBaseUrlBox.Text.Trim();
         settings.OneDriveRemoteFolder = string.IsNullOrWhiteSpace(OneDriveRemoteFolderBox.Text)
-            ? "/GoatShot"
+            ? "/Receipts"
             : OneDriveRemoteFolderBox.Text.Trim();
         settings.OneDriveCreateAnonymousViewLink = OneDriveAnonymousViewLinkBox.IsChecked == true;
         SetOAuthClientId("OneDrive", OneDriveOAuthClientIdBox.Text);
@@ -1426,10 +1441,10 @@ public partial class SettingsWindow : Window
             ? "https://www.googleapis.com/upload/youtube/v3"
             : YouTubeUploadApiBaseUrlBox.Text.Trim();
         settings.YouTubeTitleTemplate = string.IsNullOrWhiteSpace(YouTubeTitleTemplateBox.Text)
-            ? "GoatShot recording: {file}"
+            ? "Receipts recording: {file}"
             : YouTubeTitleTemplateBox.Text.Trim();
         settings.YouTubeDescriptionTemplate = string.IsNullOrWhiteSpace(YouTubeDescriptionTemplateBox.Text)
-            ? "Uploaded from GoatShot capture {id}."
+            ? "Uploaded from Receipts capture {id}."
             : YouTubeDescriptionTemplateBox.Text.Trim();
         settings.YouTubePrivacyStatus = ComboBoxText(YouTubePrivacyStatusBox, "unlisted").Trim().ToLowerInvariant();
         settings.YouTubeCategoryId = string.IsNullOrWhiteSpace(YouTubeCategoryIdBox.Text)
@@ -1441,7 +1456,7 @@ public partial class SettingsWindow : Window
             : OneNoteGraphApiBaseUrlBox.Text.Trim();
         settings.OneNoteSectionId = OneNoteSectionIdBox.Text.Trim();
         settings.OneNotePageTitleTemplate = string.IsNullOrWhiteSpace(OneNotePageTitleTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : OneNotePageTitleTemplateBox.Text.Trim();
         SetOAuthClientId("OneNote", OneNoteOAuthClientIdBox.Text);
         settings.LinearGraphqlEndpoint = string.IsNullOrWhiteSpace(LinearGraphqlEndpointBox.Text)
@@ -1450,7 +1465,7 @@ public partial class SettingsWindow : Window
         settings.LinearTeamId = LinearTeamIdBox.Text.Trim();
         settings.LinearIssueId = LinearIssueIdBox.Text.Trim();
         settings.LinearIssueTitleTemplate = string.IsNullOrWhiteSpace(LinearIssueTitleTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : LinearIssueTitleTemplateBox.Text.Trim();
         settings.LinearCreateAttachment = LinearCreateAttachmentBox.IsChecked == true;
         settings.LinearUseOAuthBearerToken = LinearUseOAuthBearerTokenBox.IsChecked == true;
@@ -1459,7 +1474,7 @@ public partial class SettingsWindow : Window
             : GitHubApiBaseUrlBox.Text.Trim();
         settings.GitHubRepository = GitHubRepositoryBox.Text.Trim();
         settings.GitHubIssueTitleTemplate = string.IsNullOrWhiteSpace(GitHubIssueTitleTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : GitHubIssueTitleTemplateBox.Text.Trim();
         settings.GitHubLabels = GitHubLabelsBox.Text.Trim();
         settings.GitHubAssignees = GitHubAssigneesBox.Text.Trim();
@@ -1469,7 +1484,7 @@ public partial class SettingsWindow : Window
             ? "Bug"
             : JiraIssueTypeBox.Text.Trim();
         settings.JiraSummaryTemplate = string.IsNullOrWhiteSpace(JiraSummaryTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : JiraSummaryTemplateBox.Text.Trim();
         settings.JiraLabels = JiraLabelsBox.Text.Trim();
         settings.JiraAccountEmail = JiraAccountEmailBox.Text.Trim();
@@ -1482,7 +1497,7 @@ public partial class SettingsWindow : Window
             ? "Bug"
             : AzureDevOpsWorkItemTypeBox.Text.Trim();
         settings.AzureDevOpsTitleTemplate = string.IsNullOrWhiteSpace(AzureDevOpsTitleTemplateBox.Text)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : AzureDevOpsTitleTemplateBox.Text.Trim();
         settings.AzureDevOpsTags = AzureDevOpsTagsBox.Text.Trim();
         settings.AzureDevOpsAssignedTo = AzureDevOpsAssignedToBox.Text.Trim();
@@ -1653,6 +1668,207 @@ public partial class SettingsWindow : Window
         settings.RecordingOverlayStyle = RecordingSettingsNormalizer.NormalizeOverlayStyle(
             (RecordingOverlayStyleBox.SelectedItem as ComboBoxItem)?.Content?.ToString());
     }
+
+    private void LoadReplaySettings(ReplayBufferSettings replay)
+    {
+        replay = replay.Normalize();
+        ReplayConsentBox.IsChecked = replay.ConsentGranted;
+        ReplayAutoArmBox.IsChecked = replay.AutoArmAtSignIn;
+        foreach (var item in ReplaySourceKindBox.Items.OfType<ComboBoxItem>())
+        {
+            if (item.Tag?.ToString()?.Equals(replay.CaptureSource.Kind.ToString(), StringComparison.OrdinalIgnoreCase) == true)
+            {
+                ReplaySourceKindBox.SelectedItem = item;
+                break;
+            }
+        }
+
+        if (ReplaySourceKindBox.SelectedIndex < 0)
+        {
+            ReplaySourceKindBox.SelectedIndex = 1;
+        }
+
+        ReplaySourceIdBox.Text = replay.CaptureSource.SourceId;
+        ReplayBoundsBox.Text = replay.CaptureSource.Bounds is null
+            ? string.Empty
+            : $"{replay.CaptureSource.Bounds.X},{replay.CaptureSource.Bounds.Y},{replay.CaptureSource.Bounds.Width},{replay.CaptureSource.Bounds.Height}";
+        ReplayBufferSecondsBox.Text = replay.BufferDuration.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        ReplaySaveSecondsBox.Text = replay.SaveDuration.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        ReplaySegmentSecondsBox.Text = replay.SegmentDuration.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        ReplayStorageMbBox.Text = (replay.MaxBufferBytes / 1024d / 1024d).ToString("0.##", CultureInfo.InvariantCulture);
+        ReplaySceneIndexBox.IsChecked = replay.EnableSceneIndexing;
+        ReplayOcrIndexBox.IsChecked = replay.EnableLocalOcrIndexing;
+        ReplayAnalysisSensitivityBox.Text = replay.AnalysisSensitivity.ToString("0.##", CultureInfo.InvariantCulture);
+        ReplayPrivacyProcessesBox.Text = string.Join(Environment.NewLine, replay.PrivacyExcludedProcessNames);
+        ReplayToggleHotkeyBox.Text = replay.ToggleHotkey;
+        ReplaySaveHotkeyBox.Text = replay.SaveHotkey;
+        RefreshReplaySourceChoices(replay.CaptureSource.SourceId);
+        UpdateReplaySourceHelp();
+    }
+
+    private void ApplyReplaySettings(AppSettings settings)
+    {
+        var existing = settings.Replay ?? new ReplayBufferSettings();
+        var sourceKindText = (ReplaySourceKindBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        var sourceKind = Enum.TryParse<ReplayCaptureSourceKind>(sourceKindText, ignoreCase: true, out var parsedKind)
+            ? parsedKind
+            : ReplayCaptureSourceKind.FollowCursorMonitor;
+        var bounds = ParseReplayBounds(ReplayBoundsBox.Text);
+        var sourceId = ReplaySourceIdBox.Text.Trim();
+        var displayName = (ReplaySourceKindBox.SelectedItem as ComboBoxItem)?.Content?.ToString()
+            ?? "Follow cursor monitor";
+        settings.Replay = new ReplayBufferSettings
+        {
+            ConsentGranted = ReplayConsentBox.IsChecked == true,
+            AutoArmAtSignIn = ReplayAutoArmBox.IsChecked == true,
+            CaptureSource = new ReplayCaptureSourceDescriptor(sourceKind, sourceId, displayName, bounds),
+            BufferDuration = TimeSpan.FromSeconds(ParseReplayDouble(ReplayBufferSecondsBox.Text, existing.BufferDuration.TotalSeconds, 2d, 86_400d)),
+            SaveDuration = TimeSpan.FromSeconds(ParseReplayDouble(ReplaySaveSecondsBox.Text, existing.SaveDuration.TotalSeconds, 2d, 86_400d)),
+            SegmentDuration = TimeSpan.FromSeconds(ParseReplayDouble(ReplaySegmentSecondsBox.Text, existing.SegmentDuration.TotalSeconds, 0.5d, 30d)),
+            MaxBufferBytes = (long)Math.Round(ParseReplayDouble(ReplayStorageMbBox.Text, existing.MaxBufferBytes / 1024d / 1024d, 16d, 102_400d) * 1024d * 1024d),
+            FramesPerSecond = Math.Clamp(settings.Recording.FramesPerSecond, 1, 120),
+            EnableSceneIndexing = ReplaySceneIndexBox.IsChecked != false,
+            EnableLocalOcrIndexing = ReplayOcrIndexBox.IsChecked != false,
+            AnalysisSensitivity = ParseReplayDouble(ReplayAnalysisSensitivityBox.Text, existing.AnalysisSensitivity, 0.05d, 1d),
+            PrivacyExcludedProcessNames = ReplayPrivacyProcessesBox.Text
+                .ReplaceLineEndings(Environment.NewLine)
+                .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ToggleHotkey = ReplayToggleHotkeyBox.Text.Trim(),
+            SaveHotkey = ReplaySaveHotkeyBox.Text.Trim()
+        }.Normalize();
+    }
+
+    private void ReplaySourceKind_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_settingsLoading)
+        {
+            RefreshReplaySourceChoices(ReplaySourceIdBox.Text.Trim());
+            UpdateReplaySourceHelp();
+        }
+    }
+
+    private void ReplaySourcePicker_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_settingsLoading || ReplaySourcePickerBox.SelectedItem is not CaptureOverlayTarget target)
+        {
+            return;
+        }
+
+        ReplaySourceIdBox.Text = target.Id;
+        ReplayBoundsBox.Text = string.Join(
+            ',',
+            target.Bounds.X,
+            target.Bounds.Y,
+            target.Bounds.Width,
+            target.Bounds.Height);
+        UpdateReplaySourceHelp();
+    }
+
+    private async void ReplayPickRegion_Click(object sender, RoutedEventArgs e)
+    {
+        var source = (ReplaySourceKindBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        if (source is not ("SelectedRegion" or "FixedRegion"))
+        {
+            ReplaySourceHelpText.Text = "Choose Selected region or Fixed region before picking screen bounds.";
+            return;
+        }
+
+        var bounds = await _services.Screenshots.SelectRegionBoundsAsync(this);
+        if (bounds is null)
+        {
+            ReplaySourceHelpText.Text = "Region selection was canceled; existing Replay bounds were kept.";
+            return;
+        }
+
+        ReplayBoundsBox.Text = string.Join(
+            ',',
+            bounds.X,
+            bounds.Y,
+            bounds.Width,
+            bounds.Height);
+        ReplaySourceHelpText.Text =
+            $"Selected {bounds.Width} × {bounds.Height} at ({bounds.X}, {bounds.Y}). " +
+            "Saving settings restarts an armed buffer so the new region takes effect.";
+    }
+
+    private void RefreshReplaySourceChoices(string? selectedSourceId = null)
+    {
+        if (ReplaySourcePickerBox is null || ReplaySourceKindBox is null)
+        {
+            return;
+        }
+
+        var sourceKindText = (ReplaySourceKindBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        var sourceKind = Enum.TryParse<ReplayCaptureSourceKind>(sourceKindText, true, out var parsed)
+            ? parsed
+            : ReplayCaptureSourceKind.FollowCursorMonitor;
+        var targetKind = sourceKind switch
+        {
+            ReplayCaptureSourceKind.SelectedMonitor => CaptureOverlayTargetKind.Monitor,
+            ReplayCaptureSourceKind.SelectedWindow => CaptureOverlayTargetKind.Window,
+            _ => (CaptureOverlayTargetKind?)null
+        };
+        if (targetKind is null)
+        {
+            ReplaySourcePickerBox.ItemsSource = null;
+            ReplaySourcePickerBox.IsEnabled = false;
+            ReplayPickRegionButton.IsEnabled = sourceKind is
+                ReplayCaptureSourceKind.SelectedRegion or ReplayCaptureSourceKind.FixedRegion;
+            return;
+        }
+
+        var targets = CaptureOverlayTargetCatalog.BuildLiveTargets()
+            .Where(target => target.Kind == targetKind.Value)
+            .ToArray();
+        ReplaySourcePickerBox.ItemsSource = targets;
+        ReplaySourcePickerBox.IsEnabled = targets.Length > 0;
+        ReplayPickRegionButton.IsEnabled = false;
+        ReplaySourcePickerBox.SelectedItem = targets.FirstOrDefault(target =>
+            target.Id.Equals(selectedSourceId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void UpdateReplaySourceHelp()
+    {
+        if (ReplaySourceHelpText is null)
+        {
+            return;
+        }
+
+        var source = (ReplaySourceKindBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "FollowCursorMonitor";
+        ReplaySourceHelpText.Text = source switch
+        {
+            "SelectedMonitor" => "Choose a live monitor from the list. The chosen monitor remains selected until you change it; display removal finalizes the segment and reports an error.",
+            "FollowCursorMonitor" => "The active monitor is resolved again at every segment boundary, so moving between monitors preserves a source transition without locking the profile.",
+            "AllMonitorsComposite" => "Every display is captured into one virtual-desktop video track.",
+            "SeparateMonitorTracks" => "Each connected display gets a synchronized track, with the storage cap enforced across all tracks.",
+            "SelectedWindow" => "Choose a live top-level window from the list. Source and size changes finalize the current segment.",
+            "FollowForegroundWindow" => "The foreground window is resolved again at segment boundaries and transitions are retained in the receipt timeline.",
+            "SelectedRegion" => "Use Pick region to draw screen bounds. The selection remains editable and takes effect when Replay is re-armed.",
+            "FixedRegion" => "Use Pick region to draw fixed screen bounds. The same coordinates are retained until you edit them.",
+            _ => string.Empty
+        };
+    }
+
+    private static ReplayCaptureBounds? ParseReplayBounds(string value)
+    {
+        var parts = (value ?? string.Empty)
+            .Split([',', 'x', 'X', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length == 4 &&
+            int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var x) &&
+            int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var y) &&
+            int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) &&
+            int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) &&
+            width > 0 && height > 0
+                ? new ReplayCaptureBounds(x, y, width, height)
+                : null;
+    }
+
+    private static double ParseReplayDouble(string value, double fallback, double minimum, double maximum) =>
+        double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            ? Math.Clamp(parsed, minimum, maximum)
+            : Math.Clamp(fallback, minimum, maximum);
 
     private async void RefreshRecordingDevices_Click(object sender, RoutedEventArgs e)
     {
@@ -1931,7 +2147,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        statusText.Text = $"Opening browser for {providerName} authorization. GoatShot is waiting for the local callback...";
+        statusText.Text = $"Opening browser for {providerName} authorization. Receipts is waiting for the local callback...";
         var result = await _services.OAuthBrowserFlow.AuthorizeAsync(
             provider,
             _services.Settings.OAuth.LocalCallbackPort,

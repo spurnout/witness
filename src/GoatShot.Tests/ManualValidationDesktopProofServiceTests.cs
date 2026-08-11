@@ -39,8 +39,11 @@ public sealed class ManualValidationDesktopProofServiceTests
             Assert.IsTrue(File.Exists(result.SummaryJsonPath));
             Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "screenshots", "main-window.png")));
             Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "screenshots", "proof-scene.png")));
+            Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "screenshots", "settings-replay.png")));
+            Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "screenshots", "frame-explorer.png")));
             Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "audits", "main-accessibility.md")));
             Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "audits", "proof-scene-accessibility.md")));
+            Assert.IsTrue(File.Exists(Path.Combine(root, "desktop-proof", "audits", "frame-explorer-accessibility.md")));
             CollectionAssert.Contains(result.EvidenceFiles, "desktop-proof/desktop-proof-summary.md");
             CollectionAssert.Contains(result.EvidenceFiles, "desktop-proof/desktop-proof-summary.json");
 

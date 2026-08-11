@@ -50,7 +50,7 @@ public sealed class BrowserExtensionInstallPlanServiceTests
         AssertGeneratedFile(output, "install-plan.json");
 
         var markdown = await File.ReadAllTextAsync(Path.Combine(output, "install-plan.md"));
-        StringAssert.Contains(markdown, "GoatShot Browser Extension Install Plan");
+        StringAssert.Contains(markdown, "Receipts Browser Extension Install Plan");
         StringAssert.Contains(markdown, "does not install browser extensions");
         StringAssert.Contains(markdown, "Host Status");
     }
@@ -83,6 +83,38 @@ public sealed class BrowserExtensionInstallPlanServiceTests
         Assert.AreEqual(extensionZip, entry.StorePackagePath);
         Assert.AreEqual(submissionZip, entry.StoreSubmissionBundlePath);
         Assert.IsTrue(entry.ManualSteps.Any(step => step.Contains(extensionZip, StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task CreateAsync_PrefersReceiptsStorePackageOverLegacyArtifacts()
+    {
+        var root = TestRoot();
+        var source = CreateExtensionSource(root);
+        var packageRoot = Path.Combine(root, "store-package");
+        var browserRoot = Path.Combine(packageRoot, "chrome");
+        Directory.CreateDirectory(browserRoot);
+        var receiptsExtension = Path.Combine(browserRoot, "receipts-browser-extension-chrome-v0.3.0.zip");
+        var legacyExtension = Path.Combine(browserRoot, "goatshot-browser-extension-chrome-v9.9.9.zip");
+        var receiptsSubmission = Path.Combine(packageRoot, "receipts-browser-extension-chrome-store-submission.zip");
+        var legacySubmission = Path.Combine(packageRoot, "goatshot-browser-extension-chrome-store-submission.zip");
+        await File.WriteAllTextAsync(receiptsExtension, "current");
+        await File.WriteAllTextAsync(legacyExtension, "legacy");
+        await File.WriteAllTextAsync(receiptsSubmission, "current");
+        await File.WriteAllTextAsync(legacySubmission, "legacy");
+
+        var result = await new BrowserExtensionInstallPlanService().CreateAsync(new BrowserExtensionInstallPlanRequest
+        {
+            Browser = "chrome",
+            ExtensionSourceDirectory = source,
+            StorePackageRoot = packageRoot,
+            OutputPath = Path.Combine(root, "install-plan"),
+            NativeHostStatus = NativeStatus(),
+            PolicyAllowed = true
+        });
+
+        var entry = result.Entries.Single();
+        Assert.AreEqual(receiptsExtension, entry.StorePackagePath);
+        Assert.AreEqual(receiptsSubmission, entry.StoreSubmissionBundlePath);
     }
 
     [TestMethod]

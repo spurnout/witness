@@ -102,7 +102,7 @@ public sealed class SftpShareProvider : IShareProvider
 
         if (string.IsNullOrWhiteSpace(_settings.SftpHostKeyFingerprint))
         {
-            return "SFTP host key SHA-256 fingerprint is required; GoatShot will not trust an unknown server key.";
+            return "SFTP host key SHA-256 fingerprint is required; Receipts will not trust an unknown server key.";
         }
 
         return string.Empty;

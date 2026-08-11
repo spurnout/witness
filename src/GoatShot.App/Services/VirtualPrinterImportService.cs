@@ -79,7 +79,7 @@ public sealed class VirtualPrinterImportService
             DriverInstallRequiresAdmin = true,
             DriverSigningRequired = true,
             InstallerHookImplemented = false,
-            Summary = "GoatShot can import print-to-file PDF/image outputs through the local file-drop path. A true Windows virtual-printer driver is not installed or shipped by GoatShot in this build."
+            Summary = "Receipts can import print-to-file PDF/image outputs through the local file-drop path. A true Windows virtual-printer driver is not installed or shipped by Receipts in this build."
         };
 
         diagnostics.DriverOptions.AddRange(
@@ -90,7 +90,7 @@ public sealed class VirtualPrinterImportService
                 Status = diagnostics.MicrosoftPrintToPdfDetected ? "available-on-this-machine" : "manual-app-export",
                 RequiresAdmin = false,
                 RequiresSignedDriver = false,
-                Notes = "Use the existing printer/export flow and save PDF/image outputs into the GoatShot drop folder. This is the current supported path."
+                Notes = "Use the existing printer/export flow and save PDF/image outputs into the Receipts drop folder. This is the current supported path."
             },
             new VirtualPrinterDriverOption
             {
@@ -129,7 +129,7 @@ public sealed class VirtualPrinterImportService
         [
             "Use `print-import contract --ensure-folder` to create the local drop folder.",
             "Print or export from another app to PDF/image and save into the drop folder.",
-            "Use `print-import import <file>` or enable the watched file-drop folder to bring the output into GoatShot.",
+            "Use `print-import import <file>` or enable the watched file-drop folder to bring the output into Receipts.",
             "Do not claim virtual-printer driver support until a signed/admin installer lane is implemented and clean-machine tested."
         ]);
 
@@ -366,14 +366,14 @@ public sealed class VirtualPrinterImportService
     private static string ResolveSetupNotePath(string? setupNotePath, string dropFolder)
     {
         return string.IsNullOrWhiteSpace(setupNotePath)
-            ? Path.Combine(dropFolder, "goatshot-print-import-setup.md")
+            ? Path.Combine(dropFolder, "receipts-print-import-setup.md")
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(setupNotePath));
     }
 
     private static string BuildSetupNote(VirtualPrinterFeasibilityDiagnostics diagnostics)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Print Import Setup");
+        builder.AppendLine("# Receipts Print Import Setup");
         builder.AppendLine();
         builder.AppendLine("## Drop Folder");
         builder.AppendLine();
@@ -386,9 +386,9 @@ public sealed class VirtualPrinterImportService
         builder.AppendLine();
         builder.AppendLine("1. Open the source document or image in the app that owns it.");
         builder.AppendLine("2. Choose Print and select Microsoft Print to PDF when it is available, or use the app's PDF/image export command.");
-        builder.AppendLine("3. Save the PDF/image into the GoatShot drop folder above.");
-        builder.AppendLine("4. If watched print import is enabled, GoatShot can import supported files from that folder while the desktop app is running.");
-        builder.AppendLine("5. You can also import one file explicitly with `goatshot print-import import <file>`.");
+        builder.AppendLine("3. Save the PDF/image into the Receipts drop folder above.");
+        builder.AppendLine("4. If watched print import is enabled, Receipts can import supported files from that folder while the desktop app is running.");
+        builder.AppendLine("5. You can also import one file explicitly with `receipts print-import import <file>`.");
         builder.AppendLine();
         builder.AppendLine("## Readiness");
         builder.AppendLine();
@@ -406,7 +406,7 @@ public sealed class VirtualPrinterImportService
         builder.AppendLine();
         builder.AppendLine("## Boundary");
         builder.AppendLine();
-        builder.AppendLine("GoatShot currently supports local file-drop import. It does not install a Windows printer driver, register a port monitor, or claim clean-machine printer-driver proof.");
+        builder.AppendLine("Receipts currently supports local file-drop import. It does not install a Windows printer driver, register a port monitor, or claim clean-machine printer-driver proof.");
         builder.AppendLine("A true virtual-printer driver remains an installer/admin-scoped, signed-driver lane that needs explicit clean-machine validation.");
         builder.AppendLine();
         builder.AppendLine("## Privacy");
@@ -456,8 +456,8 @@ public sealed class VirtualPrinterImportService
                 return new VirtualPrinterDropFolderProbe(false, false, "Drop folder does not exist.");
             }
 
-            var probeFile = Path.Combine(folder, $".goatshot-write-probe-{Guid.NewGuid():N}.tmp");
-            File.WriteAllText(probeFile, "GoatShot print-import write probe");
+            var probeFile = Path.Combine(folder, $".receipts-write-probe-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(probeFile, "Receipts print-import write probe");
             File.Delete(probeFile);
             return new VirtualPrinterDropFolderProbe(true, true, "Drop folder exists and is writable.");
         }
@@ -548,7 +548,7 @@ public sealed class VirtualPrinterImportContract
     public string DropFolder { get; set; } = string.Empty;
     public bool IncludeSubdirectories { get; set; }
     public List<string> SupportedExtensions { get; set; } = new();
-    public string DriverInstallStatus { get; set; } = "Not installed by GoatShot. Use this file-drop folder with an existing print-to-PDF/image workflow until a dedicated installer/admin lane exists.";
+    public string DriverInstallStatus { get; set; } = "Not installed by Receipts. Use this file-drop folder with an existing print-to-PDF/image workflow until a dedicated installer/admin lane exists.";
     public string PrivacyNote { get; set; } = "Print outputs can contain private document content. Keep the drop folder local and review files before sharing.";
 }
 

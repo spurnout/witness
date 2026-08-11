@@ -119,7 +119,7 @@ public static class ShareProviderCatalog
         public Task<ProviderHealth> ValidateCredentialsAsync(CancellationToken cancellationToken)
         {
             var message = _isImplemented
-                ? $"{ProviderName} is implemented in GoatShot and tracked in the provider catalog."
+                ? $"{ProviderName} is implemented in Receipts and tracked in the provider catalog."
                 : $"{ProviderName} is a roadmap provider; adapter implementation is pending.";
 
             return Task.FromResult(new ProviderHealth(_isImplemented, message));

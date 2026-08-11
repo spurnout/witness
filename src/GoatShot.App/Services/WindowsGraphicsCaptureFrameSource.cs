@@ -116,9 +116,18 @@ public sealed class WindowsGraphicsCaptureFrameSource : IDisposable
         EnsureSupportedDesktopSession("active-window frame capture");
         cancellationToken.ThrowIfCancellationRequested();
         var handle = GetForegroundWindow();
+        return StartWindow(handle, cancellationToken);
+    }
+
+    public static WindowsGraphicsCaptureFrameSource StartWindow(
+        IntPtr handle,
+        CancellationToken cancellationToken)
+    {
+        EnsureSupportedDesktopSession("chosen-window frame capture");
+        cancellationToken.ThrowIfCancellationRequested();
         if (handle == IntPtr.Zero || !IsWindowVisible(handle) || !GetWindowRect(handle, out var rect))
         {
-            throw new InvalidOperationException("Windows.Graphics.Capture could not resolve the active foreground window for recording.");
+            throw new InvalidOperationException("Windows.Graphics.Capture could not resolve the chosen window for recording.");
         }
 
         var captureItem = CreateCaptureItemForWindow(handle);

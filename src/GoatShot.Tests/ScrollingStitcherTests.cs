@@ -168,7 +168,7 @@ public sealed class ScrollingStitcherTests
 
             Assert.AreEqual(5, report.Scenarios.Count);
             StringAssert.Contains(report.PrivacyNote, "no live desktop pixels");
-            StringAssert.Contains(report.RetryGuidance, "goatshot image stitch");
+            StringAssert.Contains(report.RetryGuidance, "receipts image stitch");
 
             foreach (var scenario in report.Scenarios)
             {

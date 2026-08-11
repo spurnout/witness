@@ -5,6 +5,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>Receipts.Cli</AssemblyName>
+    <Version Condition="'$(Version)' == ''">0.3.0</Version>
+    <AssemblyVersion>0.3.0.0</AssemblyVersion>
+    <FileVersion>0.3.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

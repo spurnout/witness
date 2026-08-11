@@ -21,10 +21,16 @@ public sealed class HotkeyService : IDisposable
 
     private readonly Dictionary<int, HotkeyAction> _actions = new();
     private readonly List<string> _registrationReport = new();
+    private readonly ReplayBufferSettings _replaySettings;
     private HwndSource? _source;
     private IntPtr _handle;
 
     public event EventHandler<HotkeyAction>? ActionTriggered;
+
+    public HotkeyService(ReplayBufferSettings? replaySettings = null)
+    {
+        _replaySettings = (replaySettings ?? new ReplayBufferSettings()).Normalize();
+    }
 
     public IReadOnlyList<string> RegistrationReport => _registrationReport;
 
@@ -49,6 +55,8 @@ public sealed class HotkeyService : IDisposable
         Register(105, HotkeyAction.OcrRegion, ModControl | ModShift, VkO, "Ctrl + Shift + O");
         Register(106, HotkeyAction.ColorPicker, ModControl | ModShift, VkC, "Ctrl + Shift + C");
         Register(107, HotkeyAction.PixelRuler, ModControl | ModShift, VkU, "Ctrl + Shift + U");
+        RegisterConfigured(108, HotkeyAction.SaveReplay, _replaySettings.SaveHotkey, "Save Replay");
+        RegisterConfigured(109, HotkeyAction.ToggleReplay, _replaySettings.ToggleHotkey, "Arm/Pause Replay");
     }
 
     public void Dispose()
@@ -75,6 +83,85 @@ public sealed class HotkeyService : IDisposable
             _registrationReport.Add($"{label}: unavailable");
         }
     }
+
+    private void RegisterConfigured(int id, HotkeyAction action, string gesture, string commandLabel)
+    {
+        if (!TryParseGesture(gesture, out var modifiers, out var key))
+        {
+            _registrationReport.Add($"{commandLabel}: invalid hotkey '{gesture}'");
+            return;
+        }
+
+        Register(id, action, modifiers, key, $"{commandLabel} ({NormalizeGestureLabel(gesture)})");
+    }
+
+    internal static bool TryParseGesture(string? gesture, out uint modifiers, out uint key)
+    {
+        modifiers = 0;
+        key = 0;
+        var parts = (gesture ?? string.Empty)
+            .Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var part in parts)
+        {
+            if (part.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Control", StringComparison.OrdinalIgnoreCase))
+            {
+                modifiers |= ModControl;
+            }
+            else if (part.Equals("Alt", StringComparison.OrdinalIgnoreCase))
+            {
+                modifiers |= ModAlt;
+            }
+            else if (part.Equals("Shift", StringComparison.OrdinalIgnoreCase))
+            {
+                modifiers |= ModShift;
+            }
+            else if (key == 0 && TryParseVirtualKey(part, out key))
+            {
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return key != 0;
+    }
+
+    private static bool TryParseVirtualKey(string value, out uint key)
+    {
+        key = 0;
+        if (value.Equals("PrintScreen", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("Print Screen", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("Snapshot", StringComparison.OrdinalIgnoreCase))
+        {
+            key = VkSnapshot;
+            return true;
+        }
+
+        if (value.Length == 1 && char.IsLetterOrDigit(value[0]))
+        {
+            key = char.ToUpperInvariant(value[0]);
+            return true;
+        }
+
+        if (value.Length is 2 or 3 && value[0] is 'F' or 'f' &&
+            int.TryParse(value[1..], out var functionKey) && functionKey is >= 1 and <= 24)
+        {
+            key = (uint)(0x70 + functionKey - 1);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeGestureLabel(string gesture) =>
+        string.Join(" + ", gesture.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {

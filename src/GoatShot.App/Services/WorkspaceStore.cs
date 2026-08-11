@@ -148,7 +148,7 @@ public sealed class WorkspaceStore
             return await AddImageFileAsync(
                 target,
                 kind ?? CaptureKind.Imported,
-                notes ?? "Imported into the GoatShot library.",
+                notes ?? "Imported into the Receipts library.",
                 source);
         });
     }
@@ -182,6 +182,62 @@ public sealed class WorkspaceStore
 
             _metadataIndex?.Upsert(item);
         });
+    }
+
+    public async Task<CaptureItem> LinkReceiptDerivativeAsync(
+        CaptureItem source,
+        CaptureItem derivative,
+        string artifactRole,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(derivative);
+
+        var sourceReceiptId = source.SourceReceiptId;
+        if (string.IsNullOrWhiteSpace(sourceReceiptId))
+        {
+            return derivative;
+        }
+
+        derivative.SourceReceiptId = sourceReceiptId;
+        derivative.ArtifactRole = string.IsNullOrWhiteSpace(artifactRole)
+            ? "edited-image"
+            : artifactRole.Trim();
+        derivative.IsOriginal = false;
+        derivative.SourceAvailable = source.SourceAvailable;
+        await UpdateItemAsync(derivative).ConfigureAwait(false);
+
+        var parentLineage = await TryReadDerivativeLineageAsync(source.FilePath, cancellationToken)
+            .ConfigureAwait(false);
+        var sourceReceiptPath = parentLineage?.SourceReceiptPath;
+        if (string.IsNullOrWhiteSpace(sourceReceiptPath))
+        {
+            sourceReceiptPath = Load()
+                .FirstOrDefault(item =>
+                    item.Kind == CaptureKind.ReplayReceipt &&
+                    item.ReceiptId?.Equals(sourceReceiptId, StringComparison.OrdinalIgnoreCase) == true)
+                ?.FilePath ?? string.Empty;
+        }
+
+        var lineage = new ReceiptDerivativeLineage
+        {
+            DerivativeId = derivative.Id,
+            SourceReceiptId = sourceReceiptId,
+            SourceReceiptPath = sourceReceiptPath,
+            ArtifactRole = derivative.ArtifactRole,
+            OutputPath = derivative.FilePath,
+            ParentDerivativeId = source.Id,
+            ParentDerivativePath = source.FilePath,
+            SourceSegmentIds = parentLineage?.SourceSegmentIds.ToList() ?? [],
+            StartMonotonicTicks = parentLineage?.StartMonotonicTicks,
+            EndMonotonicTicks = parentLineage?.EndMonotonicTicks
+        };
+        await File.WriteAllTextAsync(
+                derivative.FilePath + ".receipt-lineage.json",
+                JsonSerializer.Serialize(lineage, JsonOptions),
+                cancellationToken)
+            .ConfigureAwait(false);
+        return derivative;
     }
 
     public async Task DeleteItemAsync(CaptureItem item, bool deleteFile)
@@ -257,6 +313,37 @@ public sealed class WorkspaceStore
                 ? "Private capture: not added to persistent workspace index."
                 : $"Local-first capture stored in the workspace library.{Environment.NewLine}Source: {source?.AppLabel ?? "unknown"} / {source?.WindowLabel ?? "untitled"}"
         };
+    }
+
+    private static async Task<ReceiptDerivativeLineage?> TryReadDerivativeLineageAsync(
+        string sourcePath,
+        CancellationToken cancellationToken)
+    {
+        var lineagePath = sourcePath + ".receipt-lineage.json";
+        if (!File.Exists(lineagePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = new FileStream(
+                lineagePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            return await JsonSerializer.DeserializeAsync<ReceiptDerivativeLineage>(
+                    stream,
+                    JsonOptions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
     }
 
     private string CreateThumbnail(string imagePath, Image image)

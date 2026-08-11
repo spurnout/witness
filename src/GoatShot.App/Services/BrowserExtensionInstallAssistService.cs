@@ -92,13 +92,13 @@ public sealed class BrowserExtensionInstallAssistService
             result.BrowserArguments.AddRange(BuildBrowserArguments(profileDirectory, source, remoteDebuggingPort, startUrl));
             result.Commands.Add(".\\launch-browser-extension.ps1 -NoStart");
             result.Commands.Add(".\\launch-browser-extension.ps1");
-            result.Commands.Add("goatshot browser-extension native-host status --json");
+            result.Commands.Add("receipts browser-extension native-host status --json");
         }
         else if (browser == "firefox")
         {
             result.Commands.Add("Open about:debugging#/runtime/this-firefox and choose Load Temporary Add-on.");
             result.Commands.Add($"Select the manifest.json file under {Quote(source)}.");
-            result.Commands.Add("goatshot browser-extension native-host status --json");
+            result.Commands.Add("receipts browser-extension native-host status --json");
         }
 
         Directory.CreateDirectory(outputRoot);
@@ -405,7 +405,7 @@ public sealed class BrowserExtensionInstallAssistService
     private static string BuildMarkdown(BrowserExtensionInstallAssistResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Install Assist");
+        builder.AppendLine("# Receipts Browser Extension Install Assist");
         builder.AppendLine();
         builder.AppendLine($"Browser: `{(string.IsNullOrWhiteSpace(result.Browser) ? "invalid" : result.Browser)}`");
         builder.AppendLine($"Status: `{(result.Issues.Count == 0 ? "ready" : "blocked")}`");

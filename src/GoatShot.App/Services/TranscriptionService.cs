@@ -79,7 +79,7 @@ public sealed partial class TranscriptionService
             ? $" Provider STT: {providerResult?.Message ?? "not attempted"}"
             : " Provider STT was not requested; pass --ai --provider gemini to send extracted audio to configured Gemini for short recordings.";
         return Failed(
-            "Automatic speech-to-text could not run. Provide --srt, embed an SRT/subtitle stream, or explicitly configure an external Whisper executable/model. GoatShot never downloads or bundles Whisper. " +
+            "Automatic speech-to-text could not run. Provide --srt, embed an SRT/subtitle stream, or explicitly configure an external Whisper executable/model. Receipts never downloads or bundles Whisper. " +
             $"Embedded subtitle extraction: {embedded.Message} External Whisper: {whisper.Message}{providerMessage}");
     }
 
@@ -524,12 +524,12 @@ public sealed partial class TranscriptionService
     {
         var configured = FirstNonEmpty(
             request.WhisperExecutablePath,
-            Environment.GetEnvironmentVariable("GOATSHOT_WHISPER_EXE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_WHISPER_PATH"));
+            BrandEnvironment.Resolve("WHISPER_EXE").Value,
+            BrandEnvironment.Resolve("WHISPER_PATH").Value);
         var model = FirstNonEmpty(
             request.WhisperModelPath,
-            Environment.GetEnvironmentVariable("GOATSHOT_WHISPER_MODEL"),
-            Environment.GetEnvironmentVariable("GOATSHOT_WHISPER_MODEL_PATH"));
+            BrandEnvironment.Resolve("WHISPER_MODEL").Value,
+            BrandEnvironment.Resolve("WHISPER_MODEL_PATH").Value);
 
         if (!string.IsNullOrWhiteSpace(configured))
         {

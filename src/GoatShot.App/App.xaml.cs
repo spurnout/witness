@@ -13,6 +13,7 @@ public partial class App : System.Windows.Application
     public AppServices Services { get; private set; } = null!;
     private SingleInstanceCoordinator? _singleInstance;
     private PersonalInstallService? _personalInstall;
+    private ReplayWindowsLifecycleController? _replayWindowsLifecycle;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -26,36 +27,36 @@ public partial class App : System.Windows.Application
             Console.IsInputRedirected);
         var startupOptions = AppStartupOptions.Parse(
             startupArguments,
-            Environment.GetEnvironmentVariable("GOATSHOT_OPEN_SETTINGS"),
-            Environment.GetEnvironmentVariable("GOATSHOT_SETTINGS_SECTION"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_MAIN"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_MAIN_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_SETTINGS_SECTION"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_SETTINGS_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_SETTINGS_SECTION"),
-            Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_SETTINGS_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_EDITOR_IMAGE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_EDITOR_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_TRAY_MENU"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_TRAY_MENU_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_CAPTURE_OVERLAY"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_CAPTURE_OVERLAY_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_UPLOAD_TASK_SURFACE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_UPLOAD_TASK_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_SHARE_HISTORY"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_SHARE_HISTORY_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_AI_HISTORY"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_AI_HISTORY_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_CAPTURE_TASK"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_CAPTURE_TASK_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_PROOF_SCENE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_PROOF_SCENE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RENDER_PROOF_SCENE_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RECORD_PROOF_SCENE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RECORD_PROOF_SCENE_OUTPUT"),
-            Environment.GetEnvironmentVariable("GOATSHOT_RECORD_PROOF_SCENE_DURATION"),
-            Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_WPF_SURFACE"),
-            Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_WPF_OUTPUT"));
+            ResolveStartupEnvironment("OPEN_SETTINGS"),
+            ResolveStartupEnvironment("SETTINGS_SECTION"),
+            ResolveStartupEnvironment("RENDER_MAIN"),
+            ResolveStartupEnvironment("RENDER_MAIN_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_SETTINGS_SECTION"),
+            ResolveStartupEnvironment("RENDER_SETTINGS_OUTPUT"),
+            ResolveStartupEnvironment("AUDIT_SETTINGS_SECTION"),
+            ResolveStartupEnvironment("AUDIT_SETTINGS_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_EDITOR_IMAGE"),
+            ResolveStartupEnvironment("RENDER_EDITOR_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_TRAY_MENU"),
+            ResolveStartupEnvironment("RENDER_TRAY_MENU_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_CAPTURE_OVERLAY"),
+            ResolveStartupEnvironment("RENDER_CAPTURE_OVERLAY_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_UPLOAD_TASK_SURFACE"),
+            ResolveStartupEnvironment("RENDER_UPLOAD_TASK_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_SHARE_HISTORY"),
+            ResolveStartupEnvironment("RENDER_SHARE_HISTORY_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_AI_HISTORY"),
+            ResolveStartupEnvironment("RENDER_AI_HISTORY_OUTPUT"),
+            ResolveStartupEnvironment("RENDER_CAPTURE_TASK"),
+            ResolveStartupEnvironment("RENDER_CAPTURE_TASK_OUTPUT"),
+            ResolveStartupEnvironment("PROOF_SCENE"),
+            ResolveStartupEnvironment("RENDER_PROOF_SCENE"),
+            ResolveStartupEnvironment("RENDER_PROOF_SCENE_OUTPUT"),
+            ResolveStartupEnvironment("RECORD_PROOF_SCENE"),
+            ResolveStartupEnvironment("RECORD_PROOF_SCENE_OUTPUT"),
+            ResolveStartupEnvironment("RECORD_PROOF_SCENE_DURATION"),
+            ResolveStartupEnvironment("AUDIT_WPF_SURFACE"),
+            ResolveStartupEnvironment("AUDIT_WPF_OUTPUT"));
         StartupTrace.Write($"Parsed mode={startupOptions.Mode} verb={startupOptions.RuntimeVerb}");
 
         if (startupOptions.RuntimeVerb.Equals("--complete-uninstall", StringComparison.OrdinalIgnoreCase))
@@ -99,6 +100,26 @@ public partial class App : System.Windows.Application
                 catch (Exception exception)
                 {
                     WriteProofFailure(startupOptions.RenderMainOutputPath, exception);
+                    Shutdown(1);
+                }
+            }, DispatcherPriority.ApplicationIdle);
+            return;
+        }
+
+        if (startupOptions.RenderFrameExplorer)
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                try
+                {
+                    await FrameExplorerWindowRenderer.RenderAsync(
+                        Services,
+                        startupOptions.RenderFrameExplorerOutputPath);
+                    Shutdown(0);
+                }
+                catch (Exception exception)
+                {
+                    WriteProofFailure(startupOptions.RenderFrameExplorerOutputPath, exception);
                     Shutdown(1);
                 }
             }, DispatcherPriority.ApplicationIdle);
@@ -382,6 +403,14 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        var replayStartupCleanup = AppServices.CleanupReplayBufferAtStartup(
+            new FileReplayBufferStorage(Services.Paths.ReplayBufferRoot),
+            DateTimeOffset.UtcNow);
+        StartupTrace.Write(
+            $"Receipts replay startup cleanup deleted={replayStartupCleanup.DeletedPaths.Count} " +
+            $"retained={replayStartupCleanup.RetainedPaths.Count} failures={replayStartupCleanup.Failures.Count}");
+        SubscribeReplaySystemEvents();
+
         var mainWindow = new MainWindow(
             Services,
             startHidden: startupOptions.Mode == AppStartupMode.Background);
@@ -401,8 +430,20 @@ public partial class App : System.Windows.Application
         _personalInstall.MarkStartupSuccessful();
     }
 
+    private static string? ResolveStartupEnvironment(string suffix)
+    {
+        var resolution = BrandEnvironment.Resolve(suffix);
+        if (resolution.UsedLegacyFallback)
+        {
+            StartupTrace.Write($"Legacy environment alias in use: {resolution.SourceVariable}; prefer {BrandIdentity.EnvironmentVariable(suffix)}.");
+        }
+
+        return resolution.Value;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        UnsubscribeReplaySystemEvents();
         _singleInstance?.Dispose();
         if (Services is not null)
         {
@@ -410,6 +451,51 @@ public partial class App : System.Windows.Application
         }
         base.OnExit(e);
     }
+
+    private void SubscribeReplaySystemEvents()
+    {
+        if (_replayWindowsLifecycle is not null)
+        {
+            return;
+        }
+
+        var lifecycle = new ReplayWindowsLifecycleController(
+            () => Services.Replay,
+            new WindowsReplaySystemEventSource(),
+            StartupTrace.Write);
+        _replayWindowsLifecycle = lifecycle;
+        Services.ReplayServiceChanged += Services_ReplayServiceChanged;
+        try
+        {
+            lifecycle.Start();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Services.ReplayServiceChanged -= Services_ReplayServiceChanged;
+            lifecycle.Dispose();
+            _replayWindowsLifecycle = null;
+            var failClosed = Services.Replay.SuspendForSystemEvent();
+            StartupTrace.Write(
+                $"Replay Windows lifecycle subscription failed; capture remains suspended " +
+                $"until restart ({ex.GetType().Name}: {ex.Message}). {failClosed.Message}");
+        }
+    }
+
+    private void UnsubscribeReplaySystemEvents()
+    {
+        var lifecycle = _replayWindowsLifecycle;
+        if (lifecycle is null)
+        {
+            return;
+        }
+
+        Services.ReplayServiceChanged -= Services_ReplayServiceChanged;
+        _replayWindowsLifecycle = null;
+        lifecycle.Dispose();
+    }
+
+    private void Services_ReplayServiceChanged(object? sender, EventArgs e) =>
+        _replayWindowsLifecycle?.RefreshCurrentReplay();
 
     private bool OfferPersonalInstall(PersonalInstallService install)
     {
@@ -435,9 +521,9 @@ public partial class App : System.Windows.Application
 
             var response = System.Windows.MessageBox.Show(
                 isUpdate
-                    ? $"Update the installed GoatShot {state.InstalledVersion} copy to {state.CurrentVersion}?"
-                    : "Install GoatShot for this Windows user and start it in the tray when you sign in?",
-                isUpdate ? "Update GoatShot" : "Install GoatShot",
+                    ? $"Update the installed Receipts {state.InstalledVersion} copy to {state.CurrentVersion}?"
+                    : "Install Receipts for this Windows user and start it in the tray when you sign in?",
+                isUpdate ? "Update Receipts" : "Install Receipts",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (response != MessageBoxResult.Yes)
@@ -454,7 +540,7 @@ public partial class App : System.Windows.Application
             var result = install.InstallOrUpdate();
             if (!result.Succeeded)
             {
-                System.Windows.MessageBox.Show(result.Message, "GoatShot install", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show(result.Message, "Receipts install", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
 
@@ -539,7 +625,7 @@ public partial class App : System.Windows.Application
                 result.OutputPath,
                 RequestedDurationSeconds = duration.TotalSeconds,
                 result.Message,
-                SafeContent = "GoatShot Proof Scene app-owned WPF window",
+                SafeContent = "Receipts Proof Scene app-owned WPF window",
                 AudioRequested = false,
                 WebcamRequested = false,
                 Target = "explicit proof-scene window bounds",
@@ -579,7 +665,7 @@ public partial class App : System.Windows.Application
     {
         System.Windows.MessageBox.Show(
             e.Exception.Message,
-            "GoatShot error",
+            "Receipts error",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
         e.Handled = true;

@@ -1,10 +1,10 @@
 param(
-    [string]$Version = "0.2.0",
+    [string]$Version = "0.3.0",
     [string]$Runtime = "win-x64",
     [string]$DistDir = "",
     [string]$PublishDir = "",
     [string]$OutputRoot = "artifacts\single-exe-package-verification",
-    # A correct self-contained single-file GoatShot.exe measured ~102 MB for
+    # A correct self-contained single-file executable measured ~102 MB for
     # release 0.1.0; a build under this floor has almost certainly failed to
     # embed the runtime or native libraries.
     [long]$MinimumExeBytes = 60MB,
@@ -73,7 +73,7 @@ function Build-Markdown {
     param([pscustomobject]$Result)
 
     $lines = New-Object System.Collections.Generic.List[string]
-    [void]$lines.Add("# GoatShot Single-Exe Package Verification")
+    [void]$lines.Add("# Receipts Single-Exe Package Verification")
     [void]$lines.Add("")
     [void]$lines.Add("Dist dir: ``$($Result.distDir)``")
     [void]$lines.Add("Publish dir: ``$($Result.publishDir)``")
@@ -140,7 +140,7 @@ if ([string]::IsNullOrWhiteSpace($DistDir)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($PublishDir)) {
-    $PublishDir = "artifacts\publish\GoatShot-$Runtime-single-exe"
+    $PublishDir = "artifacts\publish\Receipts-$Runtime-single-exe"
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -158,8 +158,26 @@ if (-not (Test-Path -LiteralPath $distFullPath -PathType Container)) {
     Add-Message $issues "Single-exe dist directory was not found: $distFullPath"
 }
 
-$exeName = "GoatShot-$Version-$Runtime.exe"
+$packageBrand = "Receipts"
+$effectiveVersion = $Version
+$exeName = "Receipts-$Version-$Runtime-single-exe.exe"
 $exePath = Join-Path $distFullPath $exeName
+
+# Verification remains able to inspect an already-produced GoatShot artifact,
+# but Receipts is always preferred when both layouts are present.
+if (-not (Test-Path -LiteralPath $exePath -PathType Leaf) -and
+    (Test-Path -LiteralPath $distFullPath -PathType Container)) {
+    $legacyCandidate = Get-ChildItem -LiteralPath $distFullPath -Filter "GoatShot-*-$Runtime.exe" -File |
+        Where-Object { $_.Name -notmatch '^GoatShot-Setup-' } |
+        Select-Object -First 1
+    if ($legacyCandidate -and $legacyCandidate.Name -match "^GoatShot-(.+)-$([regex]::Escape($Runtime))\.exe$") {
+        $packageBrand = "GoatShot compatibility"
+        $effectiveVersion = $Matches[1]
+        $exeName = $legacyCandidate.Name
+        $exePath = $legacyCandidate.FullName
+        Add-Message $warnings "Verifying a legacy GoatShot single-exe artifact through the compatibility reader; new artifacts must use Receipts filenames."
+    }
+}
 
 $exeExists = Test-Path -LiteralPath $exePath -PathType Leaf
 $exeLength = if ($exeExists) { (Get-Item -LiteralPath $exePath).Length } else { 0 }
@@ -169,13 +187,14 @@ if (-not $exeExists) {
     Add-Message $issues "$exeName was not found: $exePath"
 }
 elseif ($exeLength -lt $MinimumExeBytes) {
-    Add-Message $issues "GoatShot.exe is smaller than expected for a self-contained single-file build ($exeLength bytes < $MinimumExeBytes bytes). The runtime or native libraries are likely not embedded."
+    Add-Message $issues "Receipts.exe is smaller than expected for a self-contained single-file build ($exeLength bytes < $MinimumExeBytes bytes). The runtime or native libraries are likely not embedded."
 }
 
 $checksumPath = "$exePath.sha256"
-$metadataPath = Join-Path $distFullPath "GoatShot-$Version-$Runtime.build.json"
-$noticesPath = Join-Path $distFullPath "GoatShot-$Version-THIRD-PARTY-NOTICES.txt"
-$sbomPath = Join-Path $distFullPath "GoatShot-$Version-$Runtime.spdx.json"
+$companionPrefix = if ($packageBrand -eq "GoatShot compatibility") { "GoatShot" } else { "Receipts" }
+$metadataPath = Join-Path $distFullPath "$companionPrefix-$effectiveVersion-$Runtime.build.json"
+$noticesPath = Join-Path $distFullPath "$companionPrefix-$effectiveVersion-THIRD-PARTY-NOTICES.txt"
+$sbomPath = Join-Path $distFullPath "$companionPrefix-$effectiveVersion-$Runtime.spdx.json"
 if (-not $SkipMetadataChecks) {
     foreach ($required in @($checksumPath, $metadataPath, $noticesPath, $sbomPath)) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { Add-Message $issues "Required release companion is missing: $required" }
@@ -186,9 +205,10 @@ if (-not $SkipMetadataChecks) {
     }
     if (Test-Path -LiteralPath $metadataPath) {
         $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
-        if ($metadata.version -ne $Version) { Add-Message $issues "Build metadata version $($metadata.version) does not match $Version." }
+        if ($metadata.version -ne $effectiveVersion) { Add-Message $issues "Build metadata version $($metadata.version) does not match $effectiveVersion." }
         if ($metadata.executableSha256 -ne $exeSha256.ToLowerInvariant()) { Add-Message $issues "Build metadata SHA-256 does not match the executable." }
         if ([string]::IsNullOrWhiteSpace($metadata.buildId) -or [string]::IsNullOrWhiteSpace($metadata.embeddedAssetManifestSha256)) { Add-Message $issues "Build metadata is missing build or embedded-manifest identity." }
+        if ($packageBrand -eq "Receipts" -and $metadata.product -ne "Receipts") { Add-Message $issues "Build metadata does not identify the Receipts product." }
     }
     if (Test-Path -LiteralPath $noticesPath) {
         $notices = Get-Content -Raw -LiteralPath $noticesPath
@@ -219,13 +239,18 @@ if ($exeExists -and -not $SkipRuntimeSmoke) {
     $runtimeSmoke.attempted = $true
     $isolationRoot = Join-Path $outputFullPath ("isolated-runtime-" + [Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $isolationRoot | Out-Null
-    function Invoke-GoatShotRuntime([string[]] $Arguments) {
+    function Invoke-ReceiptsRuntime([string[]] $Arguments) {
         $start = New-Object System.Diagnostics.ProcessStartInfo
         $start.FileName = $exePath
         $start.UseShellExecute = $false
         $start.RedirectStandardOutput = $true
         $start.RedirectStandardError = $true
         $start.CreateNoWindow = $true
+        $start.EnvironmentVariables["RECEIPTS_LOCAL_ROOT"] = (Join-Path $isolationRoot "local")
+        $start.EnvironmentVariables["RECEIPTS_LIBRARY_ROOT"] = (Join-Path $isolationRoot "library")
+        $start.EnvironmentVariables["RECEIPTS_STARTUP_TRACE"] = (Join-Path $isolationRoot "startup-trace.log")
+        # Set both names to the same isolated roots so smoke remains safe while
+        # testing either the Receipts resolver or a legacy compatibility build.
         $start.EnvironmentVariables["GOATSHOT_LOCAL_ROOT"] = (Join-Path $isolationRoot "local")
         $start.EnvironmentVariables["GOATSHOT_LIBRARY_ROOT"] = (Join-Path $isolationRoot "library")
         $start.EnvironmentVariables["GOATSHOT_STARTUP_TRACE"] = (Join-Path $isolationRoot "startup-trace.log")
@@ -235,12 +260,12 @@ if ($exeExists -and -not $SkipRuntimeSmoke) {
         $stderrTask = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit(120000)) {
             try { $process.Kill() } catch {}
-            throw "GoatShot runtime smoke timed out."
+            throw "Receipts runtime smoke timed out."
         }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; StdOut = $stdoutTask.Result; StdErr = $stderrTask.Result }
     }
     try {
-        $diagnostics = Invoke-GoatShotRuntime @("--runtime-diagnostics")
+        $diagnostics = Invoke-ReceiptsRuntime @("--runtime-diagnostics")
         $runtimeSmoke.diagnosticsExitCode = $diagnostics.ExitCode
         if ($diagnostics.ExitCode -ne 0) { throw "Runtime diagnostics failed: $($diagnostics.StdErr)" }
         $diagnosticsJson = $diagnostics.StdOut | ConvertFrom-Json
@@ -249,10 +274,10 @@ if ($exeExists -and -not $SkipRuntimeSmoke) {
         $ffmpeg = Join-Path $runtimeDirectory "tools\ffmpeg\ffmpeg.exe"
         if (-not (Test-Path -LiteralPath $ffmpeg)) { throw "Bundled FFmpeg was not extracted during isolated launch." }
         [IO.File]::WriteAllBytes($ffmpeg, [byte[]](0x00, 0x01, 0x02))
-        $repair = Invoke-GoatShotRuntime @("--repair", "--runtime-only")
+        $repair = Invoke-ReceiptsRuntime @("--repair", "--runtime-only")
         $runtimeSmoke.repairExitCode = $repair.ExitCode
         if ($repair.ExitCode -ne 0) { throw "Runtime repair failed: $($repair.StdErr)" }
-        $postRepair = Invoke-GoatShotRuntime @("--runtime-diagnostics")
+        $postRepair = Invoke-ReceiptsRuntime @("--runtime-diagnostics")
         $postRepairJson = $postRepair.StdOut | ConvertFrom-Json
         if (-not $postRepairJson.bundledRuntime.succeeded) { throw "Runtime remained unhealthy after repair." }
         $runtimeSmoke.succeeded = $true
@@ -266,7 +291,9 @@ if ($exeExists -and -not $SkipRuntimeSmoke) {
 
 if (Test-Path -LiteralPath $distFullPath -PathType Container) {
     foreach ($entry in Get-ChildItem -LiteralPath $distFullPath -File) {
-        if ($entry.Extension -in @(".exe", ".dll", ".pdb") -and $entry.Name -ne $exeName) {
+        if ($entry.Extension -in @(".exe", ".dll", ".pdb") -and
+            $entry.Name -ne $exeName -and
+            $entry.Name -notmatch '^Receipts-.+-win-x64\.exe$') {
             [void]$unexpectedDistEntries.Add($entry.Name)
         }
     }
@@ -292,6 +319,7 @@ else {
 $result = [pscustomobject]@{
     generatedAt = (Get-Date).ToString("o")
     succeeded = $issues.Count -eq 0
+    packageBrand = $packageBrand
     distDir = $distFullPath
     publishDir = $publishFullPath
     exe = [pscustomobject]@{

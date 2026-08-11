@@ -135,11 +135,11 @@ public sealed class OAuthLiveProofPlanService
         plan.ScopeReview.AddRange(RedactAll(profile.ScopeReview));
         plan.ConsentScreenChecklist.AddRange(RedactAll(profile.ConsentScreenChecklist));
         plan.AccountDiagnostics.AddRange(RedactAll(profile.AccountDiagnostics));
-        plan.Commands.Add($"goatshot oauth status --provider {Quote(name)} --json");
-        plan.Commands.Add($"goatshot oauth auth-url {Quote(name)} --state <operator-random-state> --callback {Quote(plan.CallbackUri)}");
-        plan.Commands.Add($"goatshot oauth exchange {Quote(name)} --code <authorization-code> --callback {Quote(plan.CallbackUri)}{(provider.UsePkce ? " --code-verifier <code-verifier-from-auth-url>" : string.Empty)}");
-        plan.Commands.Add($"goatshot oauth refresh {Quote(name)}");
-        plan.Commands.Add($"goatshot diagnostics providers --provider {Quote(name)} --json");
+        plan.Commands.Add($"receipts oauth status --provider {Quote(name)} --json");
+        plan.Commands.Add($"receipts oauth auth-url {Quote(name)} --state <operator-random-state> --callback {Quote(plan.CallbackUri)}");
+        plan.Commands.Add($"receipts oauth exchange {Quote(name)} --code <authorization-code> --callback {Quote(plan.CallbackUri)}{(provider.UsePkce ? " --code-verifier <code-verifier-from-auth-url>" : string.Empty)}");
+        plan.Commands.Add($"receipts oauth refresh {Quote(name)}");
+        plan.Commands.Add($"receipts diagnostics providers --provider {Quote(name)} --json");
         plan.Commands.Add(profile.UploadProofCommand);
 
         if (plan.Issues.Count == 0)
@@ -186,7 +186,7 @@ public sealed class OAuthLiveProofPlanService
                     "YouTube cleanup evidence should be a reviewed delete/unlist note or UI/API proof; this planner does not perform remote delete."
                 ],
                 "YouTube cleanup is manual/reviewed until a safe delete flow is implemented and proven; do not leave private proof media published.",
-                "goatshot upload <safe-test-video.mp4> --provider \"YouTube\" --json");
+                "receipts upload <safe-test-video.mp4> --provider \"YouTube\" --json");
         }
 
         if (providerName.Contains("onenote", StringComparison.OrdinalIgnoreCase) ||
@@ -214,7 +214,7 @@ public sealed class OAuthLiveProofPlanService
                     "OneNote cleanup evidence should be a manual page delete note or reviewed API/UI proof; this planner does not perform remote delete."
                 ],
                 "OneNote cleanup is manual/reviewed until a safe delete flow is implemented and proven; remove safe proof pages after evidence capture.",
-                "goatshot upload <safe-test-file> --provider \"OneNote\" --json");
+                "receipts upload <safe-test-file> --provider \"OneNote\" --json");
         }
 
         if (providerName.Contains("onedrive", StringComparison.OrdinalIgnoreCase) ||
@@ -242,7 +242,7 @@ public sealed class OAuthLiveProofPlanService
                     "OneDrive cleanup evidence should be a manual recycle-bin/delete note or reviewed API/UI proof; this planner does not perform remote delete."
                 ],
                 "OneDrive cleanup is manual/reviewed until a safe delete flow is implemented and proven; do not keep private proof files in the proof folder.",
-                "goatshot upload <safe-test-file> --provider \"OneDrive\" --onedrive-folder /GoatShotProof --json");
+                "receipts upload <safe-test-file> --provider \"OneDrive\" --onedrive-folder /ReceiptsProof --json");
         }
 
         if (providerName.Contains("google photos", StringComparison.OrdinalIgnoreCase) ||
@@ -271,7 +271,7 @@ public sealed class OAuthLiveProofPlanService
                     "Google Photos cleanup evidence should be a reviewed delete/archive note or UI/API proof; this planner does not perform remote delete."
                 ],
                 "Google Photos cleanup is manual/reviewed until a safe delete flow is implemented and proven; do not leave private proof media in the library.",
-                "goatshot upload <safe-test-image-or-video> --provider \"Google Photos\" --google-photos-album-id <safe-proof-album-id> --json");
+                "receipts upload <safe-test-image-or-video> --provider \"Google Photos\" --google-photos-album-id <safe-proof-album-id> --json");
         }
 
         if (providerName.Contains("google", StringComparison.OrdinalIgnoreCase))
@@ -298,7 +298,7 @@ public sealed class OAuthLiveProofPlanService
                     "Google Drive cleanup evidence should be a manual trash/delete note or reviewed API/UI proof; this planner does not perform remote delete."
                 ],
                 "Google Drive cleanup is manual/reviewed until a safe delete flow is implemented and proven; do not keep private proof files in the test folder.",
-                "goatshot upload <safe-test-file> --provider \"Google Drive\" --google-drive-folder-id <safe-proof-folder-id> --json");
+                "receipts upload <safe-test-file> --provider \"Google Drive\" --google-drive-folder-id <safe-proof-folder-id> --json");
         }
 
         if (providerName.Contains("dropbox", StringComparison.OrdinalIgnoreCase))
@@ -325,7 +325,7 @@ public sealed class OAuthLiveProofPlanService
                     "Dropbox cleanup evidence should be a manual delete note or reviewed API/UI proof; this planner does not perform remote delete."
                 ],
                 "Dropbox cleanup is manual/reviewed until a safe delete flow is implemented and proven; remove any safe test uploads after evidence capture.",
-                "goatshot upload <safe-test-file> --provider \"Dropbox\" --dropbox-folder /GoatShotProof --json");
+                "receipts upload <safe-test-file> --provider \"Dropbox\" --dropbox-folder /ReceiptsProof --json");
         }
 
         return new OAuthProviderProofProfile(
@@ -350,7 +350,7 @@ public sealed class OAuthLiveProofPlanService
                 $"{providerName} cleanup evidence should be manual or reviewed API/UI proof unless a safe delete path is implemented."
             ],
             $"{providerName} cleanup is manual/reviewed until a safe delete flow is implemented and proven.",
-            $"goatshot upload <safe-test-file> --provider {Quote(providerName)} --json");
+            $"receipts upload <safe-test-file> --provider {Quote(providerName)} --json");
     }
 
     private static IReadOnlyList<string> BuildRequiredEvidence(string providerName) => new[]
@@ -388,7 +388,7 @@ public sealed class OAuthLiveProofPlanService
     private static IReadOnlyList<string> BuildAuthorityBoundaries() => new[]
     {
         "This command writes a local plan only.",
-        "GoatShot does not open a browser, exchange an authorization code, store credentials, refresh tokens, upload files, delete remote files, or contact providers while generating this plan.",
+        "Receipts does not open a browser, exchange an authorization code, store credentials, refresh tokens, upload files, delete remote files, or contact providers while generating this plan.",
         "Live OAuth evidence requires a human operator, a real provider account, and reviewed redacted artifacts.",
         "Stored-token markers are not raw-token proof and must not be exported as secrets."
     };
@@ -406,7 +406,7 @@ public sealed class OAuthLiveProofPlanService
     private static string BuildMarkdown(OAuthLiveProofPlanResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot OAuth Live Proof Plan");
+        builder.AppendLine("# Receipts OAuth Live Proof Plan");
         builder.AppendLine();
         builder.AppendLine($"Callback URI: `{result.CallbackUri}`");
         builder.AppendLine($"Policy allowed: `{result.PolicyAllowed}`");

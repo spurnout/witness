@@ -59,7 +59,7 @@ public sealed class DiagnosticsService
             ? $"AI is disabled by managed policy ({policy.Source}). Gemini provider calls, provider-backed transcription, and AI drafting actions are blocked until policy changes."
             : _settings.AiEnabled
                 ? _secretStore.HasGeminiApiKey
-                    ? $"AI is enabled with a saved Gemini key for image editing, screenshot explanation, explicit per-action provider-backed speech-to-text for short extracted WAV audio, AI-assisted video title/summary/chapter drafting from redacted transcript text, redacted local action history, prompt reuse, and accept/reject review status. Default image model: {_settings.GeminiDefaultModelId}. Default speech model: {_settings.GeminiSpeechToTextModelId}. Offline transcription supports provided/sidecar SRT, embedded subtitle extraction, and an explicitly configured external Whisper executable/model; GoatShot does not ship or download Whisper."
+                    ? $"AI is enabled with a saved Gemini key for image editing, screenshot explanation, explicit per-action provider-backed speech-to-text for short extracted WAV audio, AI-assisted video title/summary/chapter drafting from redacted transcript text, redacted local action history, prompt reuse, and accept/reject review status. Default image model: {_settings.GeminiDefaultModelId}. Default speech model: {_settings.GeminiSpeechToTextModelId}. Offline transcription supports provided/sidecar SRT, embedded subtitle extraction, and an explicitly configured external Whisper executable/model; Receipts does not ship or download Whisper."
                     : "AI is enabled, but no Gemini API key is saved. Local prompt history/review, offline transcription from SRT/embedded subtitles or a configured external Whisper installation, and transcript-based local video summary drafts are still available."
                 : "AI is disabled by default. Gemini image editing, screenshot explanation, provider-backed speech-to-text, and AI-assisted video drafting require explicit configuration and per-action consent before screenshots, audio, or redacted transcript text leave the machine; redacted action history, prompt reuse, accept/reject review status, and offline transcription from SRT/embedded subtitles or an external Whisper installation do not upload media.";
         return new DiagnosticSnapshot
@@ -69,7 +69,7 @@ public sealed class DiagnosticsService
             CaptureEngine = $"Active default path: Win32/GDI bitmap capture, polished frozen-screen region overlay with snapping, pixel lens, chooser, keyboard move/resize, and configurable context padding, scrolling capture, stitching tools, local synthetic fixtures, and clipboard import. Android screenshot, bounded screenrecord, polling preview, and raw H.264 preview use the in-process Windows WinUSB/ADB transport with per-user authorization keys; an explicitly configured adb.exe is troubleshooting-only. Live safe-device proof remains claim-gated. File inspection, local QR/barcode decode, color picker, and pixel ruler are implemented. Opt-in production still capture uses Windows.Graphics.Capture + Direct3D11 for supported targets, with explicit desktop-duplication diagnostics and safe app-owned proof renderers. MP4 recording can use Windows.Graphics.Capture + Direct3D11 frame capture for active monitor, active window, and explicit single-monitor region/fixed-region targets; all-monitor recording uses screenshot-frame capture across the virtual desktop. {WindowsCaptureStatus(capabilities)}",
             RecordingEngine = $"Implemented: short active-monitor GIF recording with pause/resume and cursor/click visualization through periodic local GDI captures, CLI GIF/MP4 recording targets for active monitor, all monitors, active window, explicit or interactive region, and fixed region, desktop 5-second MP4 controls for active monitor and all monitors, named recording profiles ({_settings.RecordingProfiles.Count(profile => !string.IsNullOrWhiteSpace(profile.Name))} configured), optional native Media Foundation MP4 production encoding, native AAC mux/mix, bounded webcam overlay, live webcam preview, and bundled LGPL FFmpeg/ffprobe fallback and editing tools in Personal V1 distribution builds. Person segmentation uses the hash-pinned embedded ONNX model through DirectML with CPU fallback; explicit `video person-mask --runner` and `video hosted-person-mask` integrations remain advanced overrides. Configured MP4 profile: {FormatConfiguredRecordingProfile(_settings.Recording)} {DescribeRecordingDeviceSelection(_settings.Recording)} Cursor visualization is {(_settings.IncludeCursor ? "enabled" : "disabled")} by the capture cursor setting. App-owned visual and focus/name audits are automated; live narrated screen-reader, 200% scaling, multi-monitor, long-recording, audio, and webcam observations remain claim-gated until matching operator evidence is recorded.",
             RecordingReadiness = $"Recording engine plan: choice={recordingPlan.ChoiceLabel}. {FormatProductionPrerequisites(capabilities, _settings.Recording)} Production encoder selection: {recordingPlan.ProductionEncoder.Summary} FFmpeg fallback encoder selection: {recordingPlan.FallbackVideoEncoder.Summary} {recordingPlan.Summary} {recordingConfidence.Summary}",
-            EncoderStatus = $"{capabilities.EncoderStatus} Production encoder selection: {productionEncoder.Summary} FFmpeg fallback encoder selection: {recordingPlan.FallbackVideoEncoder.Summary} Native Media Foundation MP4 encoding is wired for production recording when WGC/D3D frame capture and the selected Media Foundation encoder prerequisites are met; H.264 is the default codec, HEVC is explicit opt-in only when a local HEVC transform is reported, captured WASAPI WAV payloads can be mixed and muxed as AAC, and ffprobe metadata proof is available through `diagnostics recording-media <mp4>` when ffprobe is installed; webcam overlay can precompose bounded, periodically refreshed native camera frames before encode; desktop live preview is wired through the WPF recording panel.",
+            EncoderStatus = $"{capabilities.EncoderStatus} Production encoder selection: {productionEncoder.Summary} FFmpeg fallback encoder selection: {recordingPlan.FallbackVideoEncoder.Summary} Native Media Foundation MP4 encoding is wired for production recording when WGC/D3D frame capture and the selected Media Foundation encoder prerequisites are met; H.264 is the default codec, HEVC is explicit opt-in only when a local HEVC transform is reported, event-driven WASAPI PCM is normalized and mixed incrementally before AAC muxing without WAV or whole-recording memory buffers, and ffprobe metadata proof is available through `diagnostics recording-media <mp4>` when ffprobe is installed; webcam overlay can precompose bounded, periodically refreshed native camera frames before encode; desktop live preview is wired through the WPF recording panel.",
             OcrStatus = $"Implemented: local Windows.Media.Ocr fallback for image files and selected captures. Language: {(_settings.OcrLanguageTag.Length == 0 ? "Windows user profile" : _settings.OcrLanguageTag)}.",
             AiStatus = aiStatus,
             PolicyStatus = policy.Summary,
@@ -221,7 +221,7 @@ public sealed class DiagnosticsService
             settings.SystemAudioGain,
             settings.NoiseGateThresholdDb,
             settings.SystemAudioMuted));
-        return $"Audio capture readiness: {microphone}; {systemAudio}. {meterText} Audio controls: microphone {micControls}; system-audio {systemControls}. Short WAV proof capture is available through `record audio`; MP4 result messages include metadata-only audio timing, requested duration, WAV duration, byte count, and duration-delta fields; captured WAV payloads can be mixed and muxed as AAC in native Media Foundation MP4 recording when payload bytes are available, with FFmpeg still available as fallback.";
+        return $"Audio capture readiness: {microphone}; {systemAudio}. {meterText} Audio controls: microphone {micControls}; system-audio {systemControls}. Short standalone WAV proof capture is available through `record audio`; MP4 recording uses event-driven normalized PCM, bounded mixing, and incremental AAC muxing when samples are available, with a raw-video/raw-PCM FFmpeg fallback. Validate output A/V duration through `diagnostics recording-media <mp4>` when ffprobe is available.";
     }
 
     private static string FormatProductionPrerequisites(
@@ -474,7 +474,7 @@ public sealed class DiagnosticsService
                 $"HEVC hardware={FormatEncoderProbe(hevcHardware)}, " +
                 $"H.264 installed={FormatEncoderProbe(h264Installed)}, " +
                 $"HEVC installed={FormatEncoderProbe(hevcInstalled)}. " +
-                "Native production MP4 encoding uses the selected Media Foundation encoder when WGC/D3D frame capture is available; H.264 is the default and HEVC is opt-in only when a local HEVC transform is reported. The native path can mux captured WAV payloads as AAC and can precompose bounded, periodically refreshed native camera frames before encode; desktop live webcam preview is available in the recording panel.";
+                "Native production MP4 encoding uses the selected Media Foundation encoder when WGC/D3D frame capture is available; H.264 is the default and HEVC is opt-in only when a local HEVC transform is reported. The native path incrementally normalizes and mixes event-driven WASAPI PCM before AAC muxing, and can precompose bounded, periodically refreshed native camera frames before encode; desktop live webcam preview is available in the recording panel.";
         }
         catch (Exception ex)
         {
@@ -513,19 +513,20 @@ public sealed class DiagnosticsService
 
     private static string FfmpegEncoderStatus()
     {
-        var configured = Environment.GetEnvironmentVariable("GOATSHOT_FFMPEG_PATH");
+        var configuredResolution = BrandEnvironment.Resolve("FFMPEG_PATH");
+        var configured = configuredResolution.Value;
         if (!string.IsNullOrWhiteSpace(configured))
         {
             configured = Environment.ExpandEnvironmentVariables(configured);
             if (!File.Exists(configured))
             {
-                return $"FFmpeg fallback encoder configured but missing: {configured}";
+                return $"FFmpeg fallback encoder configured through {configuredResolution.SourceVariable} but missing: {configured}";
             }
         }
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return "FFmpeg fallback encoder probe: ffmpeg.exe was not found on PATH and GOATSHOT_FFMPEG_PATH is not set.";
+            return "FFmpeg fallback encoder probe: ffmpeg.exe was not found on PATH and RECEIPTS_FFMPEG_PATH is not set (GOATSHOT_FFMPEG_PATH remains a compatibility alias).";
         }
 
         try
@@ -575,7 +576,10 @@ public sealed class DiagnosticsService
                 ? "software x264/x265 encoders not reported"
                 : $"software encoders reported: {string.Join(", ", software)}";
 
-            return $"FFmpeg fallback encoder probe: {ffmpeg}; {hardwareText}; {softwareText}.";
+            var environmentNote = configuredResolution.UsedLegacyFallback
+                ? $" Legacy environment alias in use: {configuredResolution.SourceVariable}; prefer {BrandIdentity.EnvironmentVariable("FFMPEG_PATH")}."
+                : string.Empty;
+            return $"FFmpeg fallback encoder probe: {ffmpeg}; {hardwareText}; {softwareText}.{environmentNote}";
         }
         catch (Exception ex)
         {

@@ -1,6 +1,6 @@
 (() => {
-  const schemaVersion = "goatshot.browser-capture.v1";
-  const stitchPackageSchemaVersion = "goatshot.browser-stitch-package.v1";
+  const schemaVersion = "receipts.browser-capture.v1";
+  const stitchPackageSchemaVersion = "receipts.browser-stitch-package.v1";
   const requestType = "GOATSHOT_COLLECT_PAGE_CAPTURE";
   const responseType = "GOATSHOT_PAGE_CAPTURE_PAYLOAD";
   const defaultMaxTiles = 80;
@@ -507,9 +507,9 @@
     }
 
     const safeCorrelation = sanitizePathSegment(correlationId || `capture-${Date.now()}`);
-    const root = `GoatShot/${safeCorrelation}`;
+    const root = `Receipts/${safeCorrelation}`;
     result.downloadRoot = root;
-    result.manifestPath = `${root}/goatshot-stitch-package.json`;
+    result.manifestPath = `${root}/stitch-package.json`;
 
     const stitched = await buildStitchedImageDataUrl(capturedTiles, options, stitch);
     if (!stitched.dataUrl) {
@@ -725,8 +725,8 @@
         screenshotConsented: options.screenshotConsented === true,
         telemetryConsented,
         consentText: telemetryConsented
-          ? "User consented to page screenshot metadata plus console/network summaries for GoatShot."
-          : "User consented to page screenshot metadata for GoatShot. Telemetry was not requested.",
+          ? "User consented to page screenshot metadata plus console/network summaries for Receipts."
+          : "User consented to page screenshot metadata for Receipts. Telemetry was not requested.",
         consentedAt: new Date().toISOString()
       },
       consoleEvents: [],
@@ -740,7 +740,7 @@
 
   async function buildPayloadExclusive(options) {
     if (captureInFlight) {
-      throw new Error("Another GoatShot capture is already in progress.");
+      throw new Error("Another Receipts capture is already in progress.");
     }
 
     captureInFlight = true;
@@ -793,7 +793,7 @@
         {
           type: responseType,
           payload: null,
-          error: error?.message || "GoatShot capture failed."
+          error: error?.message || "Receipts capture failed."
         },
         "*"
       );
@@ -850,7 +850,7 @@
       })().catch((error) => {
         sendResponse({
           succeeded: false,
-          message: error.message || "GoatShot capture failed."
+          message: error.message || "Receipts capture failed."
         });
       });
 

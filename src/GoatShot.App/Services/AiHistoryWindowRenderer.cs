@@ -94,7 +94,7 @@ public static class AiHistoryWindowRenderer
             Bytes = new FileInfo(capturePath).Length,
             Width = 1440,
             Height = 900,
-            SourceApp = "GoatShot preview",
+            SourceApp = "Receipts preview",
             SourceWindowTitle = "AI review render proof"
         };
 

@@ -221,7 +221,7 @@ public sealed class VideoIntelligenceService
             .Replace('_', ' ')
             .Trim();
         return string.IsNullOrWhiteSpace(name)
-            ? $"GoatShot Recording {item.CreatedAt:yyyy-MM-dd HH:mm}"
+            ? $"Receipts Recording {item.CreatedAt:yyyy-MM-dd HH:mm}"
             : CultureTitle(name);
     }
 

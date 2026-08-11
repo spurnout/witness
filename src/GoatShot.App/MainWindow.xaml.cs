@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private bool _allowClose;
     private bool _recordingControlsReady;
     private bool _settingsPrewarmQueued;
+    private bool _replayStatusSubscribed;
     private SettingsWindow? _prewarmedSettingsWindow;
     private ShareHistoryWindow? _shareHistoryWindow;
     private AiHistoryWindow? _aiHistoryWindow;
@@ -38,10 +39,15 @@ public partial class MainWindow : Window
         _auditMode = auditMode;
         _startHidden = startHidden;
         InitializeComponent();
+        SaveReplayButton.ToolTip = $"Save the configured preceding interval ({FormatHotkey(_services.Settings.Replay.SaveHotkey)})";
+        ReplayStateButton.ToolTip = $"Replay keeps only a bounded local rolling buffer until you save it. Arm/pause: {FormatHotkey(_services.Settings.Replay.ToggleHotkey)}";
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         CaptureList.ItemsSource = _captures;
         QueueList.ItemsSource = _uploadQueueItems;
     }
+
+    private static string FormatHotkey(string value) =>
+        string.Join(" + ", (value ?? string.Empty).Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     public async void CaptureRegionCommand(string? hotkeyProfile = null) => await CaptureRegionAsync(hotkeyProfile);
     public async void CaptureWindowCommand(string? hotkeyProfile = null) => await CaptureActiveWindowAsync(hotkeyProfile);
@@ -101,7 +107,7 @@ public partial class MainWindow : Window
     public void PickColorCommand() => PickColor();
     public void OpenPixelRulerCommand() => OpenPixelRuler();
     public async void ImportClipboardCommand() => await ImportClipboardAsync();
-    public void OpenSettingsCommand(string? sectionKey = null) => OpenSettings(sectionKey);
+    public async void OpenSettingsCommand(string? sectionKey = null) => await OpenSettingsAsync(sectionKey);
     public void ShowWorkspaceCommand()
     {
         Show();
@@ -115,15 +121,15 @@ public partial class MainWindow : Window
         System.Windows.Application.Current.Shutdown();
     }
 
-    private void Window_Loaded(object sender, RoutedEventArgs e)
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         var startupOptions = AppStartupOptions.Parse(
             Environment.GetCommandLineArgs().Skip(1),
-            Environment.GetEnvironmentVariable("GOATSHOT_OPEN_SETTINGS"),
-            Environment.GetEnvironmentVariable("GOATSHOT_SETTINGS_SECTION"));
+            BrandEnvironment.Resolve("OPEN_SETTINGS").Value,
+            BrandEnvironment.Resolve("SETTINGS_SECTION").Value);
         if (startupOptions.OpenSettings)
         {
-            OpenSettings(startupOptions.SettingsSection);
+            await OpenSettingsAsync(startupOptions.SettingsSection);
         }
 
         LoadCaptures();
@@ -149,15 +155,23 @@ public partial class MainWindow : Window
         _services.UploadQueueWorker.Start();
         _services.StepRecorder.StatusChanged += Service_StatusChanged;
         _services.StepRecorder.StepCaptured += StepRecorder_StepCaptured;
+        SubscribeReplayStatus();
+        UpdateReplayUi(_services.Replay.GetStatus());
 
         _services.AttachTray(this);
+        _services.Tray?.UpdateReplayStatus(_services.Replay.GetStatus());
         QueueSettingsPrewarm();
+
+        if (_services.Settings.Replay.ConsentGranted && _services.Settings.Replay.AutoArmAtSignIn)
+        {
+            _ = ArmReplayAsync();
+        }
 
         if (_startHidden)
         {
             ShowInTaskbar = false;
             Hide();
-            SetStatus("GoatShot started in the tray.");
+            SetStatus("Receipts started in the tray.");
         }
     }
 
@@ -176,7 +190,18 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         Hide();
-        SetStatus("GoatShot is still running in the tray.");
+        SetStatus("Receipts is still running in the tray.");
+    }
+
+    internal void PrepareRecordingAuditSurface()
+    {
+        if (!_auditMode)
+        {
+            throw new InvalidOperationException("The recording audit surface is available only in audit mode.");
+        }
+
+        RecordingControlsAuditContainer.Visibility = Visibility.Visible;
+        RecordingControlsAuditContainer.IsHitTestVisible = true;
     }
 
     private void Hotkeys_ActionTriggered(object? sender, HotkeyAction action)
@@ -198,6 +223,12 @@ public partial class MainWindow : Window
                 case HotkeyAction.ToggleRecording:
                     ToggleRecordingCommand(HotkeyProfileNames.ForAction(action));
                     break;
+                case HotkeyAction.ToggleReplay:
+                    ToggleReplayCommand();
+                    break;
+                case HotkeyAction.SaveReplay:
+                    SaveReplayCommand();
+                    break;
                 case HotkeyAction.OcrRegion:
                     OcrRegionCommand(HotkeyProfileNames.ForAction(action));
                     break;
@@ -211,10 +242,209 @@ public partial class MainWindow : Window
         });
     }
 
+    public async void ToggleReplayCommand() => await ToggleReplayAsync();
+
+    public async void SaveReplayCommand() => await SaveReplayAsync();
+
+    private async void ReplayState_Click(object sender, RoutedEventArgs e) => await ToggleReplayAsync();
+
+    private async void SaveReplay_Click(object sender, RoutedEventArgs e) => await SaveReplayAsync();
+
+    private async Task ToggleReplayAsync()
+    {
+        var status = _services.Replay.GetStatus();
+        switch (status.State)
+        {
+            case ReplayBufferState.Armed:
+                SetStatus(_services.Replay.Pause().Message);
+                break;
+            case ReplayBufferState.Paused:
+                SetStatus(_services.Replay.Resume().Message);
+                break;
+            case ReplayBufferState.Saving:
+                SetStatus("Replay is saving a signed receipt and will return to its previous state when complete.");
+                break;
+            case ReplayBufferState.Error:
+                await ArmReplayAsync();
+                break;
+            default:
+                await ArmReplayAsync();
+                break;
+        }
+    }
+
+    private async Task ArmReplayAsync()
+    {
+        if (!_services.Settings.Replay.ConsentGranted)
+        {
+            var consent = System.Windows.MessageBox.Show(
+                "Replay continuously captures the configured screen, window, or region while armed and keeps a bounded local buffer. Unsaved segments are ephemeral and are not signed evidence. Continue and remember this choice?",
+                "Enable Receipts Replay",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (consent != MessageBoxResult.Yes)
+            {
+                SetStatus("Replay remains off.");
+                return;
+            }
+
+            _services.Settings.Replay.ConsentGranted = true;
+            _services.SaveSettings();
+        }
+
+        SetStatus("Arming Replay…");
+        var result = await _services.Replay.ArmAsync();
+        SetStatus(result.Message);
+        UpdateReplayUi(_services.Replay.GetStatus());
+    }
+
+    private async Task SaveReplayAsync()
+    {
+        var status = _services.Replay.GetStatus();
+        if (status.State is not (ReplayBufferState.Armed or ReplayBufferState.Paused))
+        {
+            SetStatus($"Replay cannot be saved while it is {status.State}.");
+            return;
+        }
+
+        var receiptId = Guid.NewGuid().ToString("N");
+        var destination = Path.Combine(
+            _services.Paths.ReceiptsRoot,
+            $"receipt-{DateTimeOffset.Now:yyyyMMdd-HHmmss}-{receiptId[..8]}");
+        SetStatus("Saving a signed replay receipt while the rolling buffer continues…");
+        var result = await _services.Replay.SaveAsync(new ReplaySaveRequest(
+            destination,
+            _services.Settings.Replay.SaveDuration,
+            receiptId));
+        if (!result.Succeeded || string.IsNullOrWhiteSpace(result.PackagePath))
+        {
+            SetStatus(result.Message);
+            return;
+        }
+
+        try
+        {
+            var verification = await _services.ReceiptIntegrity.VerifyPackageAsync(
+                result.PackagePath,
+                Path.Combine(_services.Paths.SecretsRoot, ReceiptDeviceKeyService.DefaultKeyFileName));
+            var manifest = ReceiptCanonicalJson.Deserialize(
+                await File.ReadAllBytesAsync(Path.Combine(result.PackagePath, ReceiptIntegrityService.ManifestFileName)));
+            var firstTrack = manifest.Tracks.First();
+            var item = new CaptureItem
+            {
+                Id = receiptId,
+                Kind = CaptureKind.ReplayReceipt,
+                CreatedAt = manifest.FinalizedAtUtc.ToLocalTime(),
+                FilePath = result.PackagePath,
+                ThumbnailPath = Path.Combine(result.PackagePath, "thumbnail.png"),
+                Width = firstTrack.Bounds.Width,
+                Height = firstTrack.Bounds.Height,
+                Bytes = Directory.EnumerateFiles(result.PackagePath, "*", SearchOption.AllDirectories)
+                    .Sum(path => new FileInfo(path).Length),
+                IsPrivate = false,
+                ReceiptId = receiptId,
+                ArtifactRole = "original-replay-receipt",
+                IsOriginal = true,
+                SourceAvailable = true,
+                IntegrityStatus = ReceiptVerificationPresentation.FormatStatus(verification.Status),
+                Notes = "Original device-signed replay receipt. Receipts will not overwrite original segments or the signed manifest. Verification proves integrity since local signing; it does not independently attest device time, remote service state, operator identity, or legal authenticity."
+            };
+            await _services.WorkspaceStore.UpdateItemAsync(item);
+            _allCaptures.Insert(0, item);
+            ApplyFilter();
+            CaptureList.SelectedItem = item;
+            SetStatus($"{result.Message} {item.IntegrityStatus}. Buffer continued: {(result.BufferContinued ? "yes" : "no")}.");
+
+            if (_services.Settings.Replay.EnableSceneIndexing || _services.Settings.Replay.EnableLocalOcrIndexing)
+            {
+                _ = AnalyzeSavedReplayAsync(item);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Replay segments were saved, but the receipt could not be indexed: {ex.Message}");
+        }
+    }
+
+    private async Task AnalyzeSavedReplayAsync(CaptureItem item)
+    {
+        try
+        {
+            await _services.ReceiptAnalysis.AnalyzeAsync(
+                item.FilePath,
+                new ReceiptAnalysisOptions(
+                    _services.Settings.Replay.EnableSceneIndexing,
+                    _services.Settings.Replay.EnableLocalOcrIndexing,
+                    _services.Settings.Replay.AnalysisSensitivity));
+            await Dispatcher.InvokeAsync(() =>
+                SetStatus(_services.Settings.Replay.EnableLocalOcrIndexing
+                    ? $"Configured local analysis is ready for receipt {item.ReceiptId}. OCR findings remain unconfirmed until reviewed in Frame Explorer."
+                    : $"Local scene indexing is ready for receipt {item.ReceiptId}; OCR comparison was disabled."));
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.InvokeAsync(() =>
+                SetStatus($"Receipt saved intact; optional local analysis failed: {ex.Message}"));
+        }
+    }
+
+    private void Replay_StatusChanged(object? sender, ReplayRecordingStatusChangedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            UpdateReplayUi(e.Status);
+            SetStatus(e.Message);
+        });
+    }
+
+    private void UpdateReplayUi(ReplayBufferStatus status)
+    {
+        if (ReplayStateButtonText is null)
+        {
+            return;
+        }
+
+        var isSystemSuspended = status.SystemSuspended &&
+            status.State is ReplayBufferState.Armed or ReplayBufferState.Saving;
+        ReplayStateButtonText.Text = isSystemSuspended
+            ? "Replay suspended"
+            : status.State switch
+        {
+            ReplayBufferState.Armed => "Replay armed",
+            ReplayBufferState.Paused => "Replay paused",
+            ReplayBufferState.Saving => "Replay saving",
+            ReplayBufferState.Error => "Replay error",
+            _ => "Replay off"
+        };
+        ReplayStateDot.Fill = isSystemSuspended
+            ? System.Windows.Media.Brushes.Gold
+            : status.State switch
+        {
+            ReplayBufferState.Armed => System.Windows.Media.Brushes.LimeGreen,
+            ReplayBufferState.Paused => System.Windows.Media.Brushes.Gold,
+            ReplayBufferState.Saving => System.Windows.Media.Brushes.DeepSkyBlue,
+            ReplayBufferState.Error => System.Windows.Media.Brushes.OrangeRed,
+            _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(82, 102, 107))
+        };
+        SaveReplayButton.IsEnabled = status.State is ReplayBufferState.Armed or ReplayBufferState.Paused;
+        var visibleState = isSystemSuspended ? "Suspended by Windows" : status.State.ToString();
+        ReplayFooterText.Text = $"Replay: {visibleState} · {status.BufferedDuration:mm\\:ss} · {status.TotalBytes / 1024d / 1024d:0.#} MB";
+        ReplayStateButton.ToolTip = isSystemSuspended
+            ? "Replay capture is temporarily suspended for the locked, sleeping, or changing Windows session; buffered history remains available"
+            : status.State switch
+        {
+            ReplayBufferState.Armed => "Pause Replay; finalized buffered segments remain available to save",
+            ReplayBufferState.Paused => "Resume Replay",
+            ReplayBufferState.Error => status.LastError ?? "Retry Replay",
+            _ => "Arm the bounded local Replay buffer"
+        };
+        _services.Tray?.UpdateReplayStatus(status);
+    }
+
     private void LoadCaptures()
     {
         _allCaptures = _services.WorkspaceStore.Load()
-            .Where(item => File.Exists(item.FilePath))
+            .Where(item => File.Exists(item.FilePath) || Directory.Exists(item.FilePath))
             .ToList();
         ApplyFilter();
     }
@@ -371,7 +601,7 @@ public partial class MainWindow : Window
         var wasVisible = IsVisible;
         if (wasVisible)
         {
-            SetStatus("Hiding GoatShot before active-window capture...");
+            SetStatus("Hiding Receipts before active-window capture...");
             Hide();
             await Task.Delay(220);
         }
@@ -800,7 +1030,7 @@ public partial class MainWindow : Window
             RefreshRecordingSetupText();
             if (!result.Succeeded)
             {
-                System.Windows.MessageBox.Show(result.Message, "GoatShot MP4 recording", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(result.Message, "Receipts MP4 recording", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         finally
@@ -1049,7 +1279,7 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 SetStatus($"Step recorder failed to start: {ex.Message}");
-                System.Windows.MessageBox.Show(ex.Message, "GoatShot step recorder", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show(ex.Message, "Receipts step recorder", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
             return;
@@ -1060,7 +1290,7 @@ public partial class MainWindow : Window
         if (!result.Succeeded)
         {
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot step recorder", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(result.Message, "Receipts step recorder", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1115,7 +1345,7 @@ public partial class MainWindow : Window
         if (!result.Succeeded)
         {
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot OCR redaction", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(result.Message, "Receipts OCR redaction", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1152,6 +1382,18 @@ public partial class MainWindow : Window
 
     private void OpenEditorForItem(CaptureItem item, AnnotationMode? initialTool = null)
     {
+        if (item.Kind == CaptureKind.ReplayReceipt)
+        {
+            OpenFrameExplorer(item);
+            return;
+        }
+
+        if (!File.Exists(item.FilePath) || !IsImageFile(item.FilePath))
+        {
+            SetStatus("The editor requires a local image file. Use Frame Explorer to extract a replay frame first.");
+            return;
+        }
+
         var editor = new EditorWindow(item, _services);
         if (initialTool is { } tool)
         {
@@ -1291,6 +1533,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedCapture();
+        if (item is null)
+        {
+            return;
+        }
+
+        OpenFrameExplorer(item);
+    }
+
+    private void OpenFrameExplorer(CaptureItem item)
+    {
+        if (item.Kind != CaptureKind.ReplayReceipt || !Directory.Exists(item.FilePath))
+        {
+            SetStatus("Select a replay receipt package first.");
+            return;
+        }
+
+        var window = new FrameExplorerWindow(_services, item)
+        {
+            Owner = this
+        };
+        window.Show();
+        SetStatus($"Opened Frame Explorer for receipt {item.ReceiptId ?? item.Id}.");
+    }
+
     private async void CopyFile_Click(object sender, RoutedEventArgs e)
     {
         await ShareSelectedAsync(ShareDestination.ClipboardFile);
@@ -1372,7 +1641,7 @@ public partial class MainWindow : Window
             if (!result.Succeeded || string.IsNullOrWhiteSpace(result.Path))
             {
                 SetStatus(result.Message);
-                System.Windows.MessageBox.Show(result.Message, "GoatShot bug report", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show(result.Message, "Receipts bug report", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1382,7 +1651,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetStatus($"Bug report export failed: {ex.Message}");
-            System.Windows.MessageBox.Show(ex.Message, "GoatShot bug report", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "Receipts bug report", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1450,7 +1719,7 @@ public partial class MainWindow : Window
                 succeeded: false,
                 result.Message);
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot AI explain", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(result.Message, "Receipts AI explain", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1969,7 +2238,7 @@ public partial class MainWindow : Window
         if (!result.Succeeded)
         {
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot video tools", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(result.Message, "Receipts video tools", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1993,7 +2262,7 @@ public partial class MainWindow : Window
         if (!result.Succeeded)
         {
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot image tools", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(result.Message, "Receipts image tools", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -2048,12 +2317,12 @@ public partial class MainWindow : Window
             var report = FileInspectorService.FormatReport(result);
             ClipboardInterop.SetText(report);
             SetStatus($"File details copied: {item.FileName}");
-            System.Windows.MessageBox.Show(report, "GoatShot file details", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(report, "Receipts file details", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             SetStatus($"File inspection failed: {ex.Message}");
-            System.Windows.MessageBox.Show(ex.Message, "GoatShot file details", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "Receipts file details", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -2066,7 +2335,7 @@ public partial class MainWindow : Window
             if (!result.Succeeded || result.Items.Count == 0)
             {
                 SetStatus(result.Message);
-                System.Windows.MessageBox.Show(result.Message, "GoatShot clipboard import", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(result.Message, "Receipts clipboard import", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -2083,7 +2352,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetStatus($"Clipboard import failed: {ex.Message}");
-            System.Windows.MessageBox.Show(ex.Message, "GoatShot clipboard import", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "Receipts clipboard import", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -2096,7 +2365,7 @@ public partial class MainWindow : Window
         }
 
         var dialog = new InputDialog(
-            "Paste OCR/plain text from this capture. GoatShot stores it locally and copies a redacted version when sensitive data is found.",
+            "Paste OCR/plain text from this capture. Receipts stores it locally and copies a redacted version when sensitive data is found.",
             item.OcrText ?? string.Empty)
         {
             Owner = this,
@@ -2137,7 +2406,7 @@ public partial class MainWindow : Window
         if (!result.Succeeded)
         {
             SetStatus(result.Message);
-            System.Windows.MessageBox.Show(result.Message, "GoatShot OCR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(result.Message, "Receipts OCR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 
@@ -2241,12 +2510,12 @@ public partial class MainWindow : Window
         OpenPixelRuler();
     }
 
-    private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
+    private async void Settings_Click(object sender, RoutedEventArgs e) => await OpenSettingsAsync();
 
     private void Diagnostics_Click(object sender, RoutedEventArgs e)
     {
         RefreshDiagnostics();
-        System.Windows.MessageBox.Show(DiagnosticsText.Text, "GoatShot diagnostics", MessageBoxButton.OK, MessageBoxImage.Information);
+        System.Windows.MessageBox.Show(DiagnosticsText.Text, "Receipts diagnostics", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async void DiagnosticBundle_Click(object sender, RoutedEventArgs e)
@@ -2258,7 +2527,7 @@ public partial class MainWindow : Window
             if (!result.Succeeded || string.IsNullOrWhiteSpace(result.Path))
             {
                 SetStatus(result.Message);
-                System.Windows.MessageBox.Show(result.Message, "GoatShot diagnostic bundle", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show(result.Message, "Receipts diagnostic bundle", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -2268,7 +2537,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SetStatus($"Diagnostic bundle failed: {ex.Message}");
-            System.Windows.MessageBox.Show(ex.Message, "GoatShot diagnostic bundle", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "Receipts diagnostic bundle", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -2371,15 +2640,25 @@ public partial class MainWindow : Window
             SelectedBytesText.Text = "—";
             SelectedDimensionsText.Text = "—";
             EmptyState.Visibility = Visibility.Visible;
+            OpenReceiptButton.Visibility = Visibility.Collapsed;
             return;
         }
 
         UpdateCaptureDetails(item);
     }
 
+    private void CaptureList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (CaptureList.SelectedItem is CaptureItem { Kind: CaptureKind.ReplayReceipt } item)
+        {
+            OpenFrameExplorer(item);
+            e.Handled = true;
+        }
+    }
+
     private void UpdateCaptureDetails(CaptureItem item)
     {
-        SetSelectionActionsEnabled(true);
+        SetSelectionActionsEnabled(true, item);
         PreviewImage.Source = LoadPreviewImage(item);
         PreviewHint.Text = item.FileName;
         EmptyState.Visibility = Visibility.Collapsed;
@@ -2387,6 +2666,9 @@ public partial class MainWindow : Window
         SelectedCreatedText.Text = item.CreatedAt.LocalDateTime.ToString("g", CultureInfo.CurrentCulture);
         SelectedBytesText.Text = item.BytesLabel;
         SelectedDimensionsText.Text = item.SizeLabel;
+        OpenReceiptButton.Visibility = item.Kind == CaptureKind.ReplayReceipt
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         DetailsText.Text =
             $"Kind: {item.Kind}{Environment.NewLine}" +
             $"Created: {item.CreatedAt.LocalDateTime:g}{Environment.NewLine}" +
@@ -2397,6 +2679,11 @@ public partial class MainWindow : Window
             $"Source app: {OcrValue(item.SourceApp)}{Environment.NewLine}" +
             $"Source window: {OcrSummary(item.SourceWindowTitle)}{Environment.NewLine}" +
             $"Monitor: {OcrValue(item.SourceMonitorName)}{Environment.NewLine}" +
+            $"Receipt ID: {OcrValue(item.ReceiptId)}{Environment.NewLine}" +
+            $"Source receipt: {OcrValue(item.SourceReceiptId)}{Environment.NewLine}" +
+            $"Artifact role: {OcrValue(item.ArtifactRole)}{Environment.NewLine}" +
+            $"Original: {(item.IsOriginal ? "yes" : "no")}{Environment.NewLine}" +
+            $"Integrity: {OcrValue(item.IntegrityStatus)}{Environment.NewLine}" +
             $"Path: {item.FilePath}{Environment.NewLine}{Environment.NewLine}" +
             $"OCR text: {OcrSummary(item.OcrText)}{Environment.NewLine}" +
             $"OCR language: {OcrValue(item.OcrLanguageTag)}{Environment.NewLine}" +
@@ -2405,11 +2692,13 @@ public partial class MainWindow : Window
             $"{item.Notes}";
     }
 
-    private void SetSelectionActionsEnabled(bool enabled)
+    private void SetSelectionActionsEnabled(bool enabled, CaptureItem? item = null)
     {
+        var hasLocalFile = enabled && item is not null && File.Exists(item.FilePath);
+        var hasLocalImage = hasLocalFile && IsImageFile(item!.FilePath);
         if (EditorToolbarActions is not null)
         {
-            EditorToolbarActions.IsEnabled = enabled;
+            EditorToolbarActions.IsEnabled = hasLocalImage;
         }
 
         if (SelectionActionBar is not null)
@@ -2417,9 +2706,29 @@ public partial class MainWindow : Window
             SelectionActionBar.IsEnabled = enabled;
         }
 
+        if (CopySelectedButton is not null)
+        {
+            CopySelectedButton.IsEnabled = hasLocalImage;
+        }
+
+        if (SaveCopyButton is not null)
+        {
+            SaveCopyButton.IsEnabled = hasLocalFile;
+        }
+
+        if (QuickShareButton is not null)
+        {
+            QuickShareButton.IsEnabled = hasLocalFile;
+        }
+
+        if (ExtractTextButton is not null)
+        {
+            ExtractTextButton.IsEnabled = hasLocalImage;
+        }
+
         if (PrivacyReviewButton is not null)
         {
-            PrivacyReviewButton.IsEnabled = enabled;
+            PrivacyReviewButton.IsEnabled = hasLocalImage;
         }
     }
 
@@ -2598,9 +2907,17 @@ public partial class MainWindow : Window
 
     private async Task DeleteLocalCaptureWithConfirmationAsync(CaptureItem item)
     {
+        var derivatives = item.Kind == CaptureKind.ReplayReceipt && !string.IsNullOrWhiteSpace(item.ReceiptId)
+            ? _services.WorkspaceStore.Load()
+                .Where(candidate => candidate.SourceReceiptId?.Equals(item.ReceiptId, StringComparison.OrdinalIgnoreCase) == true)
+                .ToArray()
+            : [];
+        var derivativeWarning = derivatives.Length > 0
+            ? $"{Environment.NewLine}{Environment.NewLine}{derivatives.Length} derivative(s) depend on this original. They will remain, but will be marked source unavailable."
+            : string.Empty;
         var confirm = System.Windows.MessageBox.Show(
-            $"Delete this local capture from disk and the workspace?{Environment.NewLine}{Environment.NewLine}{item.FilePath}",
-            "Delete local capture",
+            $"Delete this local {(item.Kind == CaptureKind.ReplayReceipt ? "original signed receipt" : "capture")} from disk and the workspace?{derivativeWarning}{Environment.NewLine}{Environment.NewLine}{item.FilePath}",
+            item.Kind == CaptureKind.ReplayReceipt ? "Delete original receipt" : "Delete local capture",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes)
@@ -2609,7 +2926,39 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _services.WorkspaceStore.DeleteItemAsync(item, deleteFile: true);
+        if (item.Kind == CaptureKind.ReplayReceipt && Directory.Exists(item.FilePath))
+        {
+            var receiptRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_services.Paths.ReceiptsRoot));
+            var packagePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(item.FilePath));
+            if (!packagePath.StartsWith(receiptRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                SetStatus("Receipt deletion was blocked because the package is outside the managed Receipts library.");
+                return;
+            }
+
+            try
+            {
+                // Delete the owned package first. If Windows denies the filesystem
+                // operation, the library entry remains available for a later retry.
+                Directory.Delete(packagePath, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                SetStatus($"Receipt deletion failed; the original remains indexed: {ex.Message}");
+                return;
+            }
+
+            await _services.WorkspaceStore.DeleteItemAsync(item, deleteFile: false);
+            foreach (var derivative in derivatives)
+            {
+                derivative.SourceAvailable = false;
+                await _services.WorkspaceStore.UpdateItemAsync(derivative);
+            }
+        }
+        else
+        {
+            await _services.WorkspaceStore.DeleteItemAsync(item, deleteFile: true);
+        }
         _allCaptures.RemoveAll(existing =>
             existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
             existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
@@ -2625,7 +2974,9 @@ public partial class MainWindow : Window
             SelectedDimensionsText.Text = "—";
             EmptyState.Visibility = Visibility.Visible;
         }
-        SetStatus($"Deleted local capture: {item.FileName}");
+        SetStatus(item.Kind == CaptureKind.ReplayReceipt
+            ? $"Deleted original receipt package. {derivatives.Length} derivative(s) were retained and marked source unavailable."
+            : $"Deleted local capture: {item.FileName}");
     }
 
     private static bool ShouldShowShareResultWindow(ShareDestination destination, ShareResult result)
@@ -2680,7 +3031,7 @@ public partial class MainWindow : Window
         SetStatus("Pixel ruler open.");
     }
 
-    private void OpenSettings(string? sectionKey = null)
+    private async Task OpenSettingsAsync(string? sectionKey = null)
     {
         SetStatus("Opening settings...");
         var settings = TakeSettingsWindow();
@@ -2688,7 +3039,34 @@ public partial class MainWindow : Window
         settings.SelectSection(sectionKey);
         try
         {
-            settings.ShowDialog();
+            if (settings.ShowDialog() != true)
+            {
+                SetStatus("Settings unchanged.");
+                return;
+            }
+
+            var wasReplayStatusSubscribed = _replayStatusSubscribed;
+            if (wasReplayStatusSubscribed)
+            {
+                UnsubscribeReplayStatus();
+            }
+
+            ReplayReconfigurationResult replayUpdate;
+            try
+            {
+                replayUpdate = await _services.ReconfigureReplayIfNeededAsync();
+            }
+            finally
+            {
+                if (wasReplayStatusSubscribed)
+                {
+                    SubscribeReplayStatus();
+                }
+            }
+
+            UpdateReplayUi(_services.Replay.GetStatus());
+            _services.Tray?.UpdateReplayStatus(_services.Replay.GetStatus());
+            SetStatus(replayUpdate.Message);
         }
         finally
         {
@@ -2697,8 +3075,29 @@ public partial class MainWindow : Window
             RefreshDiagnostics();
             RefreshWorkspaceSummary();
             QueueSettingsPrewarm();
-            SetStatus("Settings updated.");
         }
+    }
+
+    private void SubscribeReplayStatus()
+    {
+        if (_replayStatusSubscribed)
+        {
+            return;
+        }
+
+        _services.Replay.StatusChanged += Replay_StatusChanged;
+        _replayStatusSubscribed = true;
+    }
+
+    private void UnsubscribeReplayStatus()
+    {
+        if (!_replayStatusSubscribed)
+        {
+            return;
+        }
+
+        _services.Replay.StatusChanged -= Replay_StatusChanged;
+        _replayStatusSubscribed = false;
     }
 
     private SettingsWindow TakeSettingsWindow()

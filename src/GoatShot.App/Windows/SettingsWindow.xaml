@@ -1,7 +1,7 @@
 <Window x:Class="GoatShot.App.Windows.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GoatShot Settings"
+        Title="Receipts Settings"
         Width="980"
         Height="700"
         MinWidth="860"
@@ -59,7 +59,7 @@
                 BorderThickness="0,0,0,1"
                 Padding="18,14">
             <StackPanel>
-                <TextBlock Text="GoatShot Settings"
+                <TextBlock Text="Receipts Settings"
                            FontSize="20"
                            FontWeight="Bold" />
                 <TextBlock Text="Grouped controls for capture, recording, sharing, automation, plugins, AI, and local privacy posture."
@@ -129,7 +129,7 @@
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
                 <CheckBox x:Name="PrivateModeBox" Content="Private capture mode: save temporary files but do not index workspace history" />
-                <CheckBox x:Name="RunAtStartupBox" Content="Run GoatShot when I sign in to Windows" />
+                <CheckBox x:Name="RunAtStartupBox" Content="Run Receipts when I sign in to Windows" />
                 <Border Background="#101B23"
                         BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"
@@ -147,15 +147,15 @@
                         <WrapPanel>
                             <Button Content="Install or repair"
                                     Click="InstallOrRepair_Click"
-                                    AutomationProperties.Name="Install or repair GoatShot for this user" />
+                                    AutomationProperties.Name="Install or repair Receipts for this user" />
                             <Button Content="Disable startup"
                                     Click="DisableStartup_Click"
                                     Style="{StaticResource SecondaryButton}"
-                                    AutomationProperties.Name="Disable GoatShot startup" />
+                                    AutomationProperties.Name="Disable Receipts startup" />
                             <Button Content="Uninstall"
                                     Click="Uninstall_Click"
                                     Style="{StaticResource DangerButton}"
-                                    AutomationProperties.Name="Uninstall GoatShot but preserve captures and settings" />
+                                    AutomationProperties.Name="Uninstall Receipts but preserve captures and settings" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>
@@ -414,11 +414,124 @@
                     <ComboBoxItem Content="HighContrast" />
                     <ComboBoxItem Content="Subtle" />
                 </ComboBox>
-                <TextBlock Text="MP4 can use native Media Foundation production encoding when WGC/D3D and H.264 encoder prerequisites are available. Captured mic/system-audio WAV payloads can be muxed as AAC; webcam overlay can precompose bounded, periodically refreshed native camera frames, with FFmpeg DirectShow fallback still available. The main recording panel includes live desktop webcam preview."
+                <TextBlock Text="MP4 can use native Media Foundation production encoding when WGC/D3D and H.264 encoder prerequisites are available. Microphone and system audio stream as bounded PCM chunks and are encoded as AAC without temporary WAV files; the FFmpeg fallback receives raw video through a live pipe instead of a PNG frame batch. Webcam overlay uses bounded, periodically refreshed native camera frames. The main recording panel includes live desktop webcam preview."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,6,0,14" />
+
+                <Border x:Name="ReplaySettingsSection"
+                        Background="#0B151C"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="14"
+                        Margin="0,8,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Replay recording" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="Replay continuously keeps only a bounded local buffer of finalized MP4 segments. Nothing is signed or added to the library until you choose Save replay."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,5,0,10" />
+                        <CheckBox x:Name="ReplayConsentBox"
+                                  Content="I understand Replay continuously captures the configured source while armed"
+                                  AutomationProperties.Name="Consent to arm Replay" />
+                        <CheckBox x:Name="ReplayAutoArmBox"
+                                  Content="Automatically arm Replay at Windows sign-in for this profile"
+                                  Margin="0,6,0,10" />
+                        <TextBlock Text="Capture strategy" Foreground="{StaticResource MutedInkBrush}" />
+                        <ComboBox x:Name="ReplaySourceKindBox"
+                                  Margin="0,6,0,8"
+                                  Style="{StaticResource GoatComboBox}"
+                                  SelectionChanged="ReplaySourceKind_Changed">
+                            <ComboBoxItem Content="Chosen monitor" Tag="SelectedMonitor" />
+                            <ComboBoxItem Content="Follow cursor monitor" Tag="FollowCursorMonitor" />
+                            <ComboBoxItem Content="All monitors as one composite" Tag="AllMonitorsComposite" />
+                            <ComboBoxItem Content="Separate synchronized track per monitor" Tag="SeparateMonitorTracks" />
+                            <ComboBoxItem Content="Chosen window" Tag="SelectedWindow" />
+                            <ComboBoxItem Content="Follow foreground window" Tag="FollowForegroundWindow" />
+                            <ComboBoxItem Content="Selected region" Tag="SelectedRegion" />
+                            <ComboBoxItem Content="Fixed region" Tag="FixedRegion" />
+                        </ComboBox>
+                        <TextBlock Text="Chosen source ID or monitor device name" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="ReplaySourceIdBox" Margin="0,6,0,8" />
+                        <TextBlock Text="Available chosen sources" Foreground="{StaticResource MutedInkBrush}" />
+                        <ComboBox x:Name="ReplaySourcePickerBox"
+                                  Margin="0,6,0,8"
+                                  Style="{StaticResource GoatComboBox}"
+                                  DisplayMemberPath="DisplayName"
+                                  AutomationProperties.Name="Choose an available Replay monitor or window"
+                                  SelectionChanged="ReplaySourcePicker_Changed" />
+                        <TextBlock Text="Region bounds (X,Y,WIDTH,HEIGHT)" Foreground="{StaticResource MutedInkBrush}" />
+                        <Grid Margin="0,6,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ReplayBoundsBox"
+                                     AutomationProperties.Name="Replay capture region bounds" />
+                            <Button x:Name="ReplayPickRegionButton"
+                                    Grid.Column="1"
+                                    Content="Pick region…"
+                                    Margin="8,0,0,0"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="ReplayPickRegion_Click"
+                                    AutomationProperties.Name="Choose Replay region on screen" />
+                        </Grid>
+                        <UniformGrid Columns="2">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Buffer duration (seconds)" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplayBufferSecondsBox" Margin="0,6,0,8" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Text="Default save duration (seconds)" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplaySaveSecondsBox" Margin="0,6,0,8" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Segment duration (seconds)" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplaySegmentSecondsBox" Margin="0,6,0,8" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Text="Total buffer cap (MB, all tracks)" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplayStorageMbBox" Margin="0,6,0,8" />
+                            </StackPanel>
+                        </UniformGrid>
+                        <CheckBox x:Name="ReplaySceneIndexBox" Content="Index local scene changes after saving" />
+                        <CheckBox x:Name="ReplayOcrIndexBox" Content="Compare local OCR after saving (never continuously)" Margin="0,6,0,0" />
+                        <TextBlock Text="Analysis sensitivity (0.05 to 1.0)" Foreground="{StaticResource MutedInkBrush}" Margin="0,8,0,0" />
+                        <TextBox x:Name="ReplayAnalysisSensitivityBox" Margin="0,6,0,8" />
+                        <TextBlock Text="Privacy-excluded process names (one per line)" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="ReplayPrivacyProcessesBox"
+                                 Height="72"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Margin="0,6,0,8" />
+                        <UniformGrid Columns="2">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Arm / pause hotkey" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplayToggleHotkeyBox"
+                                         Margin="0,6,0,8"
+                                         AutomationProperties.Name="Replay arm and pause hotkey" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Text="Save Replay hotkey" Foreground="{StaticResource MutedInkBrush}" />
+                                <TextBox x:Name="ReplaySaveHotkeyBox"
+                                         Margin="0,6,0,8"
+                                         AutomationProperties.Name="Save Replay hotkey" />
+                            </StackPanel>
+                        </UniformGrid>
+                        <TextBlock x:Name="ReplaySourceHelpText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="Replay shares the recording profile above: encoder, quality, resolution, FPS, bitrate, cursor and click visualization, microphone, system audio, webcam, recording overlays, and privacy controls. Available audio is muxed into each finalized MP4 segment and webcam frames are precomposed locally; any device or partial-segment omission is recorded in the signed receipt. Capture and buffer changes apply when you save settings; an armed buffer restarts and releases its unsaved history. Hotkey changes apply after Receipts restarts."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
 
                 <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
 
@@ -444,7 +557,7 @@
                            TextWrapping="Wrap"
                            Margin="0,0,0,6"
                            AutomationProperties.Name="Provider readiness detail" />
-                <TextBlock Text="Detailed local diagnostics: goatshot providers --not-ready --json. OAuth consent, refresh behavior, and live account uploads remain separate parked proof lanes."
+                <TextBlock Text="Detailed local diagnostics: receipts providers --not-ready --json. OAuth consent, refresh behavior, and live account uploads remain separate parked proof lanes."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -482,7 +595,7 @@
                     <ComboBoxItem Content="Custom webhook" />
                 </ComboBox>
                 <CheckBox x:Name="ConfirmUploadBox" Content="Ask before upload or external share" />
-                <CheckBox x:Name="QueueBackgroundProcessingBox" Content="Process queued uploads in the background while GoatShot is running" />
+                <CheckBox x:Name="QueueBackgroundProcessingBox" Content="Process queued uploads in the background while Receipts is running" />
                 <TextBlock Text="Queue poll interval seconds" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="QueuePollSecondsBox" Margin="0,6,0,6" />
                 <TextBlock Text="Background processing only runs for items explicitly queued by the operator."
@@ -572,7 +685,7 @@
                 <TextBox x:Name="S3PrefixBox" Margin="0,6,0,10" />
                 <TextBlock Text="S3 public base URL" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="S3PublicBaseUrlBox" Margin="0,6,0,6" />
-                <TextBlock Text="Optional. When set, successful S3 uploads copy a share URL. Without it, GoatShot only records the s3:// bucket/key."
+                <TextBlock Text="Optional. When set, successful S3 uploads copy a share URL. Without it, Receipts only records the s3:// bucket/key."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -638,7 +751,7 @@
                            Margin="0,0,0,10" />
                 <TextBlock Text="SFTP private key path" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="SftpPrivateKeyPathBox" Margin="0,6,0,6" />
-                <TextBlock Text="Required. GoatShot reads this key only for the configured SFTP connection."
+                <TextBlock Text="Required. Receipts reads this key only for the configured SFTP connection."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -790,7 +903,7 @@
                            Margin="0,0,0,10" />
                 <TextBlock Text="Dropbox remote folder" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="DropboxRemoteFolderBox" Margin="0,6,0,6" />
-                <TextBlock Text="Example: /GoatShot or /Apps/GoatShot. GoatShot appends a unique file name."
+                <TextBlock Text="Example: /Receipts or /Apps/Receipts. Receipts appends a unique file name."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -921,7 +1034,7 @@
                            Margin="0,0,0,10" />
                 <TextBlock Text="OneDrive remote folder" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="OneDriveRemoteFolderBox" Margin="0,6,0,6" />
-                <TextBlock Text="Example: /GoatShot or /Screenshots. The folder must already exist for small-file upload."
+                <TextBlock Text="Example: /Receipts or /Screenshots. The folder must already exist for small-file upload."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1050,14 +1163,14 @@
                            Margin="0,0,0,10" />
                 <TextBlock Text="Linear team ID" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="LinearTeamIdBox" Margin="0,6,0,6" />
-                <TextBlock Text="Required when GoatShot creates a new issue."
+                <TextBlock Text="Required when Receipts creates a new issue."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
                 <TextBlock Text="Existing Linear issue ID" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="LinearIssueIdBox" Margin="0,6,0,6" />
-                <TextBlock Text="Optional. When set, GoatShot uploads the file and links it to this issue instead of creating a new one."
+                <TextBlock Text="Optional. When set, Receipts uploads the file and links it to this issue instead of creating a new one."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1096,7 +1209,7 @@
                            Margin="0,0,0,10" />
                 <TextBlock Text="GitHub repository" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="GitHubRepositoryBox" Margin="0,6,0,6" />
-                <TextBlock Text="Use owner/repo. GoatShot creates an issue and copies the issue URL; GitHub Issues API does not upload the capture file."
+                <TextBlock Text="Use owner/repo. Receipts creates an issue and copies the issue URL; GitHub Issues API does not upload the capture file."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1125,7 +1238,7 @@
 
                 <TextBlock Text="Jira base URL" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="JiraBaseUrlBox" Margin="0,6,0,6" />
-                <TextBlock Text="Example: https://example.atlassian.net. GoatShot creates Jira Cloud REST API v3 issues and copies the issue URL."
+                <TextBlock Text="Example: https://example.atlassian.net. Receipts creates Jira Cloud REST API v3 issues and copies the issue URL."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1215,7 +1328,7 @@
                              Columns="3"
                              Margin="0,0,0,12" />
                 <CheckBox x:Name="EnableWatchFoldersBox"
-                          Content="Enable watch folders while GoatShot is running"
+                          Content="Enable watch folders while Receipts is running"
                           Checked="AutomationSummaryInput_Changed"
                           Unchecked="AutomationSummaryInput_Changed" />
                 <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
@@ -1489,7 +1602,7 @@
                         <TextBlock Text="Remote plugin update check"
                                    FontWeight="Bold"
                                    Margin="0,0,0,4" />
-                        <TextBlock Text="Passive registry summary only. GoatShot does not install, trust, enable, allowlist, or execute plugin code from this surface."
+                        <TextBlock Text="Passive registry summary only. Receipts does not install, trust, enable, allowlist, or execute plugin code from this surface."
                                    Foreground="{StaticResource MutedInkBrush}"
                                    FontSize="12"
                                    TextWrapping="Wrap"
@@ -1577,7 +1690,7 @@
                 <TextBox x:Name="ExternalWhisperExecutableBox"
                          Margin="0,6,0,6"
                          AutomationProperties.Name="External Whisper executable path" />
-                <TextBlock Text="Optional. GoatShot never downloads or bundles Whisper. Leave blank to use supplied subtitles or explicitly approved Gemini speech-to-text."
+                <TextBlock Text="Optional. Receipts never downloads or bundles Whisper. Leave blank to use supplied subtitles or explicitly approved Gemini speech-to-text."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"

@@ -229,11 +229,19 @@ public sealed class ManualValidationSummaryService
     private static ManualValidationDiagnosticsSummary BuildDiagnosticsSummary(string root)
     {
         var diagnosticsRoot = Path.Combine(root, "diagnostics");
-        var bundle = Directory.Exists(diagnosticsRoot)
-            ? Directory.EnumerateFiles(diagnosticsRoot, "*.zip", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault()
-            : null;
+        string? bundle = null;
+        if (Directory.Exists(diagnosticsRoot))
+        {
+            var currentBundle = Path.Combine(diagnosticsRoot, ManualValidationBaselineService.DiagnosticsBundleFileName);
+            var legacyBundle = Path.Combine(diagnosticsRoot, ManualValidationBaselineService.LegacyDiagnosticsBundleFileName);
+            bundle = File.Exists(currentBundle)
+                ? currentBundle
+                : File.Exists(legacyBundle)
+                    ? legacyBundle
+                    : Directory.EnumerateFiles(diagnosticsRoot, "*.zip", SearchOption.TopDirectoryOnly)
+                        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                        .FirstOrDefault();
+        }
         var files = Directory.Exists(diagnosticsRoot)
             ? Directory.EnumerateFiles(diagnosticsRoot, "*", SearchOption.TopDirectoryOnly)
                 .Select(Path.GetFileName)

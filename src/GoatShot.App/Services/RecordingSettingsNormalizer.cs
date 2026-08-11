@@ -45,9 +45,9 @@ public sealed record NormalizedRecordingSettings(
         {
             var audio = (IncludeMicrophone, IncludeSystemAudio) switch
             {
-                (true, true) => " Requested microphone and system audio are captured as WASAPI WAV inputs and mixed into the MP4 when payload bytes are available.",
-                (true, false) => " Requested microphone audio is captured as a WASAPI WAV input and muxed into the MP4 when payload bytes are available.",
-                (false, true) => " Requested system audio is captured as a WASAPI loopback WAV input and muxed into the MP4 when payload bytes are available.",
+                (true, true) => " Requested microphone and system audio are streamed as normalized WASAPI PCM, mixed within a bounded buffer, and muxed into the MP4 when samples are available.",
+                (true, false) => " Requested microphone audio is streamed as normalized WASAPI PCM and muxed into the MP4 when samples are available.",
+                (false, true) => " Requested system audio is streamed as normalized WASAPI loopback PCM and muxed into the MP4 when samples are available.",
                 _ => string.Empty
             };
             if (!string.IsNullOrWhiteSpace(audio))

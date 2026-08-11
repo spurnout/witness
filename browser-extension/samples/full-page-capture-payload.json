@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "goatshot.browser-capture.v1",
+  "schemaVersion": "receipts.browser-capture.v1",
   "intent": {
     "captureMode": "full-page",
     "fullPageCaptureRequested": true,
@@ -110,7 +110,7 @@
   "consent": {
     "screenshotConsented": true,
     "telemetryConsented": true,
-    "consentText": "User consented to page screenshot metadata plus console/network summaries for GoatShot.",
+    "consentText": "User consented to page screenshot metadata plus console/network summaries for Receipts.",
     "consentedAt": "2026-06-15T04:29:58Z"
   },
   "consoleEvents": [

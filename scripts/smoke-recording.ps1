@@ -41,8 +41,20 @@ $logRoot = Join-Path $OutputRoot "logs"
 $diagnosticsRoot = Join-Path $OutputRoot "diagnostics"
 New-Item -ItemType Directory -Force -Path $OutputRoot, $localRoot, $libraryRoot, $recordingRoot, $logRoot, $diagnosticsRoot | Out-Null
 
-if ([string]::IsNullOrWhiteSpace($CliPath)) {
-    $CliPath = Join-Path $repoRoot "src\GoatShot.Cli\bin\$Configuration\net10.0-windows10.0.19041.0\GoatShot.Cli.exe"
+$useDefaultCliPath = [string]::IsNullOrWhiteSpace($CliPath)
+$cliBuildRoot = Join-Path $repoRoot "src\GoatShot.Cli\bin\$Configuration\net10.0-windows10.0.19041.0"
+$receiptsCliPath = Join-Path $cliBuildRoot "Receipts.Cli.exe"
+$legacyCliPath = Join-Path $cliBuildRoot "GoatShot.Cli.exe"
+if ($useDefaultCliPath) {
+    $CliPath = if (Test-Path -LiteralPath $receiptsCliPath -PathType Leaf) {
+        $receiptsCliPath
+    }
+    elseif (Test-Path -LiteralPath $legacyCliPath -PathType Leaf) {
+        $legacyCliPath
+    }
+    else {
+        $receiptsCliPath
+    }
 }
 
 if (-not $NoBuild) {
@@ -52,8 +64,20 @@ if (-not $NoBuild) {
     }
 }
 
+if ($useDefaultCliPath) {
+    $CliPath = if (Test-Path -LiteralPath $receiptsCliPath -PathType Leaf) {
+        $receiptsCliPath
+    }
+    elseif (Test-Path -LiteralPath $legacyCliPath -PathType Leaf) {
+        $legacyCliPath
+    }
+    else {
+        $receiptsCliPath
+    }
+}
+
 if (-not (Test-Path $CliPath)) {
-    throw "GoatShot CLI was not found at $CliPath. Build first or pass -CliPath."
+    throw "Receipts CLI was not found at $CliPath. Build first or pass -CliPath (legacy GoatShot.Cli.exe inputs remain accepted)."
 }
 
 $normalizedTargets = @()
@@ -105,7 +129,10 @@ function Find-Ffprobe {
         return $ffprobe
     }
 
-    $ffmpeg = $env:GOATSHOT_FFMPEG_PATH
+    $ffmpeg = $env:RECEIPTS_FFMPEG_PATH
+    if ([string]::IsNullOrWhiteSpace($ffmpeg)) {
+        $ffmpeg = $env:GOATSHOT_FFMPEG_PATH
+    }
     if ([string]::IsNullOrWhiteSpace($ffmpeg)) {
         $ffmpeg = Find-Executable "ffmpeg.exe"
     }
@@ -457,13 +484,15 @@ function Invoke-RecordingSmoke {
     }
 }
 
+$env:RECEIPTS_LOCAL_ROOT = $localRoot
+$env:RECEIPTS_LIBRARY_ROOT = $libraryRoot
 $env:GOATSHOT_LOCAL_ROOT = $localRoot
 $env:GOATSHOT_LIBRARY_ROOT = $libraryRoot
 $script:ffprobe = Find-Ffprobe
 $script:audioRequested = $audioRequested
 
 if ($RequireFfprobe -and -not $script:ffprobe) {
-    throw "ffprobe.exe is required for this recording smoke run. Install ffprobe, put it on PATH, or set GOATSHOT_FFMPEG_PATH to an ffmpeg.exe with sibling ffprobe.exe."
+    throw "ffprobe.exe is required for this recording smoke run. Install ffprobe, put it on PATH, or set RECEIPTS_FFMPEG_PATH (legacy GOATSHOT_FFMPEG_PATH is also accepted) to an ffmpeg.exe with sibling ffprobe.exe."
 }
 
 $plan = @($normalizedTargets | ForEach-Object { Get-SmokeValidationPlan -Target $_ })

@@ -47,6 +47,11 @@ public sealed class PluginBackgroundUpdateServiceTests
             Assert.IsFalse(result.WouldAllowlist);
             Assert.IsFalse(result.WouldExecute);
             Assert.IsTrue(File.Exists(statePath));
+            var state = JsonSerializer.Deserialize<PluginBackgroundUpdateState>(
+                await File.ReadAllTextAsync(statePath),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.IsNotNull(state);
+            Assert.AreEqual(PluginBackgroundUpdateService.CurrentSchemaVersion, state!.SchemaVersion);
             Assert.IsFalse(Directory.EnumerateFiles(paths.PluginStagingRoot, "*", SearchOption.AllDirectories).Any());
             CollectionAssert.Contains(settings.TrustedPluginIds, "sample.redaction-note");
             CollectionAssert.Contains(settings.EnabledPluginIds, "sample.redaction-note");
@@ -129,6 +134,36 @@ public sealed class PluginBackgroundUpdateServiceTests
             Assert.IsTrue(second.Skipped);
             Assert.IsFalse(second.Due);
             StringAssert.Contains(second.Message, "skipped");
+        });
+    }
+
+    [TestMethod]
+    public async Task RunAsync_AcceptsLegacyGoatShotStateSchema()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var statePath = Path.Combine(paths.LocalRoot, "legacy-background-state.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
+            await File.WriteAllTextAsync(
+                statePath,
+                JsonSerializer.Serialize(new PluginBackgroundUpdateState
+                {
+                    SchemaVersion = PluginBackgroundUpdateService.LegacySchemaVersion,
+                    NextRunUtc = DateTimeOffset.UtcNow.AddHours(1)
+                }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            var remote = new RemotePluginPackageService(paths, new LocalPluginService(paths, new AppSettings()));
+            var service = new PluginBackgroundUpdateService(paths, remote);
+
+            var result = await service.RunAsync(new PluginBackgroundUpdateRunRequest
+            {
+                RegistryLocation = "unused-while-not-due.json",
+                Mode = "check-only",
+                StatePath = statePath
+            });
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Issues));
+            Assert.IsTrue(result.Skipped);
+            Assert.IsFalse(result.Due);
         });
     }
 
@@ -219,7 +254,7 @@ public sealed class PluginBackgroundUpdateServiceTests
     {
         return $$"""
         {
-          "schemaVersion": "goatshot.plugin.v1",
+          "schemaVersion": "receipts.plugin.v1",
           "id": "sample.redaction-note",
           "name": "Sample Redaction Note",
           "version": "{{version}}",

@@ -121,6 +121,31 @@ public sealed class AppStartupOptionsTests
     }
 
     [TestMethod]
+    public void Parse_RendersFrameExplorerFromExplicitOutput()
+    {
+        var options = AppStartupOptions.Parse([
+            "--render-frame-explorer-output",
+            "frame-explorer.png"
+        ]);
+
+        Assert.IsTrue(options.RenderFrameExplorer);
+        Assert.AreEqual("frame-explorer.png", options.RenderFrameExplorerOutputPath);
+    }
+
+    [TestMethod]
+    public void Parse_RendersFrameExplorerWithShortOutputArgument()
+    {
+        var options = AppStartupOptions.Parse([
+            "--render-frame-explorer",
+            "--output",
+            "frame-explorer.png"
+        ]);
+
+        Assert.IsTrue(options.RenderFrameExplorer);
+        Assert.AreEqual("frame-explorer.png", options.RenderFrameExplorerOutputPath);
+    }
+
+    [TestMethod]
     public void Parse_RendersSettingsSectionToOutputPath()
     {
         var options = AppStartupOptions.Parse([

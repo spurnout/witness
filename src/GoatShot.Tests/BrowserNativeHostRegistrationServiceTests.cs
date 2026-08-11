@@ -32,11 +32,14 @@ public sealed class BrowserNativeHostRegistrationServiceTests
 
             Assert.AreEqual(2, results.Count);
             var chromeJson = await File.ReadAllTextAsync(results.Single(result => result.Browser == BrowserNativeHostBrowser.Chrome).ManifestPath);
-            StringAssert.Contains(chromeJson, "\"name\": \"com.goatshot.bridge\"");
+            StringAssert.Contains(chromeJson, "\"name\": \"com.receipts.bridge\"");
             StringAssert.Contains(chromeJson, $"\"path\": \"{hostExe.Replace("\\", "\\\\")}\"");
             StringAssert.Contains(chromeJson, $"chrome-extension://{ChromeExtensionId}/");
             StringAssert.Contains(chromeJson, "\"allowed_origins\"");
             Assert.IsFalse(chromeJson.Contains("allowed_extensions", StringComparison.Ordinal));
+            var legacyChromePath = Path.Combine(Path.GetDirectoryName(results.Single(result => result.Browser == BrowserNativeHostBrowser.Chrome).ManifestPath)!, "com.goatshot.bridge.json");
+            Assert.IsTrue(File.Exists(legacyChromePath));
+            StringAssert.Contains(await File.ReadAllTextAsync(legacyChromePath), "\"name\": \"com.goatshot.bridge\"");
 
             var firefoxJson = await File.ReadAllTextAsync(results.Single(result => result.Browser == BrowserNativeHostBrowser.Firefox).ManifestPath);
             StringAssert.Contains(firefoxJson, "\"allowed_extensions\"");
@@ -63,9 +66,10 @@ public sealed class BrowserNativeHostRegistrationServiceTests
             });
 
             Assert.AreEqual(3, results.Count);
-            Assert.AreEqual(2, registry.Values.Count);
+            Assert.AreEqual(4, registry.Values.Count);
             Assert.IsTrue(registry.Values.Keys.Any(key => key.Contains(@"Google\Chrome", StringComparison.Ordinal)));
             Assert.IsTrue(registry.Values.Keys.Any(key => key.Contains(@"Microsoft\Edge", StringComparison.Ordinal)));
+            Assert.IsTrue(File.Exists(Path.Combine(firefoxRoot, "com.receipts.bridge.json")));
             Assert.IsTrue(File.Exists(Path.Combine(firefoxRoot, "com.goatshot.bridge.json")));
 
             var status = service.GetStatus();
@@ -93,6 +97,7 @@ public sealed class BrowserNativeHostRegistrationServiceTests
 
             Assert.AreEqual(3, results.Count);
             Assert.AreEqual(0, registry.Values.Count);
+            Assert.IsFalse(File.Exists(Path.Combine(firefoxRoot, "com.receipts.bridge.json")));
             Assert.IsFalse(File.Exists(Path.Combine(firefoxRoot, "com.goatshot.bridge.json")));
         });
     }

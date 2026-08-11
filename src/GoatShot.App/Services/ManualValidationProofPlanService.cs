@@ -113,7 +113,7 @@ public sealed class ManualValidationProofPlanService
             {
                 "Open the evidence folder and complete environment fields in 01-baseline-setup.md.",
                 "Run the commands from commands.md for build, tests, diagnostics print, diagnostics recording, devices, capture engine, and providers.",
-                "Save command outputs under diagnostics/ and keep goatshot-diagnostics.zip attached.",
+                "Save command outputs under diagnostics/ and keep receipts-diagnostics.zip attached (legacy goatshot-diagnostics.zip remains accepted).",
                 "Mark Passed only after the build/test/diagnostics outputs are present and reviewed for redaction."
             },
             "keyboard-traversal" => new[]
@@ -147,15 +147,15 @@ public sealed class ManualValidationProofPlanService
             "live-region-drag" => new[]
             {
                 "Stage safe desktop content with no private files, chats, email, credentials, or customer data visible.",
-                "Start interactive region capture from GoatShot.",
+                "Start interactive region capture from Receipts.",
                 "Verify drag, resize, cancel, complete, edge snapping, Shift snap bypass, pixel lens, size badge, padding, and chooser behavior.",
                 "Keep screenshots or short clips only if they contain safe demo content."
             },
             "clean-machine-install" => new[]
             {
                 "Use the latest portable ZIP on a clean Windows profile or VM.",
-                "Set isolated GOATSHOT_LOCAL_ROOT and GOATSHOT_LIBRARY_ROOT when possible.",
-                "Launch GoatShot.exe and confirm app folders are created, Settings can be saved, and a simple capture/import/edit/export loop works.",
+                "Set isolated RECEIPTS_LOCAL_ROOT and RECEIPTS_LIBRARY_ROOT; legacy GOATSHOT_* aliases remain valid for older packages.",
+                "Launch Receipts.exe (or GoatShot.exe for a legacy input package) and confirm app folders are created, Settings can be saved, and a simple capture/import/edit/export loop works.",
                 "If installer tooling is available, separately record installer compile/install/uninstall behavior; otherwise keep installer compilation skipped."
             },
             _ => BuildGenericSteps(summary)
@@ -211,7 +211,7 @@ public sealed class ManualValidationProofPlanService
                 "diagnostics/build-release.txt",
                 "diagnostics/test-release.txt",
                 "diagnostics/diagnostics-print.txt",
-                "diagnostics/goatshot-diagnostics.zip"
+                "diagnostics/receipts-diagnostics.zip (legacy goatshot-diagnostics.zip accepted)"
             },
             "keyboard-traversal" => new[]
             {

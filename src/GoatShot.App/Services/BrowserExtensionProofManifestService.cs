@@ -7,7 +7,8 @@ namespace GoatShot.App.Services;
 
 public sealed class BrowserExtensionProofManifestService
 {
-    public const string SchemaVersion = "goatshot.browser-proof.v1";
+    public const string SchemaVersion = "receipts.browser-proof.v1";
+    public const string LegacySchemaVersion = "goatshot.browser-proof.v1";
     public const string ManifestFileName = "browser-proof-manifest.json";
     public const string ValidationFileName = "browser-proof-validation.md";
 
@@ -632,8 +633,14 @@ public sealed class BrowserExtensionProofManifestService
 
     private static string? FindStitchPackage(string root)
     {
-        var manifest = Directory.EnumerateFiles(root, "goatshot-stitch-package.json", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+        var manifest = new[]
+            {
+                "receipts-stitch-package.json",
+                "stitch-package.json",
+                "goatshot-stitch-package.json"
+            }
+            .SelectMany(pattern => Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             .FirstOrDefault();
         return manifest is null ? null : Path.GetDirectoryName(manifest);
     }

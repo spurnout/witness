@@ -2,8 +2,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using GoatShot.App.Models;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 namespace GoatShot.App.Services;
 
@@ -21,8 +19,6 @@ public static class NativeMediaFoundationMp4Encoder
     public const bool ProductionEngineImplemented = true;
     public const bool ProductionAudioMixingImplemented = true;
     public const bool ProductionWebcamCompositorImplemented = true;
-
-    public sealed record NativeMp4AudioInput(AudioCaptureSource Source, string Path);
 
     public static bool CanEncodeVideoOnly(
         RecordingEnginePlan plan,
@@ -54,7 +50,7 @@ public static class NativeMediaFoundationMp4Encoder
     public static bool CanEncodeProduction(
         RecordingEnginePlan plan,
         NormalizedRecordingSettings settings,
-        IReadOnlyList<NativeMp4AudioInput> audioInputs,
+        int audioSourceCount,
         out string reason)
     {
         if (plan.Choice != RecordingEngineChoice.Production)
@@ -65,172 +61,376 @@ public static class NativeMediaFoundationMp4Encoder
 
         if (settings.EnableWebcamOverlay)
         {
-            reason = audioInputs.Count == 0
+            reason = audioSourceCount == 0
                 ? "production video and precomposited webcam overlay encoding are available."
                 : "production video, precomposited webcam overlay, and AAC audio muxing are available.";
             return true;
         }
 
-        if ((settings.IncludeMicrophone || settings.IncludeSystemAudio) && audioInputs.Count == 0)
+        if ((settings.IncludeMicrophone || settings.IncludeSystemAudio) && audioSourceCount == 0)
         {
             reason = "requested audio did not produce payload bytes; native production can continue video-only.";
             return true;
         }
 
-        reason = audioInputs.Count == 0
+        reason = audioSourceCount == 0
             ? "production video-only encoding is available."
             : "production video and AAC audio muxing are available.";
         return true;
     }
 
-    public static async Task<RecordingResult> EncodePngFramesAsync(
-        string frameDirectory,
+    /// <summary>
+    /// Opens a Media Foundation sink writer that accepts frames as they are captured.
+    /// The optional audio stream is populated from incrementally written normalized PCM chunks.
+    /// This path never writes an intermediate image-frame spool.
+    /// </summary>
+    public static StreamingVideoSession StartStreamingVideo(
+        string outputPath,
         NormalizedRecordingSettings settings,
         ProductionVideoEncoderSelection encoder,
-        string outputPath,
-        IReadOnlyList<NativeMp4AudioInput>? audioInputs,
-        CancellationToken cancellationToken)
+        int width,
+        int height,
+        bool reserveAudioStream = false)
     {
-        var frames = Directory
-            .EnumerateFiles(frameDirectory, "frame*.png", SearchOption.TopDirectoryOnly)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (frames.Count == 0)
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(encoder);
+        if (width <= 0 || height <= 0)
         {
-            return new RecordingResult
-            {
-                Succeeded = false,
-                Message = "Native Media Foundation encode could not start because no PNG frames were captured."
-            };
+            throw new ArgumentOutOfRangeException(nameof(width), "Streaming frame dimensions must be positive.");
         }
 
-        try
-        {
-            await Task.Run(
-                () => EncodePngFrames(frames, settings, encoder, outputPath, audioInputs ?? [], cancellationToken),
-                cancellationToken);
-
-            var audioText = audioInputs is { Count: > 0 }
-                ? $"audioInputs={audioInputs.Count}; "
-                : string.Empty;
-            return new RecordingResult
-            {
-                Succeeded = true,
-                OutputPath = outputPath,
-                Message = $"MP4 encoded through native Media Foundation {encoder.Codec} ({encoder.ChoiceLabel}); hardware={(encoder.IsHardwareAccelerated ? "yes" : "no")}; frames={frames.Count}; {audioText}{FormatNativeSummary(settings, audioInputs?.Count ?? 0)}"
-            };
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return new RecordingResult
-            {
-                Succeeded = false,
-                Message = $"Native Media Foundation MP4 encode failed ({ex.GetType().Name}: {ex.Message})"
-            };
-        }
+        return new StreamingVideoSession(outputPath, settings, encoder, width, height, reserveAudioStream);
     }
 
-    private static void EncodePngFrames(
-        IReadOnlyList<string> frames,
-        NormalizedRecordingSettings settings,
-        ProductionVideoEncoderSelection encoder,
-        string outputPath,
-        IReadOnlyList<NativeMp4AudioInput> audioInputs,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Incremental Media Foundation encoder shared by normal recording and rolling replay segments.
+    /// </summary>
+    public sealed class StreamingVideoSession : IDisposable
     {
-        using var first = new Bitmap(frames[0]);
-        var width = first.Width;
-        var height = first.Height;
-        var fps = Math.Max(1, settings.FramesPerSecond);
-        var frameDuration = HnsPerSecond / fps;
-        var bitrate = Math.Max(750_000, settings.BitrateKbps * 1_000);
+        private readonly object _gate = new();
+        private readonly string _outputPath;
+        private readonly int _width;
+        private readonly int _height;
+        private readonly int _framesPerSecond;
+        private readonly long _frameDuration;
+        private IMFSinkWriter? _writer;
+        private IMFMediaType? _outputType;
+        private IMFMediaType? _inputType;
+        private IMFMediaType? _audioOutputType;
+        private IMFMediaType? _audioInputType;
+        private int _streamIndex;
+        private int? _audioStreamIndex;
+        private int _frameCount;
+        private int _audioInputCount;
+        private readonly string? _audioSpoolPath;
+        private FileStream? _audioSpool;
+        private long _audioPcmBytes;
+        private bool _mediaFoundationStarted;
+        private bool _completed;
+        private bool _disposed;
 
-        CheckHResult(MFStartup(MfVersion, 0), "Media Foundation startup");
-        IMFSinkWriter? writer = null;
-        IMFMediaType? outputType = null;
-        IMFMediaType? inputType = null;
-        IMFMediaType? audioOutputType = null;
-        IMFMediaType? audioInputType = null;
-        NativeAudioPayload? audioPayload = null;
-        try
+        internal StreamingVideoSession(
+            string outputPath,
+            NormalizedRecordingSettings settings,
+            ProductionVideoEncoderSelection encoder,
+            int width,
+            int height,
+            bool reserveAudioStream)
         {
-            audioPayload = BuildNativeAudioPayload(audioInputs, cancellationToken);
-            CheckHResult(MFCreateSinkWriterFromURL(outputPath, IntPtr.Zero, IntPtr.Zero, out writer), "create sink writer");
-            var videoSubtype = VideoSubtypeForEncoder(encoder);
-            outputType = CreateVideoType(videoSubtype, width, height, fps, bitrate, includeBitrate: true);
-            CheckHResult(writer.AddStream(outputType, out var streamIndex), $"add {encoder.Codec} stream");
-            int? audioStreamIndex = null;
-            if (audioPayload is not null)
-            {
-                audioOutputType = CreateAudioType(MfAudioFormatAac, audioPayload.SampleRate, audioPayload.Channels, NativeAudioBitsPerSample, NativeAudioAacBytesPerSecond, includeAverageBytesPerSecond: true);
-                CheckHResult(writer.AddStream(audioOutputType, out var audioIndex), "add AAC audio stream");
-                audioStreamIndex = audioIndex;
-            }
+            _outputPath = Path.GetFullPath(outputPath);
+            _width = width;
+            _height = height;
+            _framesPerSecond = Math.Max(1, settings.FramesPerSecond);
+            _frameDuration = HnsPerSecond / _framesPerSecond;
+            Directory.CreateDirectory(Path.GetDirectoryName(_outputPath)!);
 
-            inputType = CreateVideoType(MfVideoFormatRgb32, width, height, fps, bitrate, includeBitrate: false);
-            CheckHResult(inputType.SetUINT32(MfMtDefaultStride, width * 4), "set input stride");
-            CheckHResult(writer.SetInputMediaType(streamIndex, inputType, IntPtr.Zero), "set RGB32 input type");
-            if (audioPayload is not null && audioStreamIndex.HasValue)
+            try
             {
-                audioInputType = CreateAudioType(MfAudioFormatPcm, audioPayload.SampleRate, audioPayload.Channels, NativeAudioBitsPerSample, audioPayload.AverageBytesPerSecond, includeAverageBytesPerSecond: false);
-                CheckHResult(writer.SetInputMediaType(audioStreamIndex.Value, audioInputType, IntPtr.Zero), "set PCM audio input type");
-            }
-
-            CheckHResult(writer.BeginWriting(), "begin writing");
-
-            for (var index = 0; index < frames.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                using var source = new Bitmap(frames[index]);
-                if (source.Width != width || source.Height != height)
+                CheckHResult(MFStartup(MfVersion, 0), "Media Foundation startup");
+                _mediaFoundationStarted = true;
+                CheckHResult(MFCreateSinkWriterFromURL(_outputPath, IntPtr.Zero, IntPtr.Zero, out _writer), "create streaming sink writer");
+                _outputType = CreateVideoType(
+                    VideoSubtypeForEncoder(encoder),
+                    width,
+                    height,
+                    _framesPerSecond,
+                    Math.Max(750_000, settings.BitrateKbps * 1_000),
+                    includeBitrate: true);
+                CheckHResult(_writer.AddStream(_outputType, out _streamIndex), $"add streaming {encoder.Codec} stream");
+                if (reserveAudioStream)
                 {
-                    throw new InvalidOperationException("Captured MP4 frames changed size during recording.");
+                    _audioOutputType = CreateAudioType(
+                        MfAudioFormatAac,
+                        NativeAudioSampleRate,
+                        NativeAudioChannels,
+                        NativeAudioBitsPerSample,
+                        NativeAudioAacBytesPerSecond,
+                        includeAverageBytesPerSecond: true);
+                    CheckHResult(_writer.AddStream(_audioOutputType, out var audioStreamIndex), "add streaming AAC audio stream");
+                    _audioStreamIndex = audioStreamIndex;
                 }
 
-                using var sample = CreateSampleFromBitmap(source, index * frameDuration, frameDuration);
-                CheckHResult(writer.WriteSample(streamIndex, sample.Sample), $"write frame {index + 1}");
-            }
+                _inputType = CreateVideoType(
+                    MfVideoFormatRgb32,
+                    width,
+                    height,
+                    _framesPerSecond,
+                    Math.Max(750_000, settings.BitrateKbps * 1_000),
+                    includeBitrate: false);
+                CheckHResult(_inputType.SetUINT32(MfMtDefaultStride, width * 4), "set streaming input stride");
+                CheckHResult(_writer.SetInputMediaType(_streamIndex, _inputType, IntPtr.Zero), "set streaming RGB32 input type");
+                if (_audioStreamIndex.HasValue)
+                {
+                    _audioInputType = CreateAudioType(
+                        MfAudioFormatPcm,
+                        NativeAudioSampleRate,
+                        NativeAudioChannels,
+                        NativeAudioBitsPerSample,
+                        NativeAudioSampleRate * NativeAudioChannels * (NativeAudioBitsPerSample / 8),
+                        includeAverageBytesPerSecond: false);
+                    CheckHResult(
+                        _writer.SetInputMediaType(_audioStreamIndex.Value, _audioInputType, IntPtr.Zero),
+                        "set streaming PCM audio input type");
+                }
 
-            if (audioPayload is not null && audioStreamIndex.HasValue)
+                CheckHResult(_writer.BeginWriting(), "begin streaming video");
+                if (_audioStreamIndex.HasValue)
+                {
+                    _audioSpoolPath = _outputPath + $".audio-{Guid.NewGuid():N}.pcm.tmp";
+                    _audioSpool = new FileStream(
+                        _audioSpoolPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.Read,
+                        bufferSize: 64 * 1024,
+                        FileOptions.SequentialScan);
+                }
+            }
+            catch
             {
-                var videoDurationHns = frames.Count * frameDuration;
-                WriteAudioSamples(writer, audioStreamIndex.Value, audioPayload, videoDurationHns, cancellationToken);
+                ReleaseResources();
+                throw;
             }
-
-            CheckHResult(writer.Finalize_(), "finalize MP4");
         }
-        finally
+
+        public string OutputPath => _outputPath;
+        public int Width => _width;
+        public int Height => _height;
+        public int FramesPerSecond => _framesPerSecond;
+        public int FrameCount => Volatile.Read(ref _frameCount);
+        public long AudioPcmBytes => Interlocked.Read(ref _audioPcmBytes);
+
+        /// <summary>
+        /// Incrementally appends normalized 48 kHz stereo PCM16. The session keeps only a
+        /// bounded FileStream buffer; it never materializes the full audio track in memory.
+        /// </summary>
+        public void WriteAudioPcm(ReadOnlyMemory<byte> pcm16)
         {
-            if (writer is not null)
+            if (pcm16.IsEmpty)
             {
-                Marshal.FinalReleaseComObject(writer);
+                return;
             }
 
-            if (outputType is not null)
+            lock (_gate)
             {
-                Marshal.FinalReleaseComObject(outputType);
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_completed)
+                {
+                    throw new InvalidOperationException("The streaming video session is already complete.");
+                }
+
+                if (_audioSpool is null)
+                {
+                    throw new InvalidOperationException("This streaming session did not reserve an audio stream.");
+                }
+
+                var byteCount = pcm16.Length - pcm16.Length %
+                    (NativeAudioChannels * (NativeAudioBitsPerSample / 8));
+                if (byteCount == 0)
+                {
+                    return;
+                }
+
+                _audioSpool.Write(pcm16.Span[..byteCount]);
+                _audioPcmBytes += byteCount;
+            }
+        }
+
+        public void WriteFrame(Bitmap source, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_completed)
+                {
+                    throw new InvalidOperationException("The streaming video session is already complete.");
+                }
+
+                if (source.Width != _width || source.Height != _height)
+                {
+                    throw new InvalidOperationException(
+                        $"Streaming frame dimensions changed from {_width}x{_height} to {source.Width}x{source.Height}.");
+                }
+
+                var index = _frameCount;
+                using var sample = CreateSampleFromBitmap(source, index * _frameDuration, _frameDuration);
+                CheckHResult(
+                    (_writer ?? throw new ObjectDisposedException(nameof(StreamingVideoSession))).WriteSample(_streamIndex, sample.Sample),
+                    $"write streaming frame {index + 1}");
+                _frameCount++;
+            }
+        }
+
+        public RecordingResult Complete()
+        {
+            return Complete(includeAudio: true, audioSourceCount: 0, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Streams the incrementally captured PCM spool into bounded Media Foundation samples,
+        /// then finalizes the MP4. Suppressed audio is discarded without entering the MP4.
+        /// </summary>
+        public RecordingResult Complete(
+            bool includeAudio,
+            int audioSourceCount,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_completed)
+                {
+                    return BuildResult();
+                }
+
+                if (_frameCount == 0)
+                {
+                    throw new InvalidOperationException("A streaming video segment cannot be completed without frames.");
+                }
+
+                if (audioSourceCount > 0 && !_audioStreamIndex.HasValue)
+                {
+                    throw new InvalidOperationException("Audio sources produced PCM, but this streaming session did not reserve an audio stream.");
+                }
+
+                _audioSpool?.Flush(flushToDisk: false);
+                _audioSpool?.Dispose();
+                _audioSpool = null;
+                if (includeAudio && _audioPcmBytes > 0 && _audioStreamIndex.HasValue && _audioSpoolPath is not null)
+                {
+                    var videoDurationHns = _frameCount * _frameDuration;
+                    WriteAudioSamplesFromPcmFile(
+                        _writer ?? throw new ObjectDisposedException(nameof(StreamingVideoSession)),
+                        _audioStreamIndex.Value,
+                        _audioSpoolPath,
+                        videoDurationHns,
+                        cancellationToken);
+                    _audioInputCount = Math.Max(0, audioSourceCount);
+                }
+
+                CheckHResult(
+                    (_writer ?? throw new ObjectDisposedException(nameof(StreamingVideoSession))).Finalize_(),
+                    "finalize streaming video");
+                _completed = true;
+                ReleaseResources();
+                return BuildResult();
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                if (!_completed && _frameCount > 0)
+                {
+                    try
+                    {
+                        _writer?.Finalize_();
+                    }
+                    catch
+                    {
+                        // A canceled or failed segment is best-effort finalized before cleanup.
+                    }
+                }
+
+                _completed = true;
+                ReleaseResources();
+                _disposed = true;
+            }
+        }
+
+        private RecordingResult BuildResult()
+        {
+            return new RecordingResult
+            {
+                Succeeded = File.Exists(_outputPath) && _frameCount > 0,
+                OutputPath = _outputPath,
+                Message = $"Streaming MP4 segment encoded with {_frameCount} frame(s) at {_framesPerSecond} fps."
+                    + (_audioStreamIndex.HasValue
+                        ? $" AAC audio inputs muxed: {_audioInputCount}."
+                        : string.Empty)
+            };
+        }
+
+        private void ReleaseResources()
+        {
+            _audioSpool?.Dispose();
+            _audioSpool = null;
+            if (!string.IsNullOrWhiteSpace(_audioSpoolPath))
+            {
+                try
+                {
+                    File.Delete(_audioSpoolPath);
+                }
+                catch
+                {
+                    // Startup cleanup owns abandoned *.tmp PCM spools after a crash.
+                }
             }
 
-            if (inputType is not null)
+            if (_writer is not null)
             {
-                Marshal.FinalReleaseComObject(inputType);
+                Marshal.FinalReleaseComObject(_writer);
+                _writer = null;
             }
 
-            if (audioOutputType is not null)
+            if (_outputType is not null)
             {
-                Marshal.FinalReleaseComObject(audioOutputType);
+                Marshal.FinalReleaseComObject(_outputType);
+                _outputType = null;
             }
 
-            if (audioInputType is not null)
+            if (_inputType is not null)
             {
-                Marshal.FinalReleaseComObject(audioInputType);
+                Marshal.FinalReleaseComObject(_inputType);
+                _inputType = null;
             }
 
-            _ = MFShutdown();
+            if (_audioOutputType is not null)
+            {
+                Marshal.FinalReleaseComObject(_audioOutputType);
+                _audioOutputType = null;
+            }
+
+            if (_audioInputType is not null)
+            {
+                Marshal.FinalReleaseComObject(_audioInputType);
+                _audioInputType = null;
+            }
+
+            if (_mediaFoundationStarted)
+            {
+                _ = MFShutdown();
+                _mediaFoundationStarted = false;
+            }
         }
     }
 
@@ -292,137 +492,36 @@ public static class NativeMediaFoundationMp4Encoder
         return mediaType;
     }
 
-    internal static NativeAudioPayload? BuildNativeAudioPayload(
-        IReadOnlyList<NativeMp4AudioInput> audioInputs,
-        CancellationToken cancellationToken = default)
-    {
-        var existingInputs = audioInputs
-            .Where(input => !string.IsNullOrWhiteSpace(input.Path) && File.Exists(input.Path))
-            .ToList();
-        if (existingInputs.Count == 0)
-        {
-            return null;
-        }
-
-        var providers = new List<ISampleProvider>();
-        var readers = new List<AudioFileReader>();
-        try
-        {
-            foreach (var input in existingInputs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var reader = new AudioFileReader(input.Path);
-                readers.Add(reader);
-                ISampleProvider provider = reader;
-                provider = EnsureStereo(provider);
-                if (provider.WaveFormat.SampleRate != NativeAudioSampleRate)
-                {
-                    provider = new WdlResamplingSampleProvider(provider, NativeAudioSampleRate);
-                }
-
-                providers.Add(provider);
-            }
-
-            if (providers.Count == 0)
-            {
-                return null;
-            }
-
-            var samplesPerChunk = NativeAudioFramesPerSample * NativeAudioChannels;
-            var providerBuffers = providers.Select(_ => new float[samplesPerChunk]).ToList();
-            var mix = new float[samplesPerChunk];
-            using var pcm = new MemoryStream();
-
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Array.Clear(mix);
-                var maxRead = 0;
-                for (var providerIndex = 0; providerIndex < providers.Count; providerIndex++)
-                {
-                    var buffer = providerBuffers[providerIndex];
-                    var read = providers[providerIndex].Read(buffer, 0, buffer.Length);
-                    if (read <= 0)
-                    {
-                        continue;
-                    }
-
-                    maxRead = Math.Max(maxRead, read);
-                    for (var sample = 0; sample < read; sample++)
-                    {
-                        mix[sample] += buffer[sample] / providers.Count;
-                    }
-                }
-
-                if (maxRead == 0)
-                {
-                    break;
-                }
-
-                WritePcm16Samples(pcm, mix, maxRead);
-            }
-
-            if (pcm.Length == 0)
-            {
-                return null;
-            }
-
-            return new NativeAudioPayload(
-                pcm.ToArray(),
-                NativeAudioSampleRate,
-                NativeAudioChannels,
-                NativeAudioBitsPerSample,
-                existingInputs.Count);
-        }
-        finally
-        {
-            foreach (var reader in readers)
-            {
-                reader.Dispose();
-            }
-        }
-    }
-
-    private static ISampleProvider EnsureStereo(ISampleProvider provider)
-    {
-        return provider.WaveFormat.Channels switch
-        {
-            1 => new MonoToStereoSampleProvider(provider),
-            2 => provider,
-            _ => new StereoDownmixSampleProvider(provider)
-        };
-    }
-
-    private static void WritePcm16Samples(Stream output, float[] samples, int sampleCount)
-    {
-        Span<byte> bytes = stackalloc byte[2];
-        for (var i = 0; i < sampleCount; i++)
-        {
-            var value = Math.Clamp(samples[i], -1f, 1f);
-            var pcm = (short)Math.Round(value * short.MaxValue);
-            bytes[0] = (byte)(pcm & 0xFF);
-            bytes[1] = (byte)((pcm >> 8) & 0xFF);
-            output.Write(bytes);
-        }
-    }
-
-    private static void WriteAudioSamples(
+    private static void WriteAudioSamplesFromPcmFile(
         IMFSinkWriter writer,
         int streamIndex,
-        NativeAudioPayload payload,
+        string pcmPath,
         long maxDurationHns,
         CancellationToken cancellationToken)
     {
-        var bytesPerFrame = payload.Channels * (payload.BitsPerSample / 8);
+        var bytesPerFrame = NativeAudioChannels * (NativeAudioBitsPerSample / 8);
         var bytesPerSample = NativeAudioFramesPerSample * bytesPerFrame;
         // Trim audio to the encoded video duration so the MP4 does not trail off with
         // audio-only content; the FFmpeg fallback enforces the same bound via -shortest.
-        var maxAudioFrames = maxDurationHns * payload.SampleRate / HnsPerSecond;
+        var maxAudioFrames = maxDurationHns * NativeAudioSampleRate / HnsPerSecond;
+        var buffer = new byte[bytesPerSample];
         long framesWritten = 0;
-        for (var offset = 0; offset < payload.Pcm16.Length; offset += bytesPerSample)
+        using var pcm = new FileStream(
+            pcmPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: bytesPerSample,
+            FileOptions.SequentialScan);
+        while (framesWritten < maxAudioFrames)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var byteCount = Math.Min(bytesPerSample, payload.Pcm16.Length - offset);
+            var byteCount = pcm.Read(buffer, 0, buffer.Length);
+            if (byteCount <= 0)
+            {
+                break;
+            }
+
             var frameCount = (int)Math.Min(byteCount / bytesPerFrame, maxAudioFrames - framesWritten);
             if (frameCount <= 0)
             {
@@ -430,9 +529,9 @@ public static class NativeMediaFoundationMp4Encoder
             }
 
             byteCount = frameCount * bytesPerFrame;
-            var sampleTime = framesWritten * HnsPerSecond / payload.SampleRate;
-            var sampleDuration = frameCount * HnsPerSecond / payload.SampleRate;
-            using var sample = CreateSampleFromBytes(payload.Pcm16, offset, byteCount, sampleTime, sampleDuration);
+            var sampleTime = framesWritten * HnsPerSecond / NativeAudioSampleRate;
+            var sampleDuration = frameCount * HnsPerSecond / NativeAudioSampleRate;
+            using var sample = CreateSampleFromBytes(buffer, 0, byteCount, sampleTime, sampleDuration);
             CheckHResult(writer.WriteSample(streamIndex, sample.Sample), $"write audio sample at frame {framesWritten}");
             framesWritten += frameCount;
         }
@@ -444,7 +543,7 @@ public static class NativeMediaFoundationMp4Encoder
             ? $"Overlays: border={(settings.ShowRecordingBorder ? "on" : "off")}, timer={(settings.ShowRecordingTimer ? settings.RecordingTimerPosition : "off")}, keys={(settings.ShowKeystrokeOverlay ? settings.KeystrokeOverlayPosition : "off")}, badge {settings.RecordingOverlayBadgeFontSize}px {settings.RecordingOverlayStyle}."
             : "Overlays: off.";
         var audio = audioInputCount > 0
-            ? "Native AAC audio mux/mix enabled for captured WAV input(s)."
+            ? "Native AAC audio mux/mix enabled for incrementally captured PCM stream(s)."
             : "Native video-only production encode.";
         var webcam = settings.EnableWebcamOverlay
             ? "Webcam overlay frames are precomposited before native encode with bounded native camera-frame refresh."
@@ -568,73 +667,6 @@ public static class NativeMediaFoundationMp4Encoder
         finally
         {
             bitmap.UnlockBits(data);
-        }
-    }
-
-    internal sealed record NativeAudioPayload(
-        byte[] Pcm16,
-        int SampleRate,
-        int Channels,
-        int BitsPerSample,
-        int SourceCount)
-    {
-        public int AverageBytesPerSecond => SampleRate * Channels * (BitsPerSample / 8);
-        public double DurationSeconds => Pcm16.Length / (double)AverageBytesPerSecond;
-    }
-
-    private sealed class StereoDownmixSampleProvider : ISampleProvider
-    {
-        private readonly ISampleProvider _source;
-        private readonly int _sourceChannels;
-        private readonly float[] _sourceBuffer;
-
-        public StereoDownmixSampleProvider(ISampleProvider source)
-        {
-            _source = source;
-            _sourceChannels = Math.Max(1, source.WaveFormat.Channels);
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.WaveFormat.SampleRate, NativeAudioChannels);
-            _sourceBuffer = new float[NativeAudioFramesPerSample * _sourceChannels];
-        }
-
-        public WaveFormat WaveFormat { get; }
-
-        public int Read(float[] buffer, int offset, int count)
-        {
-            var requestedFrames = Math.Min(count / NativeAudioChannels, NativeAudioFramesPerSample);
-            if (requestedFrames <= 0)
-            {
-                return 0;
-            }
-
-            var sourceSamplesRequested = requestedFrames * _sourceChannels;
-            var read = _source.Read(_sourceBuffer, 0, sourceSamplesRequested);
-            var framesRead = read / _sourceChannels;
-            for (var frame = 0; frame < framesRead; frame++)
-            {
-                var baseIndex = frame * _sourceChannels;
-                var left = _sourceBuffer[baseIndex];
-                var right = _sourceChannels > 1 ? _sourceBuffer[baseIndex + 1] : left;
-                if (_sourceChannels > 2)
-                {
-                    for (var channel = 2; channel < _sourceChannels; channel++)
-                    {
-                        if ((channel & 1) == 0)
-                        {
-                            left += _sourceBuffer[baseIndex + channel] * 0.5f;
-                        }
-                        else
-                        {
-                            right += _sourceBuffer[baseIndex + channel] * 0.5f;
-                        }
-                    }
-                }
-
-                var target = offset + frame * NativeAudioChannels;
-                buffer[target] = Math.Clamp(left, -1f, 1f);
-                buffer[target + 1] = Math.Clamp(right, -1f, 1f);
-            }
-
-            return framesRead * NativeAudioChannels;
         }
     }
 

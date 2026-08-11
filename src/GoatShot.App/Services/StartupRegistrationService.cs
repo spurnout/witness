@@ -6,7 +6,8 @@ namespace GoatShot.App.Services;
 public sealed class StartupRegistrationService
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "GoatShot";
+    private const string ValueName = BrandIdentity.ProductName;
+    private const string LegacyValueName = BrandIdentity.LegacyProductName;
 
     public StartupRegistrationState GetState(string? executablePath = null)
     {
@@ -22,6 +23,12 @@ public sealed class StartupRegistrationService
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
             var command = key?.GetValue(ValueName) as string;
+            var isLegacyRegistration = false;
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                command = key?.GetValue(LegacyValueName) as string;
+                isLegacyRegistration = !string.IsNullOrWhiteSpace(command);
+            }
             if (string.IsNullOrWhiteSpace(command))
             {
                 return new StartupRegistrationState
@@ -38,8 +45,12 @@ public sealed class StartupRegistrationService
                 IsCurrentCommand = isCurrent,
                 Command = command,
                 Message = isCurrent
-                    ? "Startup registration is enabled for the current app path."
-                    : "Startup registration exists but points to a different app path."
+                    ? isLegacyRegistration
+                        ? "Legacy GoatShot startup registration is active for the current app path and will be migrated on the next successful update."
+                        : "Startup registration is enabled for the current Receipts app path."
+                    : isLegacyRegistration
+                        ? "Legacy GoatShot startup registration exists but does not point to the current Receipts app path."
+                        : "Startup registration exists but points to a different Receipts app path."
             };
         }
         catch (Exception ex)
@@ -79,18 +90,21 @@ public sealed class StartupRegistrationService
             if (enabled)
             {
                 key.SetValue(ValueName, BuildStartupCommand(executablePath), RegistryValueKind.String);
+                // Remove the old value only after the Receipts value was written successfully.
+                key.DeleteValue(LegacyValueName, throwOnMissingValue: false);
                 return new StartupRegistrationResult
                 {
                     Succeeded = true,
-                    Message = "GoatShot will run when the current Windows user signs in."
+                    Message = "Receipts will run when the current Windows user signs in."
                 };
             }
 
             key.DeleteValue(ValueName, throwOnMissingValue: false);
+            key.DeleteValue(LegacyValueName, throwOnMissingValue: false);
             return new StartupRegistrationResult
             {
                 Succeeded = true,
-                Message = "GoatShot startup registration is disabled."
+                Message = "Receipts startup registration is disabled."
             };
         }
         catch (Exception ex)

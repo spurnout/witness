@@ -868,7 +868,7 @@ public sealed class ShareService
     private string BuildDropboxPath(CaptureItem item)
     {
         var folder = string.IsNullOrWhiteSpace(_settings.DropboxRemoteFolder)
-            ? "/GoatShot"
+            ? "/Receipts"
             : _settings.DropboxRemoteFolder.Replace('\\', '/').Trim();
         if (folder.Length == 0 || folder == ".")
         {

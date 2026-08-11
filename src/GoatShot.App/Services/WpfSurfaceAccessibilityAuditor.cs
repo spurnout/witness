@@ -50,16 +50,39 @@ public static class WpfSurfaceAccessibilityAuditor
         var surface = NormalizeSurface(surfaceKey);
         Window? window = null;
         string? temporaryEditorImage = null;
+        FrameExplorerRenderFixture? frameExplorerFixture = null;
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            (window, temporaryEditorImage) = CreateWindow(services, surface, fullPath);
+            if (surface == "frame-explorer")
+            {
+                frameExplorerFixture = await FrameExplorerWindowRenderer.CreateFixtureAsync(cancellationToken);
+                window = new FrameExplorerWindow(
+                    services,
+                    frameExplorerFixture.Item,
+                    autoLoad: false);
+            }
+            else
+            {
+                (window, temporaryEditorImage) = CreateWindow(services, surface, fullPath);
+            }
+
+            if (surface == "recording" && window is MainWindow recordingWindow)
+            {
+                recordingWindow.PrepareRecordingAuditSurface();
+            }
+
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = -10000;
             window.Top = -10000;
-            window.Width = surface == "editor" ? 1200 : 1180;
-            window.Height = surface == "settings" ? 820 : 760;
+            window.Width = surface switch
+            {
+                "editor" => 1200,
+                "frame-explorer" => 1320,
+                _ => 1180
+            };
+            window.Height = surface is "settings" or "frame-explorer" ? 820 : 760;
             window.ShowInTaskbar = false;
             window.Show();
 
@@ -69,12 +92,19 @@ public static class WpfSurfaceAccessibilityAuditor
             }
 
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+            if (window is FrameExplorerWindow frameExplorer && frameExplorerFixture is not null)
+            {
+                await frameExplorer.PrepareRenderProofAsync(frameExplorerFixture.PreviewFramePath);
+            }
+
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
 
             var root = SelectAuditRoot(window, surface);
-            var controls = Descendants(root)
+            var elements = Descendants(root)
                 .Where(IsKeyboardRelevant)
+                .ToList();
+            var controls = elements
                 .Select((element, index) => InspectControl(element, index + 1))
                 .ToList();
 
@@ -90,6 +120,8 @@ public static class WpfSurfaceAccessibilityAuditor
             {
                 TryDelete(temporaryEditorImage);
             }
+
+            frameExplorerFixture?.Dispose();
         }
     }
 
@@ -183,7 +215,7 @@ public static class WpfSurfaceAccessibilityAuditor
         var automationName = AutomationProperties.GetName(element);
         var name = FirstNonBlank(automationName, peerName, ContentName(element));
         var control = element as WpfControl;
-        var focusAccepted = element.IsEnabled && element.Focusable && element.Focus();
+        var focusAccepted = element.IsEnabled && element.Focusable && TryAcceptFocus(element);
 
         return new WpfAccessibilityItem(
             index,
@@ -196,6 +228,16 @@ public static class WpfSurfaceAccessibilityAuditor
             control?.TabIndex,
             focusAccepted,
             AutomationProperties.GetLiveSetting(element).ToString());
+    }
+
+    private static bool TryAcceptFocus(FrameworkElement element)
+    {
+        if (element is TabItem tabItem)
+        {
+            tabItem.IsSelected = true;
+        }
+
+        return element.Focus();
     }
 
     private static string BuildReport(
@@ -261,6 +303,7 @@ public static class WpfSurfaceAccessibilityAuditor
             "recording" or "recording-controls" => "recording",
             "editor" or "editor-window" => "editor",
             "settings" or "settings-window" => "settings",
+            "frame-explorer" or "frameexplorer" or "replay" or "replay-receipt" => "frame-explorer",
             "proof" or "proof-scene" or "safe-proof" or "safe-proof-scene" => "proof-scene",
             _ => key
         };
@@ -274,6 +317,7 @@ public static class WpfSurfaceAccessibilityAuditor
             "recording" => "Recording Controls",
             "editor" => "Editor",
             "settings" => "Settings",
+            "frame-explorer" => "Frame Explorer",
             "proof-scene" => "Safe Proof Scene",
             _ => surface
         };

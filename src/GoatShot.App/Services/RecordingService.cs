@@ -41,6 +41,35 @@ public sealed class RecordingService : IDisposable
         _cameraOverlay = cameraOverlay;
     }
 
+    internal enum Mp4CaptureArchitecture
+    {
+        StreamingMediaFoundation,
+        StreamingRawVideoFfmpeg
+    }
+
+    internal sealed record ProductionMp4FeatureRouting(
+        bool ReserveAudioStream,
+        bool PrecomposeWebcam,
+        bool UsesTemporaryImageFrameSpool);
+
+    internal static Mp4CaptureArchitecture SelectMp4CaptureArchitecture(RecordingEnginePlan enginePlan)
+    {
+        ArgumentNullException.ThrowIfNull(enginePlan);
+        return enginePlan.Choice == RecordingEngineChoice.Production
+            ? Mp4CaptureArchitecture.StreamingMediaFoundation
+            : Mp4CaptureArchitecture.StreamingRawVideoFfmpeg;
+    }
+
+    internal static ProductionMp4FeatureRouting BuildProductionFeatureRouting(
+        NormalizedRecordingSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return new ProductionMp4FeatureRouting(
+            ReserveAudioStream: settings.IncludeMicrophone || settings.IncludeSystemAudio,
+            PrecomposeWebcam: settings.EnableWebcamOverlay,
+            UsesTemporaryImageFrameSpool: false);
+    }
+
     public bool IsRecording
     {
         get
@@ -294,9 +323,23 @@ public sealed class RecordingService : IDisposable
 
         Directory.CreateDirectory(_paths.VideosRoot);
         outputPath = string.IsNullOrWhiteSpace(outputPath)
-            ? Path.Combine(_paths.VideosRoot, $"goatshot-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.mp4")
+            ? Path.Combine(_paths.VideosRoot, $"receipts-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.mp4")
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(outputPath));
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+
+        if (SelectMp4CaptureArchitecture(enginePlan) == Mp4CaptureArchitecture.StreamingMediaFoundation)
+        {
+            return await RecordStreamingProductionAsync(
+                duration,
+                outputPath,
+                recordingSettings,
+                normalized,
+                target,
+                capabilities,
+                enginePlan,
+                addToWorkspace,
+                cancellationToken);
+        }
 
         var tempRoot = Path.Combine(_paths.TempRoot, $"mp4-recording-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
@@ -304,16 +347,18 @@ public sealed class RecordingService : IDisposable
         var encodedFrameCount = 0;
         var capturedFrameCount = 0;
         var expectedFrameCount = ExpectedMp4FrameCount(duration, normalized.FramesPerSecond);
-        var startedAt = DateTimeOffset.Now;
-        var stopwatch = Stopwatch.StartNew();
-        string? lastFramePath = null;
+        var stopwatch = new Stopwatch();
+        Bitmap? lastFrame = null;
         WindowsGraphicsCaptureFrameSource? wgcFrameSource = null;
+        NativeWebcamOverlaySource? nativeWebcamOverlaySource = null;
+        FfmpegRawVideoSession? rawVideo = null;
+        StreamingRecordingAudioSession? streamingAudio = null;
+        FileStream? mixedPcm = null;
+        var silentVideoPath = Path.Combine(tempRoot, "video-only.mp4");
+        var mixedPcmPath = Path.Combine(tempRoot, "mixed-audio.pcm.tmp");
         var frameSourceSummary = $"GDI screenshot frame capture from {target.DisplayName}";
         string? frameSourceFallbackNote = null;
-        using var audioCaptureCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pendingAudioCaptures = StartMp4AudioCaptures(recordingSettings, normalized, tempRoot, duration, audioCaptureCts.Token);
-        NativeWebcamOverlaySource? nativeWebcamOverlaySource = null;
-        var nativeWebcamMessage = normalized.EnableWebcamOverlay
+        var webcamMessage = normalized.EnableWebcamOverlay
             ? "requested but native camera frame capture was not attempted."
             : "not requested.";
 
@@ -332,16 +377,17 @@ public sealed class RecordingService : IDisposable
                 }
             }
 
-            if (normalized.EnableWebcamOverlay && enginePlan.ProductionEngineImplemented)
+            if (normalized.EnableWebcamOverlay)
             {
                 var nativeWebcam = await PrepareNativeWebcamOverlayAsync(
                     recordingSettings,
                     cancellationToken);
                 nativeWebcamOverlaySource = nativeWebcam.Input;
-                nativeWebcamMessage = nativeWebcam.Message;
+                webcamMessage = nativeWebcam.Message;
             }
 
-            while (stopwatch.Elapsed < duration && encodedFrameCount < expectedFrameCount)
+            while ((!stopwatch.IsRunning || stopwatch.Elapsed < duration) &&
+                   encodedFrameCount < expectedFrameCount)
             {
                 try
                 {
@@ -364,10 +410,12 @@ public sealed class RecordingService : IDisposable
                         captured,
                         _settings.IncludeCursor,
                         normalized,
-                        DateTimeOffset.Now - startedAt);
+                        stopwatch.IsRunning ? stopwatch.Elapsed : TimeSpan.Zero);
                     if (nativeWebcamOverlaySource is not null)
                     {
-                        await nativeWebcamOverlaySource.RefreshIfDueAsync(DateTimeOffset.Now, cancellationToken);
+                        await nativeWebcamOverlaySource.RefreshIfDueAsync(
+                            DateTimeOffset.Now,
+                            cancellationToken);
                     }
 
                     var nativeWebcamOverlay = nativeWebcamOverlaySource?.Current;
@@ -375,19 +423,57 @@ public sealed class RecordingService : IDisposable
                         ? CloneBitmapArgb(decorated)
                         : ComposeNativeWebcamOverlay(decorated, nativeWebcamOverlay);
                     using var frame = ResizeFrame(composited, normalized);
-                    lastFramePath = SaveNextMp4Frame(frame, tempRoot, ref encodedFrameCount);
+                    if (rawVideo is null)
+                    {
+                        var attempt = BuildVideoEncoderAttempts(
+                            enginePlan.FallbackVideoEncoder,
+                            normalized).First();
+                        rawVideo = FfmpegRawVideoSession.Start(
+                            ffmpeg!,
+                            silentVideoPath,
+                            normalized,
+                            attempt.EncoderName,
+                            attempt.Provider,
+                            attempt.IsHardwareAccelerated,
+                            attempt.TargetBitrateKbps,
+                            frame.Width,
+                            frame.Height);
+                        stopwatch.Restart();
+                        if (normalized.IncludeMicrophone || normalized.IncludeSystemAudio)
+                        {
+                            mixedPcm = new FileStream(
+                                mixedPcmPath,
+                                FileMode.CreateNew,
+                                FileAccess.Write,
+                                FileShare.Read,
+                                bufferSize: 64 * 1024,
+                                FileOptions.SequentialScan);
+                        }
+
+                        streamingAudio = StartStreamingRecordingAudio(
+                            recordingSettings,
+                            normalized,
+                            pcm => mixedPcm?.Write(pcm.Span),
+                            cancellationToken);
+                    }
+
+                    await rawVideo.WriteFrameAsync(frame, cancellationToken);
+                    encodedFrameCount = rawVideo.FrameCount;
                     capturedFrameCount++;
+                    lastFrame?.Dispose();
+                    lastFrame = (Bitmap)frame.Clone();
 
                     var pacedFrameCount = DesiredPacedMp4FrameCount(
                         stopwatch.Elapsed,
                         duration,
                         normalized.FramesPerSecond,
                         encodedFrameCount);
-                    DuplicateLastMp4FrameUntil(
-                        lastFramePath,
-                        tempRoot,
-                        Math.Min(pacedFrameCount, expectedFrameCount),
-                        ref encodedFrameCount);
+                    while (rawVideo.FrameCount < Math.Min(pacedFrameCount, expectedFrameCount))
+                    {
+                        await rawVideo.WriteFrameAsync(lastFrame, cancellationToken);
+                    }
+
+                    encodedFrameCount = rawVideo.FrameCount;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -406,7 +492,7 @@ public sealed class RecordingService : IDisposable
                 }
             }
 
-            if (encodedFrameCount == 0 || lastFramePath is null)
+            if (encodedFrameCount == 0 || lastFrame is null || rawVideo is null)
             {
                 return new RecordingResult
                 {
@@ -415,111 +501,43 @@ public sealed class RecordingService : IDisposable
                 };
             }
 
-            DuplicateLastMp4FrameUntil(
-                lastFramePath,
-                tempRoot,
-                expectedFrameCount,
-                ref encodedFrameCount);
-
-            var audioCaptureSummary = await CompleteMp4AudioCapturesAsync(pendingAudioCaptures, audioCaptureCts);
-            var webcamSummary = new Mp4WebcamCaptureSummary(null, nativeWebcamOverlaySource?.Summary ?? nativeWebcamMessage);
-            RecordingResult encode;
-            var nativeAudioInputs = audioCaptureSummary.Inputs
-                .Select(input => new NativeMediaFoundationMp4Encoder.NativeMp4AudioInput(input.Source, input.Path))
-                .ToList();
-            var usedProductionEncoder = NativeMediaFoundationMp4Encoder.CanEncodeProduction(
-                enginePlan,
-                normalized,
-                nativeAudioInputs,
-                out var productionEligibility);
-            if (usedProductionEncoder && normalized.EnableWebcamOverlay && nativeWebcamOverlaySource is null && canUseFfmpegFallback)
+            while (rawVideo.FrameCount < expectedFrameCount)
             {
-                usedProductionEncoder = false;
-                productionEligibility = nativeWebcamMessage;
-            }
-            if (usedProductionEncoder)
-            {
-                encode = await NativeMediaFoundationMp4Encoder.EncodePngFramesAsync(
-                    tempRoot,
-                    normalized,
-                    enginePlan.ProductionEncoder,
-                    outputPath,
-                    nativeAudioInputs,
-                    cancellationToken);
-                if (!encode.Succeeded && canUseFfmpegFallback)
-                {
-                    var productionFailure = encode.Message;
-                    webcamSummary = await PrepareMp4WebcamInputAsync(
-                        ffmpeg!,
-                        recordingSettings,
-                        normalized,
-                        cancellationToken);
-                    encode = await EncodeMp4Async(
-                        ffmpeg!,
-                        tempRoot,
-                        normalized,
-                        enginePlan.FallbackVideoEncoder,
-                        outputPath,
-                        duration,
-                        audioCaptureSummary.Inputs,
-                        webcamSummary.Input,
-                        cancellationToken);
-                    if (encode.Succeeded)
-                    {
-                        encode.Message = $"{encode.Message} Retried after native production encode failed: {productionFailure}";
-                        usedProductionEncoder = false;
-                    }
-                }
-            }
-            else
-            {
-                if (!canUseFfmpegFallback)
-                {
-                    return new RecordingResult
-                    {
-                        Succeeded = false,
-                        Message = $"MP4 recording is unavailable. Production path was not usable ({productionEligibility}) and no FFmpeg fallback is available. {enginePlan.Summary}"
-                    };
-                }
-
-                webcamSummary = await PrepareMp4WebcamInputAsync(
-                    ffmpeg!,
-                    recordingSettings,
-                    normalized,
-                    cancellationToken);
-                encode = await EncodeMp4Async(
-                    ffmpeg!,
-                    tempRoot,
-                    normalized,
-                    enginePlan.FallbackVideoEncoder,
-                    outputPath,
-                    duration,
-                    audioCaptureSummary.Inputs,
-                    webcamSummary.Input,
-                    cancellationToken);
+                await rawVideo.WriteFrameAsync(lastFrame, cancellationToken);
             }
 
-            if (!encode.Succeeded && webcamSummary.Input is not null && canUseFfmpegFallback)
+            encodedFrameCount = rawVideo.FrameCount;
+
+            var audioCaptureSummary = streamingAudio is null
+                ? new StreamingRecordingAudioResult([], 0, [])
+                : await streamingAudio.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            mixedPcm?.Flush(flushToDisk: false);
+            mixedPcm?.Dispose();
+            mixedPcm = null;
+
+            var encode = await rawVideo.CompleteAsync(cancellationToken);
+            if (encode.Succeeded &&
+                audioCaptureSummary.SourcesWithPayload.Count > 0 &&
+                File.Exists(mixedPcmPath) &&
+                new FileInfo(mixedPcmPath).Length > 0)
             {
-                var failedWithWebcam = encode.Message;
-                var retry = await EncodeMp4Async(
+                var mux = await MuxRawPcmIntoMp4Async(
                     ffmpeg!,
-                    tempRoot,
-                    normalized,
-                    enginePlan.FallbackVideoEncoder,
+                    silentVideoPath,
+                    mixedPcmPath,
                     outputPath,
-                    duration,
-                    audioCaptureSummary.Inputs,
-                    webcamInput: null,
                     cancellationToken);
-                if (retry.Succeeded)
+                if (mux.Succeeded)
                 {
-                    webcamSummary = webcamSummary with
-                    {
-                        Message = $"{webcamSummary.Message} Webcam overlay failed during FFmpeg encode and was omitted on retry ({failedWithWebcam})."
-                    };
-                    encode = retry;
+                    mux.Message = $"{encode.Message} {mux.Message}";
                 }
+
+                encode = mux;
+            }
+            else if (encode.Succeeded)
+            {
+                File.Move(silentVideoPath, outputPath, overwrite: true);
+                encode.OutputPath = outputPath;
             }
 
             if (!encode.Succeeded)
@@ -533,39 +551,41 @@ public sealed class RecordingService : IDisposable
                 item = await _workspaceStore.AddImageFileAsync(
                     outputPath,
                     CaptureKind.RecordingMp4,
-                    $"MP4 recording encoded through {(usedProductionEncoder ? "native Media Foundation production video path" : "FFmpeg fallback")} for {target.DisplayName}. Encoder: {encode.Message} Frame source: {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} Audio: {audioCaptureSummary.Message} Webcam: {webcamSummary.Message} Engine plan: {enginePlan.Summary}");
+                    $"MP4 recording encoded through FFmpeg rawvideo fallback for {target.DisplayName}. Encoder: {encode.Message} Frame source: {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} Audio: {audioCaptureSummary.Message} Webcam: {webcamMessage} Engine plan: {enginePlan.Summary}");
             }
 
-            var messageSuffix = usedProductionEncoder
-                ? nativeAudioInputs.Count > 0
-                    ? nativeWebcamOverlaySource is not null
-                        ? "Native Media Foundation production recording encoded screen frames with continuously refreshed precomposited webcam overlay and muxed captured audio as AAC."
-                        : "Native Media Foundation production recording encoded screen frames and muxed captured audio as AAC."
-                    : nativeWebcamOverlaySource is not null
-                        ? "Native Media Foundation production recording encoded screen frames with continuously refreshed precomposited webcam overlay."
-                        : "Native Media Foundation production recording encoded video-only screen frames."
-                : normalized.FallbackLimitSummary;
+            var messageSuffix = normalized.FallbackLimitSummary;
             var framePacingMessage = capturedFrameCount == encodedFrameCount
                 ? $"Captured/encoded frames: {encodedFrameCount}."
                 : $"Captured frames: {capturedFrameCount}; encoded paced frames: {encodedFrameCount}.";
             var frameSourceMessage = $"Frame source: {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} {framePacingMessage}";
             var encoderMessage = $"Video encoder: {encode.Message}";
             var audioMessage = $"Audio: {audioCaptureSummary.Message}";
-            var webcamMessage = $"Webcam: {webcamSummary.Message}";
+            var webcamSummaryMessage = $"Webcam: {webcamMessage}";
             return new RecordingResult
             {
                 Succeeded = true,
                 OutputPath = outputPath,
                 Item = item,
                 Message = item is null
-                    ? $"MP4 recording saved: {outputPath}. Target: {target.DisplayName}. {encoderMessage} {frameSourceMessage} {audioMessage} {webcamMessage} {messageSuffix} Engine plan: {enginePlan.Summary}"
-                    : $"MP4 recording saved and indexed: {item.FileName}. Target: {target.DisplayName}. {encoderMessage} {frameSourceMessage} {audioMessage} {webcamMessage} {messageSuffix} Engine plan: {enginePlan.Summary}"
+                    ? $"MP4 recording saved: {outputPath}. Target: {target.DisplayName}. {encoderMessage} {frameSourceMessage} {audioMessage} {webcamSummaryMessage} {messageSuffix} Engine plan: {enginePlan.Summary}"
+                    : $"MP4 recording saved and indexed: {item.FileName}. Target: {target.DisplayName}. {encoderMessage} {frameSourceMessage} {audioMessage} {webcamSummaryMessage} {messageSuffix} Engine plan: {enginePlan.Summary}"
             };
         }
         finally
         {
-            audioCaptureCts.Cancel();
-            await SwallowPendingAudioCapturesAsync(pendingAudioCaptures);
+            if (streamingAudio is not null)
+            {
+                await streamingAudio.DisposeAsync().ConfigureAwait(false);
+            }
+
+            mixedPcm?.Dispose();
+            if (rawVideo is not null)
+            {
+                await rawVideo.DisposeAsync().ConfigureAwait(false);
+            }
+
+            lastFrame?.Dispose();
             nativeWebcamOverlaySource?.Dispose();
             wgcFrameSource?.Dispose();
             try
@@ -574,143 +594,237 @@ public sealed class RecordingService : IDisposable
             }
             catch
             {
-                // Temp frames are best-effort cleanup.
+                // Rawvideo/audio temporary files are best-effort cleanup.
             }
         }
     }
 
-    private IReadOnlyList<PendingAudioCapture> StartMp4AudioCaptures(
+    private async Task<RecordingResult> RecordStreamingProductionAsync(
+        TimeSpan duration,
+        string outputPath,
         RecordingSettings recordingSettings,
         NormalizedRecordingSettings normalized,
-        string tempRoot,
-        TimeSpan duration,
+        RecordingCaptureTarget target,
+        RecordingCapabilitySnapshot capabilities,
+        RecordingEnginePlan enginePlan,
+        bool addToWorkspace,
         CancellationToken cancellationToken)
     {
-        var captures = new List<PendingAudioCapture>();
+        var featureRouting = BuildProductionFeatureRouting(normalized);
+        var interval = TimeSpan.FromSeconds(1d / normalized.FramesPerSecond);
+        var expectedFrameCount = ExpectedMp4FrameCount(duration, normalized.FramesPerSecond);
+        var stopwatch = new Stopwatch();
+        WindowsGraphicsCaptureFrameSource? frameSource = null;
+        NativeMediaFoundationMp4Encoder.StreamingVideoSession? encoder = null;
+        StreamingRecordingAudioSession? streamingAudio = null;
+        NativeWebcamOverlaySource? nativeWebcamOverlaySource = null;
+        Bitmap? lastFrame = null;
+        var frameSourceSummary = $"GDI screenshot frame capture from {target.DisplayName}";
+        string? frameSourceFallbackNote = null;
+        var capturedFrameCount = 0;
+        var webcamMessage = normalized.EnableWebcamOverlay
+            ? "requested but native camera frame capture was not attempted."
+            : "not requested.";
+
+        try
+        {
+            if (ShouldUseWindowsGraphicsCaptureFrameSource(recordingSettings, capabilities, target))
+            {
+                try
+                {
+                    frameSource = WindowsGraphicsCaptureFrameSource.Start(target, cancellationToken);
+                    frameSourceSummary = $"Windows.Graphics.Capture frame capture from {frameSource.SourceName}";
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    frameSourceFallbackNote = FormatFrameSourceFallbackNote(ex);
+                }
+            }
+
+            if (featureRouting.PrecomposeWebcam)
+            {
+                var nativeWebcam = await PrepareNativeWebcamOverlayAsync(
+                    recordingSettings,
+                    cancellationToken);
+                nativeWebcamOverlaySource = nativeWebcam.Input;
+                webcamMessage = nativeWebcam.Message;
+            }
+
+            while ((!stopwatch.IsRunning || stopwatch.Elapsed < duration) &&
+                   (encoder?.FrameCount ?? 0) < expectedFrameCount)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var currentFrameCount = encoder?.FrameCount ?? 0;
+                var nextDue = TimeSpan.FromSeconds(currentFrameCount / (double)normalized.FramesPerSecond);
+                var delay = nextDue - stopwatch.Elapsed;
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+
+                using var captured = await CaptureMp4FrameAsync(
+                    frameSource,
+                    target,
+                    currentFrameCount == 0 ? TimeSpan.FromSeconds(1) : interval,
+                    ex =>
+                    {
+                        frameSourceFallbackNote ??= FormatFrameSourceFallbackNote(ex);
+                        frameSource?.Dispose();
+                        frameSource = null;
+                    },
+                    cancellationToken);
+                using var decorated = DecorateRecordingFrame(
+                    captured,
+                    _settings.IncludeCursor,
+                    normalized,
+                    stopwatch.IsRunning ? stopwatch.Elapsed : TimeSpan.Zero);
+                if (nativeWebcamOverlaySource is not null)
+                {
+                    await nativeWebcamOverlaySource.RefreshIfDueAsync(DateTimeOffset.Now, cancellationToken);
+                }
+
+                var nativeWebcamOverlay = nativeWebcamOverlaySource?.Current;
+                using var composited = nativeWebcamOverlay is null
+                    ? CloneBitmapArgb(decorated)
+                    : ComposeNativeWebcamOverlay(decorated, nativeWebcamOverlay);
+                using var resized = ResizeFrame(composited, normalized);
+                if (encoder is null)
+                {
+                    encoder = NativeMediaFoundationMp4Encoder.StartStreamingVideo(
+                        outputPath,
+                        normalized,
+                        enginePlan.ProductionEncoder,
+                        resized.Width,
+                        resized.Height,
+                        featureRouting.ReserveAudioStream);
+                    stopwatch.Restart();
+                    streamingAudio = StartStreamingRecordingAudio(
+                        recordingSettings,
+                        normalized,
+                        encoder.WriteAudioPcm,
+                        cancellationToken);
+                }
+
+                encoder.WriteFrame(resized, cancellationToken);
+                capturedFrameCount++;
+                lastFrame?.Dispose();
+                lastFrame = (Bitmap)resized.Clone();
+
+                var desired = Math.Min(
+                    expectedFrameCount,
+                    Math.Max(encoder.FrameCount, (int)Math.Ceiling(stopwatch.Elapsed.TotalSeconds * normalized.FramesPerSecond)));
+                while (encoder.FrameCount < desired)
+                {
+                    encoder.WriteFrame(lastFrame, cancellationToken);
+                }
+            }
+
+            if (encoder is null || lastFrame is null || encoder.FrameCount == 0)
+            {
+                return new RecordingResult
+                {
+                    Succeeded = false,
+                    Message = "MP4 recording stopped before any frames were captured."
+                };
+            }
+
+            while (encoder.FrameCount < expectedFrameCount)
+            {
+                encoder.WriteFrame(lastFrame, cancellationToken);
+            }
+
+            var encodedFrameCount = encoder.FrameCount;
+            var audioCaptureSummary = streamingAudio is null
+                ? new StreamingRecordingAudioResult([], 0, [])
+                : await streamingAudio.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            var encoded = encoder.Complete(
+                includeAudio: audioCaptureSummary.SourcesWithPayload.Count > 0,
+                audioSourceCount: audioCaptureSummary.SourcesWithPayload.Count,
+                cancellationToken);
+            if (!encoded.Succeeded)
+            {
+                return encoded;
+            }
+
+            CaptureItem? item = null;
+            if (addToWorkspace)
+            {
+                item = await _workspaceStore.AddImageFileAsync(
+                    outputPath,
+                    CaptureKind.RecordingMp4,
+                    $"MP4 recording streamed directly through native Media Foundation without a temporary image-frame spool for {target.DisplayName}. Encoder: {enginePlan.ProductionEncoder.ChoiceLabel}. Frame source: {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} Audio: {audioCaptureSummary.Message} Webcam: {webcamMessage}");
+            }
+
+            var featureSummary = $"Audio: {audioCaptureSummary.Message} Webcam: {webcamMessage}";
+            return new RecordingResult
+            {
+                Succeeded = true,
+                OutputPath = outputPath,
+                Item = item,
+                Message = item is null
+                    ? $"MP4 recording saved: {outputPath}. Direct Media Foundation stream; captured {capturedFrameCount} frame(s), encoded {encodedFrameCount} paced frame(s). {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} {featureSummary}"
+                    : $"MP4 recording saved and indexed: {item.FileName}. Direct Media Foundation stream; captured {capturedFrameCount} frame(s), encoded {encodedFrameCount} paced frame(s). {frameSourceSummary}.{frameSourceFallbackNote ?? string.Empty} {featureSummary}"
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new RecordingResult
+            {
+                Succeeded = false,
+                OutputPath = outputPath,
+                Message = $"Direct Media Foundation recording failed ({ex.GetType().Name}: {ex.Message})."
+            };
+        }
+        finally
+        {
+            if (streamingAudio is not null)
+            {
+                await streamingAudio.DisposeAsync().ConfigureAwait(false);
+            }
+
+            lastFrame?.Dispose();
+            encoder?.Dispose();
+            nativeWebcamOverlaySource?.Dispose();
+            frameSource?.Dispose();
+        }
+    }
+
+    private StreamingRecordingAudioSession? StartStreamingRecordingAudio(
+        RecordingSettings recordingSettings,
+        NormalizedRecordingSettings normalized,
+        Action<ReadOnlyMemory<byte>> onMixedPcm,
+        CancellationToken cancellationToken)
+    {
+        var requests = new List<StreamingAudioCaptureRequest>(2);
         if (normalized.IncludeMicrophone)
         {
-            var output = Path.Combine(tempRoot, "microphone.wav");
-            captures.Add(new PendingAudioCapture(
+            requests.Add(new StreamingAudioCaptureRequest(
                 AudioCaptureSource.Microphone,
-                output,
-                duration,
-                DateTimeOffset.Now,
-                _audioCapture.CaptureWavAsync(
-                    new AudioCaptureRequest(
-                        AudioCaptureSource.Microphone,
-                        duration,
-                        output,
-                        recordingSettings.MicrophoneDeviceId,
-                        new AudioCaptureProcessingSettings(
-                            recordingSettings.MicrophoneGain,
-                            recordingSettings.NoiseGateThresholdDb,
-                            recordingSettings.MicrophoneMuted)),
-                    cancellationToken)));
+                recordingSettings.MicrophoneDeviceId,
+                new AudioCaptureProcessingSettings(
+                    recordingSettings.MicrophoneGain,
+                    recordingSettings.NoiseGateThresholdDb,
+                    recordingSettings.MicrophoneMuted)));
         }
 
         if (normalized.IncludeSystemAudio)
         {
-            var output = Path.Combine(tempRoot, "system-audio.wav");
-            captures.Add(new PendingAudioCapture(
+            requests.Add(new StreamingAudioCaptureRequest(
                 AudioCaptureSource.SystemAudio,
-                output,
-                duration,
-                DateTimeOffset.Now,
-                _audioCapture.CaptureWavAsync(
-                    new AudioCaptureRequest(
-                        AudioCaptureSource.SystemAudio,
-                        duration,
-                        output,
-                        recordingSettings.SystemAudioDeviceId,
-                        new AudioCaptureProcessingSettings(
-                            recordingSettings.SystemAudioGain,
-                            recordingSettings.NoiseGateThresholdDb,
-                            recordingSettings.SystemAudioMuted)),
-                    cancellationToken)));
+                recordingSettings.SystemAudioDeviceId,
+                new AudioCaptureProcessingSettings(
+                    recordingSettings.SystemAudioGain,
+                    recordingSettings.NoiseGateThresholdDb,
+                    recordingSettings.SystemAudioMuted)));
         }
 
-        return captures;
-    }
-
-    private static async Task<Mp4AudioCaptureSummary> CompleteMp4AudioCapturesAsync(
-        IReadOnlyList<PendingAudioCapture> pendingCaptures,
-        CancellationTokenSource audioCaptureCts)
-    {
-        if (pendingCaptures.Count == 0)
-        {
-            return new Mp4AudioCaptureSummary([], "not requested.");
-        }
-
-        audioCaptureCts.CancelAfter(TimeSpan.FromSeconds(2));
-        var inputs = new List<Mp4AudioInput>();
-        var notes = new List<string>();
-        foreach (var pending in pendingCaptures)
-        {
-            try
-            {
-                var result = await pending.Task;
-                if (result.Succeeded && result.BytesWritten > 0 && File.Exists(pending.OutputPath))
-                {
-                    inputs.Add(new Mp4AudioInput(pending.Source, pending.OutputPath));
-                    notes.Add(FormatAudioCaptureProof(pending, result, DateTimeOffset.Now));
-                }
-                else if (result.Succeeded)
-                {
-                    notes.Add($"{FormatAudioCaptureProof(pending, result, DateTimeOffset.Now)} No payload bytes were produced, so this track was omitted.");
-                }
-                else
-                {
-                    notes.Add($"{FormatAudioSource(pending.Source)} unavailable ({result.Message}); requested={FormatSeconds(pending.RequestedDuration.TotalSeconds)}, started={pending.StartedAt:O}");
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                notes.Add($"{FormatAudioSource(pending.Source)} capture timed out before muxing");
-            }
-            catch (Exception ex)
-            {
-                notes.Add($"{FormatAudioSource(pending.Source)} capture failed ({ex.GetType().Name}: {ex.Message})");
-            }
-        }
-
-        var muxText = inputs.Count switch
-        {
-            0 => "No requested audio input produced payload bytes for MP4 muxing.",
-            1 => $"{FormatAudioSource(inputs[0].Source)} will be muxed into the MP4.",
-            _ => "Microphone and system-audio captures will be mixed into the MP4."
-        };
-        return new Mp4AudioCaptureSummary(inputs, $"{muxText} {string.Join(" ", notes)}");
-    }
-
-    private static string FormatAudioCaptureProof(
-        PendingAudioCapture pending,
-        AudioCaptureResult result,
-        DateTimeOffset completedAt)
-    {
-        var elapsed = completedAt - pending.StartedAt;
-        var durationDelta = Math.Abs(result.Duration.TotalSeconds - pending.RequestedDuration.TotalSeconds);
-        var deltaText = $"duration-delta={FormatSeconds(durationDelta)}";
-        return $"{FormatAudioSource(pending.Source)} captured bytes={result.BytesWritten}; requested={FormatSeconds(pending.RequestedDuration.TotalSeconds)}; wav-duration={FormatSeconds(result.Duration.TotalSeconds)}; elapsed={FormatSeconds(elapsed.TotalSeconds)}; {deltaText}; started={pending.StartedAt:O}; completed={completedAt:O}.";
-    }
-
-    private static string FormatSeconds(double seconds)
-    {
-        return $"{Math.Max(0d, seconds):0.###}s";
-    }
-
-    private static async Task SwallowPendingAudioCapturesAsync(IReadOnlyList<PendingAudioCapture> pendingCaptures)
-    {
-        foreach (var pending in pendingCaptures)
-        {
-            try
-            {
-                await pending.Task;
-            }
-            catch
-            {
-                // Audio capture failures are reported before encode when possible; cleanup should not mask recording errors.
-            }
-        }
+        return requests.Count == 0
+            ? null
+            : StreamingRecordingAudioSession.Start(
+                _audioCapture,
+                requests,
+                onMixedPcm,
+                cancellationToken);
     }
 
     private async Task<NativeWebcamOverlayCaptureSummary> PrepareNativeWebcamOverlayAsync(
@@ -866,27 +980,6 @@ public sealed class RecordingService : IDisposable
         var desired = (int)Math.Ceiling(boundedElapsedSeconds * fps);
         desired = Math.Max(currentFrameCount, desired);
         return Math.Clamp(desired, 0, ExpectedMp4FrameCount(duration, fps));
-    }
-
-    private static string SaveNextMp4Frame(Bitmap frame, string tempRoot, ref int frameCount)
-    {
-        frameCount++;
-        var framePath = Path.Combine(tempRoot, $"frame{frameCount:000000}.png");
-        frame.Save(framePath, ImageFormat.Png);
-        return framePath;
-    }
-
-    private static void DuplicateLastMp4FrameUntil(
-        string lastFramePath,
-        string tempRoot,
-        int desiredFrameCount,
-        ref int frameCount)
-    {
-        while (frameCount < desiredFrameCount && frameCount < MaxMp4Frames)
-        {
-            frameCount++;
-            File.Copy(lastFramePath, Path.Combine(tempRoot, $"frame{frameCount:000000}.png"), overwrite: true);
-        }
     }
 
     private async Task<Mp4WebcamCaptureSummary> PrepareMp4WebcamInputAsync(
@@ -1220,7 +1313,7 @@ public sealed class RecordingService : IDisposable
     {
         Directory.CreateDirectory(_paths.VideosRoot);
         outputPath = string.IsNullOrWhiteSpace(outputPath)
-            ? Path.Combine(_paths.VideosRoot, $"goatshot-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.gif")
+            ? Path.Combine(_paths.VideosRoot, $"receipts-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.gif")
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(outputPath));
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
@@ -1522,61 +1615,11 @@ public sealed class RecordingService : IDisposable
         };
     }
 
-    private static async Task<RecordingResult> EncodeMp4Async(
+    internal static async Task<RecordingResult> MuxRawPcmIntoMp4Async(
         string ffmpeg,
-        string frameDirectory,
-        NormalizedRecordingSettings settings,
-        FfmpegVideoEncoderSelection videoEncoder,
+        string videoPath,
+        string pcmPath,
         string outputPath,
-        TimeSpan duration,
-        IReadOnlyList<Mp4AudioInput> audioInputs,
-        Mp4WebcamInput? webcamInput,
-        CancellationToken cancellationToken)
-    {
-        var attempts = BuildVideoEncoderAttempts(videoEncoder, settings);
-        RecordingResult? firstFailure = null;
-        foreach (var attempt in attempts)
-        {
-            var result = await RunFfmpegMp4EncodeAsync(
-                ffmpeg,
-                frameDirectory,
-                settings,
-                attempt,
-                outputPath,
-                duration,
-                audioInputs,
-                webcamInput,
-                cancellationToken);
-            if (result.Succeeded)
-            {
-                if (firstFailure is null)
-                {
-                    return result;
-                }
-
-                result.Message = $"{result.Message} Retried after: {firstFailure.Message}";
-                return result;
-            }
-
-            firstFailure ??= result;
-        }
-
-        return firstFailure ?? new RecordingResult
-        {
-            Succeeded = false,
-            Message = "No FFmpeg video encoder attempt was available."
-        };
-    }
-
-    private static async Task<RecordingResult> RunFfmpegMp4EncodeAsync(
-        string ffmpeg,
-        string frameDirectory,
-        NormalizedRecordingSettings settings,
-        Mp4VideoEncoderAttempt videoEncoder,
-        string outputPath,
-        TimeSpan duration,
-        IReadOnlyList<Mp4AudioInput> audioInputs,
-        Mp4WebcamInput? webcamInput,
         CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo
@@ -1588,79 +1631,27 @@ public sealed class RecordingService : IDisposable
             CreateNoWindow = true
         };
         start.ArgumentList.Add("-y");
-        start.ArgumentList.Add("-framerate");
-        start.ArgumentList.Add(settings.FramesPerSecond.ToString());
         start.ArgumentList.Add("-i");
-        start.ArgumentList.Add(Path.Combine(frameDirectory, "frame%06d.png"));
-        foreach (var audioInput in audioInputs)
-        {
-            start.ArgumentList.Add("-i");
-            start.ArgumentList.Add(audioInput.Path);
-        }
-
-        var webcamInputIndex = audioInputs.Count + 1;
-        if (webcamInput is not null)
-        {
-            start.ArgumentList.Add("-thread_queue_size");
-            start.ArgumentList.Add("512");
-            start.ArgumentList.Add("-rtbufsize");
-            start.ArgumentList.Add("100M");
-            start.ArgumentList.Add("-f");
-            start.ArgumentList.Add("dshow");
-            start.ArgumentList.Add("-i");
-            start.ArgumentList.Add($"video={webcamInput.DirectShowDeviceName}");
-        }
-
-        var filterParts = new List<string>();
-        var videoMap = "0:v:0";
-        if (webcamInput is not null)
-        {
-            filterParts.Add(BuildWebcamOverlayFilter(webcamInputIndex, webcamInput));
-            videoMap = "[webcam_video]";
-        }
-
-        if (audioInputs.Count > 1)
-        {
-            filterParts.Add(BuildAudioMixFilter(audioInputs.Count));
-        }
-
-        if (filterParts.Count > 0)
-        {
-            start.ArgumentList.Add("-filter_complex");
-            start.ArgumentList.Add(string.Join(";", filterParts));
-        }
-
+        start.ArgumentList.Add(videoPath);
+        start.ArgumentList.Add("-f");
+        start.ArgumentList.Add("s16le");
+        start.ArgumentList.Add("-ar");
+        start.ArgumentList.Add(StreamingRecordingAudioSession.SampleRate.ToString());
+        start.ArgumentList.Add("-ac");
+        start.ArgumentList.Add(StreamingRecordingAudioSession.Channels.ToString());
+        start.ArgumentList.Add("-i");
+        start.ArgumentList.Add(pcmPath);
         start.ArgumentList.Add("-map");
-        start.ArgumentList.Add(videoMap);
-        if (audioInputs.Count == 1)
-        {
-            start.ArgumentList.Add("-map");
-            start.ArgumentList.Add("1:a:0");
-        }
-        else if (audioInputs.Count > 1)
-        {
-            start.ArgumentList.Add("-map");
-            start.ArgumentList.Add("[mixed_audio]");
-        }
-
-        AddVideoEncoderArguments(start, settings, videoEncoder);
-        start.ArgumentList.Add("-pix_fmt");
-        start.ArgumentList.Add("yuv420p");
-        start.ArgumentList.Add("-t");
-        start.ArgumentList.Add(duration.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
-        if (audioInputs.Count > 0)
-        {
-            start.ArgumentList.Add("-c:a");
-            start.ArgumentList.Add("aac");
-            start.ArgumentList.Add("-b:a");
-            start.ArgumentList.Add("160k");
-        }
-
-        if (audioInputs.Count > 0 || webcamInput is not null)
-        {
-            start.ArgumentList.Add("-shortest");
-        }
-
+        start.ArgumentList.Add("0:v:0");
+        start.ArgumentList.Add("-map");
+        start.ArgumentList.Add("1:a:0");
+        start.ArgumentList.Add("-c:v");
+        start.ArgumentList.Add("copy");
+        start.ArgumentList.Add("-c:a");
+        start.ArgumentList.Add("aac");
+        start.ArgumentList.Add("-b:a");
+        start.ArgumentList.Add("160k");
+        start.ArgumentList.Add("-shortest");
         start.ArgumentList.Add("-movflags");
         start.ArgumentList.Add("+faststart");
         start.ArgumentList.Add(outputPath);
@@ -1671,20 +1662,21 @@ public sealed class RecordingService : IDisposable
             return new RecordingResult
             {
                 Succeeded = false,
-                Message = "FFmpeg could not be started."
+                Message = "FFmpeg could not start the streaming PCM mux."
             };
         }
 
-        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-
+        var stderr = await stderrTask;
+        var stdout = await stdoutTask;
         if (process.ExitCode != 0 || !File.Exists(outputPath))
         {
             return new RecordingResult
             {
                 Succeeded = false,
-                Message = $"FFmpeg MP4 encode failed with {videoEncoder.EncoderName} ({videoEncoder.Provider}) and exit code {process.ExitCode}. {ShortFfmpegMessage(stderr, stdout)}"
+                Message = $"FFmpeg streaming PCM mux failed with exit code {process.ExitCode}. {ShortFfmpegMessage(stderr, stdout)}"
             };
         }
 
@@ -1692,7 +1684,7 @@ public sealed class RecordingService : IDisposable
         {
             Succeeded = true,
             OutputPath = outputPath,
-            Message = $"MP4 encoded through FFmpeg fallback using {videoEncoder.EncoderName} ({videoEncoder.Provider}); hardware={(videoEncoder.IsHardwareAccelerated ? "yes" : "no")}; {RecordingSettingsNormalizer.FormatSummary(settings)}"
+            Message = "Incrementally captured 48 kHz stereo PCM was encoded to AAC without a WAV or whole-file memory buffer."
         };
     }
 
@@ -1732,43 +1724,12 @@ public sealed class RecordingService : IDisposable
         return attempts;
     }
 
-    private static void AddVideoEncoderArguments(
-        ProcessStartInfo start,
-        NormalizedRecordingSettings settings,
-        Mp4VideoEncoderAttempt videoEncoder)
-    {
-        start.ArgumentList.Add("-c:v");
-        start.ArgumentList.Add(videoEncoder.EncoderName);
-        if (videoEncoder.IsHardwareAccelerated)
-        {
-            start.ArgumentList.Add("-b:v");
-            start.ArgumentList.Add($"{Math.Max(800, videoEncoder.TargetBitrateKbps)}k");
-            return;
-        }
-
-        if (settings.BitrateKbps > 0)
-        {
-            start.ArgumentList.Add("-b:v");
-            start.ArgumentList.Add($"{settings.BitrateKbps}k");
-        }
-        else if (settings.UseVariableBitrate)
-        {
-            start.ArgumentList.Add("-crf");
-            start.ArgumentList.Add(settings.Crf.ToString());
-        }
-
-        start.ArgumentList.Add("-preset");
-        start.ArgumentList.Add(settings.QualityProfile.Equals("Small", StringComparison.OrdinalIgnoreCase)
-            ? "ultrafast"
-            : "veryfast");
-    }
-
     internal static string? FindFfmpeg()
     {
-        var configured = Environment.GetEnvironmentVariable("GOATSHOT_FFMPEG_PATH");
-        if (!string.IsNullOrWhiteSpace(configured))
+        var resolution = BrandEnvironment.Resolve("FFMPEG_PATH");
+        if (resolution.IsConfigured)
         {
-            configured = Environment.ExpandEnvironmentVariables(configured);
+            var configured = Environment.ExpandEnvironmentVariables(resolution.Value!);
             return File.Exists(configured) ? configured : null;
         }
 
@@ -1797,13 +1758,6 @@ public sealed class RecordingService : IDisposable
         var text = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
         text = text.ReplaceLineEndings(" ").Trim();
         return text.Length <= 360 ? text : text[..360] + "...";
-    }
-
-    private static string BuildAudioMixFilter(int inputCount)
-    {
-        var labels = Enumerable.Range(1, inputCount)
-            .Select(index => $"[{index}:a:0]");
-        return string.Concat(labels) + $"amix=inputs={inputCount}:duration=longest:normalize=0[mixed_audio]";
     }
 
     internal static string BuildWebcamOverlayFilter(int webcamInputIndex, Mp4WebcamInput webcamInput)
@@ -1897,14 +1851,17 @@ public sealed class RecordingService : IDisposable
         return resized;
     }
 
-    private static (int Width, int Height) ResolveFrameSize(int sourceWidth, int sourceHeight, NormalizedRecordingSettings settings)
+    internal static (int Width, int Height) ResolveFrameSize(
+        int sourceWidth,
+        int sourceHeight,
+        NormalizedRecordingSettings settings)
     {
         var targetWidth = settings.TargetWidth;
         var targetHeight = settings.TargetHeight;
 
         if (targetWidth <= 0 && targetHeight <= 0)
         {
-            targetWidth = Math.Min(sourceWidth, MaxFrameWidth);
+            return (MakeEven(sourceWidth), MakeEven(sourceHeight));
         }
 
         if (targetWidth > 0 && targetHeight > 0)
@@ -1965,7 +1922,7 @@ public sealed class RecordingService : IDisposable
         };
     }
 
-    private static Bitmap DecorateRecordingFrame(
+    internal static Bitmap DecorateRecordingFrame(
         CapturedBitmap captured,
         bool includeCursorVisualization,
         NormalizedRecordingSettings? settings = null,
@@ -2333,21 +2290,6 @@ public sealed class RecordingService : IDisposable
             }
         }
     }
-
-    private sealed record PendingAudioCapture(
-        AudioCaptureSource Source,
-        string OutputPath,
-        TimeSpan RequestedDuration,
-        DateTimeOffset StartedAt,
-        Task<AudioCaptureResult> Task);
-
-    private sealed record Mp4AudioInput(
-        AudioCaptureSource Source,
-        string Path);
-
-    private sealed record Mp4AudioCaptureSummary(
-        IReadOnlyList<Mp4AudioInput> Inputs,
-        string Message);
 
     internal sealed record Mp4WebcamInput(
         string DirectShowDeviceName,

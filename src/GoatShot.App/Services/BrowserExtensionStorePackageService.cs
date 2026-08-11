@@ -100,7 +100,7 @@ public sealed class BrowserExtensionStorePackageService
         var version = string.IsNullOrWhiteSpace(readiness.Manifest.Version)
             ? "unknown"
             : SafeFileToken(readiness.Manifest.Version);
-        var extensionPackagePath = Path.Combine(targetRoot, $"goatshot-browser-extension-{targetName}-v{version}.zip");
+        var extensionPackagePath = Path.Combine(targetRoot, $"receipts-browser-extension-{targetName}-v{version}.zip");
         var package = await new BrowserExtensionPackageService().PackageAsync(
             source,
             extensionPackagePath,
@@ -159,7 +159,7 @@ public sealed class BrowserExtensionStorePackageService
         // its own hash and size, which a zip cannot honestly contain about itself, so
         // they are written as authoritative sibling files on disk rather than embedded
         // as a stale, self-contradicting copy inside the zip.
-        var submissionBundlePath = Path.Combine(outputRoot, $"goatshot-browser-extension-{targetName}-store-submission.zip");
+        var submissionBundlePath = Path.Combine(outputRoot, $"receipts-browser-extension-{targetName}-store-submission.zip");
         if (File.Exists(submissionBundlePath))
         {
             File.Delete(submissionBundlePath);
@@ -335,7 +335,7 @@ public sealed class BrowserExtensionStorePackageService
     private static string BuildSummaryMarkdown(BrowserExtensionStorePackageResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Store Package Summary");
+        builder.AppendLine("# Receipts Browser Extension Store Package Summary");
         builder.AppendLine();
         builder.AppendLine($"Source: `{result.SourceDirectory}`");
         builder.AppendLine($"Output: `{result.OutputPath}`");
@@ -370,7 +370,7 @@ public sealed class BrowserExtensionStorePackageService
     private static string BuildTargetChecklistMarkdown(BrowserExtensionStorePackageTargetResult target)
     {
         var builder = new StringBuilder();
-        builder.AppendLine($"# GoatShot {target.Target} Store Submission Package");
+        builder.AppendLine($"# Receipts {target.Target} Store Submission Package");
         builder.AppendLine();
         builder.AppendLine($"Status: `{target.Status}`");
         builder.AppendLine();
@@ -441,7 +441,7 @@ public sealed class BrowserExtensionStorePackageService
         "This package is not browser-store signing or review approval.",
         "This package is not automatic extension installation.",
         "This package is not live native-host Host Status proof.",
-        "This package does not bypass GoatShot desktop policy, local consent, or native payload validation."
+        "This package does not bypass Receipts desktop policy, local consent, or native payload validation."
     };
 
     private static string EmptyIfMissing(string? value) =>

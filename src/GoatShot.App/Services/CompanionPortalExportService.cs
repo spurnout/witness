@@ -647,10 +647,16 @@ public sealed class CompanionPortalExportService
             .OrderByDescending(file => file.LastWriteTimeUtc)
             .Take(10)
             .ToList();
-        var zips = Directory
+        var receiptsZips = Directory
+            .EnumerateFiles(root, "Receipts-release-proof-*.zip", SearchOption.AllDirectories)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc);
+        var legacyZips = Directory
             .EnumerateFiles(root, "GoatShot-release-proof-*.zip", SearchOption.AllDirectories)
             .Select(path => new FileInfo(path))
-            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .OrderByDescending(file => file.LastWriteTimeUtc);
+        var zips = receiptsZips
+            .Concat(legacyZips)
             .Take(10)
             .ToList();
         var latestManifest = manifests.FirstOrDefault();
@@ -774,9 +780,9 @@ public sealed class CompanionPortalExportService
         {
             Title = report.Boundary.WouldHostPortal
                 ? report.Boundary.RemoteClientsAllowed
-                    ? "GoatShot companion portal self-hosted preview"
-                    : "GoatShot companion portal loopback preview"
-                : "GoatShot companion portal read-only local export",
+                    ? "Receipts companion portal self-hosted preview"
+                    : "Receipts companion portal loopback preview"
+                : "Receipts companion portal read-only local export",
             OutputRootLabel = RedactPortalText(outputRoot),
             BoundarySummary = report.Boundary.Summary,
             ProofSummary = report.ReleaseProof.Included
@@ -803,7 +809,7 @@ public sealed class CompanionPortalExportService
         builder.AppendLine("<head>");
         builder.AppendLine("<meta charset=\"utf-8\">");
         builder.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-        builder.AppendLine("<title>GoatShot Companion Portal Export</title>");
+        builder.AppendLine("<title>Receipts Companion Portal Export</title>");
         builder.AppendLine("<style>");
         builder.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;margin:32px;line-height:1.45;color:#14171a;background:#f8fafc}main{max-width:1040px;margin:0 auto}section{background:#fff;border:1px solid #d7dde5;border-radius:8px;padding:18px;margin:16px 0}h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:0 0 12px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e6ebf0;text-align:left;padding:8px}code{background:#eef2f7;padding:2px 5px;border-radius:4px}.flag{display:inline-block;margin:3px 8px 3px 0;padding:3px 7px;border-radius:999px;background:#e9f7f2;color:#145b45;font-size:12px}.warn{background:#fff6df;color:#6f4b00}");
         builder.AppendLine("</style>");
@@ -906,13 +912,13 @@ public sealed class CompanionPortalExportService
         builder.AppendLine("<head>");
         builder.AppendLine("<meta charset=\"utf-8\">");
         builder.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-        builder.AppendLine("<title>GoatShot Companion Portal Media Review</title>");
+        builder.AppendLine("<title>Receipts Companion Portal Media Review</title>");
         builder.AppendLine("<style>");
         builder.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;margin:32px;line-height:1.45;color:#14171a;background:#f8fafc}main{max-width:1040px;margin:0 auto}.item{background:#fff;border:1px solid #d7dde5;border-radius:8px;padding:18px;margin:16px 0}img,video{display:block;max-width:100%;max-height:640px;background:#eef2f7;border:1px solid #d7dde5}code{background:#eef2f7;padding:2px 5px;border-radius:4px}.meta{color:#46515f;font-size:13px}.boundary{background:#e9f7f2;color:#145b45;display:inline-block;margin:3px 8px 3px 0;padding:3px 7px;border-radius:999px;font-size:12px}");
         builder.AppendLine("</style>");
         builder.AppendLine("</head>");
         builder.AppendLine("<body><main>");
-        builder.AppendLine("<h1>GoatShot companion portal media review</h1>");
+        builder.AppendLine("<h1>Receipts companion portal media review</h1>");
         builder.AppendLine($"<p>{Html(mediaReview.PrivacyNote)}</p>");
         foreach (var note in mediaReview.BoundaryNotes)
         {
@@ -1062,7 +1068,7 @@ public sealed class CompanionPortalExportReport
 {
     public int ManifestVersion { get; set; } = 1;
     public DateTimeOffset GeneratedAt { get; set; }
-    public string Product { get; set; } = "GoatShot";
+    public string Product { get; set; } = BrandIdentity.ProductName;
     public string Mode { get; set; } = string.Empty;
     public CompanionPortalReportSummary Summary { get; set; } = new();
     public CompanionPortalBoundarySummary Boundary { get; set; } = new();

@@ -1,10 +1,12 @@
-# GoatShot Browser Extension Bridge Contract
+# Receipts Browser Extension Bridge Contract
 
-Schema version: `goatshot.browser-capture.v1`
+Schema version: `receipts.browser-capture.v1`
+
+Receipts emits `receipts.*.v1` schemas. The desktop reader continues to accept existing `goatshot.*.v1` browser payloads and stitch packages, and the `GOATSHOT_*` browser message types remain compatibility-bound transport identifiers.
 
 ## Required Top-Level Fields
 
-- `schemaVersion`: must equal `goatshot.browser-capture.v1`.
+- `schemaVersion`: should equal `receipts.browser-capture.v1`; legacy `goatshot.browser-capture.v1` payloads remain accepted.
 - `intent`: capture mode, full-page intent, DOM metadata intent, telemetry intent, and correlation id.
 - `page`: URL, title, referrer, content type, language, and capture timestamp.
 - `viewport`: visible viewport dimensions, device pixel ratio, and current scroll offsets.
@@ -44,15 +46,16 @@ Disallowed in this prototype:
 
 ## Native Handoff Requirement
 
-Before GoatShot accepts a payload, it must run `BrowserExtensionPayloadContractService.Validate` and `RedactForStorage`. Invalid payloads are rejected with validation issues; redacted payloads may be used for local bug reports, capture planning, or workspace import.
+Before Receipts accepts a payload, it must run `BrowserExtensionPayloadContractService.Validate` and `RedactForStorage`. Invalid payloads are rejected with validation issues; redacted payloads may be used for local bug reports, capture planning, or workspace import.
 
 Current native receiver:
 
-- `goatshot browser-extension receive <payload.json>` stores a redacted payload under the local browser bridge area or a requested `--redacted-output` path.
+- `Receipts.Cli.exe browser-extension receive <payload.json>` stores a redacted payload under the local browser bridge area or a requested `--redacted-output` path.
 - `--screenshot <image>` imports a consented browser screenshot into the workspace as `BrowserPage`.
 - `--stitch-package <dir-or-manifest>` validates a bounded stitch package and imports its stitched output image into the workspace as `BrowserPage`.
-- `goatshot browser-extension status` reports the local receiver and native-host registration status.
-- `goatshot browser-extension package` validates and creates a minimal local extension ZIP for unpacked/manual loading.
+- `Receipts.Cli.exe browser-extension status` reports the local receiver and native-host registration status.
+- `Receipts.Cli.exe browser-extension package` validates and creates a minimal local extension ZIP for unpacked/manual loading.
+- `com.receipts.bridge` is the primary native host. `com.goatshot.bridge` remains a compatibility alias during upgrades.
 - Native messaging host registration, local ZIP packaging, browser-download stitch-package export, and read-only publication planning are implemented; browser-store account submission/review/signing and automatic extension installation remain later proof lanes.
 
 ## Stitch Manifest
@@ -75,9 +78,9 @@ Bitmap bytes are not embedded in `stitch`. If the prototype captures visible-tab
 
 ## Stitch Package
 
-The extension can export a local stitch package through browser downloads under the relative folder hint `GoatShot/<correlationId>/`. The native bridge accepts that local package through CLI `--stitch-package` or native-host JSON `stitchPackagePath`. A package path may be either a directory containing `goatshot-stitch-package.json` / `stitch-package.json`, or a direct manifest file.
+The extension can export a local stitch package through browser downloads under the relative folder hint `Receipts/<correlationId>/`. The native bridge accepts that local package through CLI `--stitch-package` or native-host JSON `stitchPackagePath`. A package path may be either a directory containing the current `receipts-stitch-package.json` or `stitch-package.json`, the legacy `goatshot-stitch-package.json`, or a direct manifest file.
 
-Package manifest schema version: `goatshot.browser-stitch-package.v1`.
+Package manifest schema version: `receipts.browser-stitch-package.v1`; legacy `goatshot.browser-stitch-package.v1` remains readable.
 
 Required fields:
 

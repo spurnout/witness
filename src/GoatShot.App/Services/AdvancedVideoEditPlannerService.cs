@@ -61,7 +61,7 @@ public sealed class AdvancedVideoEditPlannerService
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("silence-removal", "FFmpeg was not found. Install FFmpeg or set GOATSHOT_FFMPEG_PATH to enable audio-level silence planning.");
+            return Failed("silence-removal", "FFmpeg was not found. Install FFmpeg or set RECEIPTS_FFMPEG_PATH (GOATSHOT_FFMPEG_PATH remains a compatibility alias) to enable audio-level silence planning.");
         }
 
         var detection = await RunSilenceDetectAsync(
@@ -224,7 +224,7 @@ public sealed class AdvancedVideoEditPlannerService
             BlurStrength = Math.Clamp(request.BlurStrength ?? 12, 1, 64),
             BackgroundColor = NormalizeFfmpegColor(request.BackgroundColor, "0x101820"),
             Notes = usesExternalMask
-                ? "Uses a reviewed external luma mask/person matte with FFmpeg compositing. GoatShot can generate deterministic masks or run an explicitly accepted local external person-segmentation runner separately, but this recipe does not itself generate a mask or bundle a model."
+                ? "Uses a reviewed external luma mask/person matte with FFmpeg compositing. Receipts can generate deterministic masks or run an explicitly accepted local external person-segmentation runner separately, but this recipe does not itself generate a mask or bundle a model."
                 : "Uses FFmpeg chromakey/colorkey-style processing for keyed webcam backgrounds. It is not a general person-segmentation model."
         };
         return new AdvancedVideoEditPlan
@@ -242,7 +242,7 @@ public sealed class AdvancedVideoEditPlannerService
                     ? "The mask/matte is treated as already-reviewed foreground evidence; white/luma keeps the subject by default."
                     : "This is keyed-background processing for green-screen/key-color footage, not automatic human segmentation.",
                 usesExternalMask
-                    ? "Mask files can come from GoatShot's deterministic mask generator, an explicitly accepted local external person-segmentation runner, or another reviewed source; they must align with the source clip and avoid private/unsafe content."
+                    ? "Mask files can come from Receipts' deterministic mask generator, an explicitly accepted local external person-segmentation runner, or another reviewed source; they must align with the source clip and avoid private/unsafe content."
                     : "Use --mask with an externally generated person matte when chromakey footage is not available.",
                 "Review a short preview export before applying to long recordings.",
                 "Plan files may contain local media paths."

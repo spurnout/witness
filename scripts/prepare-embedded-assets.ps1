@@ -1,6 +1,6 @@
 param(
     [string] $OutputRoot,
-    [string] $Version = "0.2.0",
+    [string] $Version = "0.3.0",
     [string] $BuildId,
     [switch] $Force
 )
@@ -84,14 +84,14 @@ if (-not (Test-Path -LiteralPath $extensionSource)) { throw "Browser extension s
 Copy-Item -LiteralPath $extensionSource -Destination (Join-Path $bundleRoot "browser-extension") -Recurse -Force
 
 $notices = @"
-# GoatShot third-party notices
+# Receipts third-party notices
 
 - FFmpeg $($lock.ffmpeg.version), $($lock.ffmpeg.license), built by BtbN from FFmpeg source with the locked $($lock.ffmpeg.build) configuration. Source: $($lock.ffmpeg.source)
 - ONNX Model Zoo FCN ResNet50 person-segmentation model $($lock.personSegmentation.version), $($lock.personSegmentation.license). Source: $($lock.personSegmentation.source)
 - Microsoft.ML.OnnxRuntime.DirectML 1.24.4, MIT.
 - SSH.NET 2025.1.0, MIT.
 
-GoatShot does not embed Whisper, Google Platform Tools, browser binaries, cloud credentials, hardware drivers, or user scripts.
+Receipts does not embed Whisper, Google Platform Tools, browser binaries, cloud credentials, hardware drivers, or user scripts.
 "@
 $noticesPath = Join-Path $bundleRoot "THIRD_PARTY_NOTICES.md"
 [IO.File]::WriteAllText($noticesPath, $notices, [Text.UTF8Encoding]::new($false))
@@ -112,13 +112,13 @@ Get-ChildItem -LiteralPath $bundleRoot -Recurse -File | Sort-Object FullName | F
         '^THIRD_PARTY_NOTICES\.md$' { 'third-party-notices'; break }
         default { "ffmpeg-runtime-$($assetFile.Name.ToLowerInvariant())" }
     }
-    $source = if ($relative.StartsWith('tools/ffmpeg/')) { $lock.ffmpeg.source } elseif ($relative.StartsWith('models/')) { $lock.personSegmentation.source } else { 'GoatShot repository' }
-    $license = if ($relative.StartsWith('tools/ffmpeg/')) { $lock.ffmpeg.license } elseif ($relative.StartsWith('models/')) { $lock.personSegmentation.license } else { 'GoatShot' }
+    $source = if ($relative.StartsWith('tools/ffmpeg/')) { $lock.ffmpeg.source } elseif ($relative.StartsWith('models/')) { $lock.personSegmentation.source } else { 'Receipts repository' }
+    $license = if ($relative.StartsWith('tools/ffmpeg/')) { $lock.ffmpeg.license } elseif ($relative.StartsWith('models/')) { $lock.personSegmentation.license } else { 'Receipts' }
     $capability = if ($relative.StartsWith('tools/ffmpeg/')) { 'video-tools' } elseif ($relative.StartsWith('models/')) { 'person-segmentation' } elseif ($relative.StartsWith('browser-extension/')) { 'browser-extension' } else { 'notices' }
     $assetVersion = if ($relative.StartsWith('tools/ffmpeg/')) { $lock.ffmpeg.version } elseif ($relative.StartsWith('models/')) { $lock.personSegmentation.version } else { $Version }
     $assets.Add([ordered]@{
         id = $id
-        resourceName = "GoatShot.EmbeddedAsset.$id"
+        resourceName = "Receipts.EmbeddedAsset.$id"
         relativePath = $relative
         sha256 = Get-Sha256Hex $_.FullName
         size = $_.Length
@@ -133,7 +133,7 @@ Get-ChildItem -LiteralPath $bundleRoot -Recurse -File | Sort-Object FullName | F
 }
 
 $manifest = [ordered]@{
-    schemaVersion = 'goatshot.embedded-assets.v1'
+    schemaVersion = 'receipts.embedded-assets.v1'
     productVersion = $Version
     buildId = $BuildId
     manifestSha256 = ''

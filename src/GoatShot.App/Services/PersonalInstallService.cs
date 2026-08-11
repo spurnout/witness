@@ -8,8 +8,9 @@ namespace GoatShot.App.Services;
 
 public sealed class PersonalInstallService
 {
-    public const string ProductVersion = "0.2.0";
-    private const string InstalledRelativePath = @"Programs\GoatShot\GoatShot.exe";
+    public const string ProductVersion = BrandIdentity.ReleaseVersion;
+    private const string InstalledRelativePath = @"Programs\Receipts\Receipts.exe";
+    private const string LegacyInstalledRelativePath = @"Programs\GoatShot\GoatShot.exe";
     private readonly StartupRegistrationService _startup;
     private readonly string _localAppData;
     private readonly string _currentExecutable;
@@ -25,17 +26,20 @@ public sealed class PersonalInstallService
     }
 
     public string InstalledExecutablePath => Path.Combine(_localAppData, InstalledRelativePath);
+    public string LegacyInstalledExecutablePath => Path.Combine(_localAppData, LegacyInstalledRelativePath);
     public string InstallDirectory => Path.GetDirectoryName(InstalledExecutablePath)!;
     public string PreviousExecutablePath => InstalledExecutablePath + ".previous";
-    public string RuntimeRoot => Path.Combine(_localAppData, "GoatShot", "runtime");
+    public string RuntimeRoot => Path.Combine(_localAppData, BrandIdentity.LocalDataDirectoryName, "runtime");
     public bool IsRunningInstalledCopy => PathsEqual(_currentExecutable, InstalledExecutablePath);
     public bool IsDistributionBuild => Assembly.GetEntryAssembly()?
         .GetCustomAttributes<AssemblyMetadataAttribute>()
-        .Any(attribute => attribute.Key == "GoatShotDistribution" && attribute.Value == "true") == true;
+        .Any(attribute =>
+            (attribute.Key == "ReceiptsDistribution" || attribute.Key == "GoatShotDistribution") &&
+            attribute.Value == "true") == true;
 
     public PersonalInstallState GetState()
     {
-        var installedVersion = ReadFileVersion(InstalledExecutablePath);
+        var installedVersion = ReadInstalledVersion();
         var currentVersion = ReadFileVersion(_currentExecutable) ?? ProductVersion;
         var startup = _startup.GetState(InstalledExecutablePath);
         return new PersonalInstallState(
@@ -78,11 +82,11 @@ public sealed class PersonalInstallService
                 return new PersonalInstallResult(false, InstalledExecutablePath, registration.Message, false);
             }
 
-            return new PersonalInstallResult(true, InstalledExecutablePath, "GoatShot was installed for the current Windows user and will start in the tray at sign-in.", true);
+            return new PersonalInstallResult(true, InstalledExecutablePath, "Receipts was installed for the current Windows user and will start in the tray at sign-in.", true);
         }
         catch (Exception exception)
         {
-            return new PersonalInstallResult(false, InstalledExecutablePath, $"GoatShot could not be installed: {exception.Message}", false);
+            return new PersonalInstallResult(false, InstalledExecutablePath, $"Receipts could not be installed: {exception.Message}", false);
         }
     }
 
@@ -109,7 +113,7 @@ public sealed class PersonalInstallService
         {
             _startup.SetEnabled(false, InstalledExecutablePath);
             RemoveOwnedScheduledJobs();
-            var helperPath = Path.Combine(Path.GetTempPath(), $"GoatShot-uninstall-{Guid.NewGuid():N}.exe");
+            var helperPath = Path.Combine(Path.GetTempPath(), $"Receipts-uninstall-{Guid.NewGuid():N}.exe");
             File.Copy(_currentExecutable, helperPath, overwrite: false);
             Process.Start(new ProcessStartInfo
             {
@@ -117,7 +121,7 @@ public sealed class PersonalInstallService
                 UseShellExecute = false,
                 Arguments = $"--complete-uninstall --wait-pid {Environment.ProcessId} --installed-directory \"{InstallDirectory}\" --runtime-directory \"{RuntimeRoot}\""
             });
-            return new PersonalInstallResult(true, InstalledExecutablePath, "GoatShot uninstall will finish after the app exits. Captures and settings will be preserved.", false);
+            return new PersonalInstallResult(true, InstalledExecutablePath, "Receipts uninstall will finish after the app exits. Captures and settings will be preserved.", false);
         }
         catch (Exception exception)
         {
@@ -147,7 +151,7 @@ public sealed class PersonalInstallService
             }
         }
 
-        DeleteDirectoryIfSafe(installedDirectory, "GoatShot");
+        DeleteDirectoryIfSafe(installedDirectory, BrandIdentity.ProductName, BrandIdentity.LegacyProductName);
         DeleteDirectoryIfSafe(runtimeDirectory, "runtime");
         var helper = Environment.ProcessPath;
         if (!string.IsNullOrWhiteSpace(helper))
@@ -168,7 +172,7 @@ public sealed class PersonalInstallService
 
     public bool IsNewerThanInstalled()
     {
-        var installed = ReadFileVersion(InstalledExecutablePath);
+        var installed = ReadInstalledVersion();
         var current = ReadFileVersion(_currentExecutable) ?? ProductVersion;
         return string.IsNullOrWhiteSpace(installed) ||
             (Version.TryParse(current, out var currentVersion) &&
@@ -201,7 +205,7 @@ public sealed class PersonalInstallService
         throw new IOException("The running installed copy did not exit in time for an atomic update.", lastError);
     }
 
-    private static void DeleteDirectoryIfSafe(string path, string expectedLeaf)
+    private static void DeleteDirectoryIfSafe(string path, params string[] expectedLeaves)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -209,7 +213,8 @@ public sealed class PersonalInstallService
         }
 
         var fullPath = Path.GetFullPath(path);
-        if (!Path.GetFileName(fullPath).Equals(expectedLeaf, StringComparison.OrdinalIgnoreCase))
+        if (!expectedLeaves.Any(expectedLeaf =>
+                Path.GetFileName(fullPath).Equals(expectedLeaf, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException($"Refusing to remove unexpected directory: {fullPath}");
         }
@@ -224,11 +229,20 @@ public sealed class PersonalInstallService
     {
         var taskNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "Receipts Plugin Background Updates",
             "GoatShot Plugin Background Updates"
         };
-        var dataRoot = Path.Combine(_localAppData, "GoatShot");
-        if (Directory.Exists(dataRoot))
+        foreach (var dataRoot in new[]
+                 {
+                     Path.Combine(_localAppData, BrandIdentity.LocalDataDirectoryName),
+                     Path.Combine(_localAppData, BrandIdentity.LegacyLocalDataDirectoryName)
+                 }.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            if (!Directory.Exists(dataRoot))
+            {
+                continue;
+            }
+
             foreach (var manifestPath in Directory.EnumerateFiles(dataRoot, "plugin-update-schedule.json", SearchOption.AllDirectories))
             {
                 try
@@ -292,6 +306,9 @@ public sealed class PersonalInstallService
         return FileVersionInfo.GetVersionInfo(path).ProductVersion?.Split('+')[0];
     }
 
+    private string? ReadInstalledVersion() =>
+        ReadFileVersion(InstalledExecutablePath) ?? ReadFileVersion(LegacyInstalledExecutablePath);
+
     private static bool PathsEqual(string left, string right) =>
         Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar)
             .Equals(Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
@@ -323,5 +340,5 @@ public static class BuildIdentity
 {
     public static string Current => Assembly.GetEntryAssembly()?
         .GetCustomAttributes<AssemblyMetadataAttribute>()
-        .FirstOrDefault(attribute => attribute.Key == "GoatShotBuildId")?.Value ?? "local";
+        .FirstOrDefault(attribute => attribute.Key is "ReceiptsBuildId" or "GoatShotBuildId")?.Value ?? "local";
 }

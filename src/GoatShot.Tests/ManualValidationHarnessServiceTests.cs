@@ -136,11 +136,11 @@ public sealed class ManualValidationHarnessServiceTests
             Assert.IsTrue(File.Exists(result.DiagnosticsBundlePath));
 
             var summary = await File.ReadAllTextAsync(result.SummaryPath);
-            StringAssert.Contains(summary, "`diagnostics/goatshot-diagnostics.zip`");
+            StringAssert.Contains(summary, "`diagnostics/receipts-diagnostics.zip`");
 
             var diagnosticsReadme = await File.ReadAllTextAsync(result.DiagnosticsReadmePath);
             StringAssert.Contains(diagnosticsReadme, "Diagnostics bundle created");
-            StringAssert.Contains(diagnosticsReadme, "goatshot-diagnostics.zip");
+            StringAssert.Contains(diagnosticsReadme, "receipts-diagnostics.zip");
         }
         finally
         {

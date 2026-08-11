@@ -7,7 +7,9 @@ namespace GoatShot.App.Services;
 
 public sealed class PersonSegmentationModelPackageService
 {
-    public const string CurrentManifestSchemaVersion = "goatshot.person-segmentation-model.v1";
+    public const string CurrentManifestSchemaVersion = "receipts.person-segmentation-model.v1";
+    public const string LegacyManifestSchemaVersion = "goatshot.person-segmentation-model.v1";
+    public const string CurrentStageSchemaVersion = "receipts.person-segmentation-model-stage.v1";
     public const long DefaultMaxModelBytes = 750L * 1024L * 1024L;
 
     private static readonly Regex IdPattern = new("^[a-z0-9][a-z0-9._-]{2,63}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -153,7 +155,7 @@ public sealed class PersonSegmentationModelPackageService
         var stageManifestPath = Path.Combine(stageDirectory, "model-stage-manifest.json");
         var stageManifest = new PersonSegmentationModelStageManifest
         {
-            SchemaVersion = "goatshot.person-segmentation-model-stage.v1",
+            SchemaVersion = CurrentStageSchemaVersion,
             ModelId = result.ModelId,
             Version = result.Version,
             Name = result.Name,
@@ -176,7 +178,7 @@ public sealed class PersonSegmentationModelPackageService
             Notes =
             [
                 "Model package is staged only.",
-                "GoatShot did not run inference, trust, enable, register, or certify this model.",
+                "Receipts did not run inference, trust, enable, register, or certify this model.",
                 "Operator review and a separate runner/inference integration are still required before use."
             ]
         };
@@ -265,9 +267,10 @@ public sealed class PersonSegmentationModelPackageService
         PersonSegmentationModelManifest manifest,
         PersonSegmentationModelPackageResult result)
     {
-        if (!string.Equals(manifest.SchemaVersion, CurrentManifestSchemaVersion, StringComparison.Ordinal))
+        if (!string.Equals(manifest.SchemaVersion, CurrentManifestSchemaVersion, StringComparison.Ordinal) &&
+            !string.Equals(manifest.SchemaVersion, LegacyManifestSchemaVersion, StringComparison.Ordinal))
         {
-            result.Issues.Add($"schemaVersion must be {CurrentManifestSchemaVersion}.");
+            result.Issues.Add($"schemaVersion must be {CurrentManifestSchemaVersion} (legacy {LegacyManifestSchemaVersion} is also accepted).");
         }
 
         if (!IsValidId(manifest.ModelId))
@@ -457,7 +460,7 @@ public sealed class PersonSegmentationModelPackageService
     {
         result.NextActions.Add("Review the staged model, license, source, checksum, and runner compatibility before use.");
         result.NextActions.Add("Use a separate explicit runner/inference integration to generate masks; staging does not enable inference.");
-        result.NextActions.Add("Quality-certify generated masks with `goatshot video mask-quality` against reviewed reference masks.");
+        result.NextActions.Add("Quality-certify generated masks with `receipts video mask-quality` against reviewed reference masks.");
     }
 
     private sealed record LoadedPersonSegmentationModelManifest(

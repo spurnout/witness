@@ -67,7 +67,7 @@ public static class TrayMenuPreviewRenderer
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock
         {
-            Text = "GoatShot tray menu",
+            Text = "Receipts tray menu",
             Foreground = Brush("#F5FAFF"),
             FontSize = 21,
             FontWeight = FontWeights.SemiBold

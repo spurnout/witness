@@ -185,14 +185,14 @@ public sealed class OAuthCallbackSession : IAsyncDisposable
     private static async Task WriteResponseAsync(NetworkStream stream, OAuthCallbackResult result, CancellationToken cancellationToken)
     {
         var status = result.Succeeded ? "200 OK" : "400 Bad Request";
-        var title = result.Succeeded ? "GoatShot authorization complete" : "GoatShot authorization failed";
+        var title = result.Succeeded ? "Receipts authorization complete" : "Receipts authorization failed";
         var body = "<!doctype html><html><head><meta charset=\"utf-8\"><title>" +
             WebUtility.HtmlEncode(title) +
             "</title></head><body><h1>" +
             WebUtility.HtmlEncode(title) +
             "</h1><p>" +
             WebUtility.HtmlEncode(result.Message) +
-            "</p><p>You can close this browser tab and return to GoatShot.</p></body></html>";
+            "</p><p>You can close this browser tab and return to Receipts.</p></body></html>";
         var bytes = Encoding.UTF8.GetBytes(body);
         var header = Encoding.ASCII.GetBytes(
             $"HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bytes.Length}\r\nConnection: close\r\n\r\n");

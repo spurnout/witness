@@ -62,7 +62,7 @@ public sealed class AndroidAdbCaptureService
         string? adbPath = null,
         CancellationToken cancellationToken = default)
     {
-        var configuredExternal = FirstNonEmpty(adbPath, Environment.GetEnvironmentVariable("GOATSHOT_ADB_PATH"));
+        var configuredExternal = FirstNonEmpty(adbPath, BrandEnvironment.Resolve("ADB_PATH").Value);
         if (string.IsNullOrWhiteSpace(configuredExternal))
         {
             try
@@ -219,9 +219,9 @@ public sealed class AndroidAdbCaptureService
         var output = ResolveVideoOutputPath(request.OutputPath, selected.Device.Serial);
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
         var remoteDirectory = string.IsNullOrWhiteSpace(request.RemoteDirectory)
-            ? "/sdcard/Movies/GoatShot"
+            ? "/sdcard/Movies/Receipts"
             : request.RemoteDirectory.Trim().TrimEnd('/');
-        var remotePath = $"{remoteDirectory}/goatshot-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
+        var remotePath = $"{remoteDirectory}/receipts-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
 
         AdbProcessResult mkdir;
         try
@@ -794,8 +794,8 @@ public sealed class AndroidAdbCaptureService
     {
         var output = ResolveVideoOutputPath(request.OutputPath, device.Serial);
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-        var remotePath = $"/sdcard/Movies/GoatShot/goatshot-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
-        var command = $"sh -c 'mkdir -p /sdcard/Movies/GoatShot && screenrecord --time-limit {durationSeconds.ToString(CultureInfo.InvariantCulture)} {remotePath} >/dev/null 2>&1; cat {remotePath}; rm -f {remotePath}'";
+        var remotePath = $"/sdcard/Movies/Receipts/receipts-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
+        var command = $"sh -c 'mkdir -p /sdcard/Movies/Receipts && screenrecord --time-limit {durationSeconds.ToString(CultureInfo.InvariantCulture)} {remotePath} >/dev/null 2>&1; cat {remotePath}; rm -f {remotePath}'";
         var capture = await RunTransportBinaryAsync(
             device,
             command,
@@ -821,7 +821,7 @@ public sealed class AndroidAdbCaptureService
                 $"Android in-process WinUSB screenrecord imported from {device.DisplayLabel}. Duration limit: {durationSeconds} seconds.",
                 new CaptureSource
                 {
-                    ProcessName = "GoatShot WinUSB ADB",
+                    ProcessName = "Receipts WinUSB ADB",
                     WindowTitle = device.DisplayLabel,
                     MonitorName = "Android device"
                 });
@@ -1204,7 +1204,7 @@ public sealed class AndroidAdbCaptureService
 
     private static string ResolveLivePreviewManifestPath(string? outputDirectory)
     {
-        return Path.Combine(outputDirectory ?? string.Empty, "goatshot-android-preview-manifest.json");
+        return Path.Combine(outputDirectory ?? string.Empty, "receipts-android-preview-manifest.json");
     }
 
     private async Task<string> WriteLivePreviewExecutionManifestAsync(
@@ -1213,7 +1213,7 @@ public sealed class AndroidAdbCaptureService
     {
         var outputDirectory = result.OutputDirectory ?? _paths.TempRoot;
         var manifestPath = string.IsNullOrWhiteSpace(result.ManifestPath)
-            ? Path.Combine(outputDirectory, "goatshot-android-preview-manifest.json")
+            ? Path.Combine(outputDirectory, "receipts-android-preview-manifest.json")
             : result.ManifestPath;
         var manifest = new AndroidAdbLivePreviewExecutionManifest
         {
@@ -1506,7 +1506,7 @@ public sealed class AndroidAdbCaptureService
 
     private static string? ResolveFfmpegPath()
     {
-        var environmentPath = Environment.GetEnvironmentVariable("GOATSHOT_FFMPEG_PATH");
+        var environmentPath = BrandEnvironment.Resolve("FFMPEG_PATH").Value;
         if (!string.IsNullOrWhiteSpace(environmentPath))
         {
             var configured = Environment.ExpandEnvironmentVariables(environmentPath);
@@ -1619,7 +1619,7 @@ public sealed class AndroidAdbCaptureService
             PrivacyNotes = DefaultLivePreviewPrivacyNotes(),
             Warnings =
             [
-                "This is a dry-run plan; GoatShot does not start live Android preview capture in this tranche.",
+                "This is a dry-run plan; Receipts does not start live Android preview capture in this tranche.",
                 "Repeated screencap polling is safer to prototype than raw H.264 streaming, but it is lower FPS and can expose notifications or private app content."
             ],
             CleanupPlan = "No remote file is created. Stop polling immediately on timeout, cancellation, ADB non-zero exit, empty/invalid PNG payload, or device disconnect.",
@@ -1696,7 +1696,7 @@ public sealed class AndroidAdbCaptureService
             PrivacyNotes = DefaultLivePreviewPrivacyNotes(),
             Warnings =
             [
-                "This is a dry-run plan; GoatShot does not start live Android H.264 streaming in this tranche.",
+                "This is a dry-run plan; Receipts does not start live Android H.264 streaming in this tranche.",
                 "Android screenrecord stdout streaming is device/OS dependent and may fail even when bounded MP4 pull/import works.",
                 "The H.264 stream needs parsing/remux validation before it can be treated as production preview."
             ],
@@ -1768,7 +1768,7 @@ public sealed class AndroidAdbCaptureService
                 : null;
         }
 
-        var environmentPath = Environment.GetEnvironmentVariable("GOATSHOT_ADB_PATH");
+        var environmentPath = BrandEnvironment.Resolve("ADB_PATH").Value;
         if (!string.IsNullOrWhiteSpace(environmentPath))
         {
             var configured = Environment.ExpandEnvironmentVariables(environmentPath);

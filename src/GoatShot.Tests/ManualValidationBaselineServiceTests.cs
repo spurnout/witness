@@ -28,6 +28,7 @@ public sealed class ManualValidationBaselineServiceTests
             Assert.IsTrue(File.Exists(result.CommandResultsPath));
             Assert.IsTrue(result.Commands.All(command => command.ExitCode == 0));
             Assert.AreEqual(0, result.MissingRequiredEvidence.Count, string.Join(Environment.NewLine, result.MissingRequiredEvidence));
+            Assert.IsTrue(File.Exists(Path.Combine(root, "diagnostics", ManualValidationBaselineService.DiagnosticsBundleFileName)));
 
             var baseline = await File.ReadAllTextAsync(Path.Combine(root, ManualValidationBaselineService.BaselineFileName));
             StringAssert.Contains(baseline, "- [x] Passed");

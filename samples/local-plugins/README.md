@@ -1,8 +1,8 @@
-# GoatShot Local Plugin Samples
+# Receipts Local Plugin Samples
 
 These fixtures document the local plugin manifest shape used by the current Plugin SDK tranche.
 
-Copy a sample plugin folder into GoatShot's app-owned plugin folder, shown by `goatshot plugins list`, to inspect it locally. Discovered plugins are disabled and untrusted by default. A plugin action only reaches dry-run approval when all three settings are present:
+Copy a sample plugin folder into Receipts' app-owned plugin folder, shown by `receipts plugins list`, to inspect it locally. Discovered plugins are disabled and untrusted by default. A plugin action only reaches dry-run approval when all three settings are present:
 
 - `EnableLocalPlugins = true`
 - plugin id in `TrustedPluginIds`
@@ -13,13 +13,13 @@ The current SDK validates manifests, reports diagnostics, dry-runs actions, and 
 
 Remote plugin package acquisition is staged separately from local execution:
 
-- `registry.json` shows the `goatshot.plugin-registry.v1` shape.
-- `goatshot plugins registry validate samples\local-plugins\registry.json` validates registry metadata.
-- `goatshot plugins install-plan sample.redaction-note --registry samples\local-plugins\registry.json` reports whether a package can be staged.
-- `goatshot plugins marketplace-plan --registry samples\local-plugins\registry.json` reports read-only marketplace governance, registry/local/staged/plugin-policy state, operator gates, privacy boundaries, and later-scope non-goals without downloading or mutating anything.
-- `goatshot plugins schedule-updates --registry samples\local-plugins\registry.json --output artifacts\plugin-update-schedule` writes a local Task Scheduler handoff for the governed background update runner without registering a task by itself.
-- `goatshot plugins update-task status --manifest artifacts\plugin-update-schedule\plugin-update-schedule.json` queries the generated task name, while `register --accept-task-registration` and `unregister --accept-task-removal` are the explicit scheduler lifecycle commands. Add `--dry-run` to prove register/unregister wiring without mutating Task Scheduler.
-- `goatshot plugins stage sample.redaction-note --registry <registry>` downloads or copies the referenced ZIP into GoatShot's app-owned staging folder after SHA-256, size, optional RSA SHA-256 package signature, manifest, compatibility, and archive traversal checks.
+- `registry.json` shows the current `receipts.plugin-registry.v1` shape. Receipts continues to read legacy `goatshot.plugin-registry.v1` registries.
+- `receipts plugins registry validate samples\local-plugins\registry.json` validates registry metadata.
+- `receipts plugins install-plan sample.redaction-note --registry samples\local-plugins\registry.json` reports whether a package can be staged.
+- `receipts plugins marketplace-plan --registry samples\local-plugins\registry.json` reports read-only marketplace governance, registry/local/staged/plugin-policy state, operator gates, privacy boundaries, and later-scope non-goals without downloading or mutating anything.
+- `receipts plugins schedule-updates --registry samples\local-plugins\registry.json --output artifacts\plugin-update-schedule` writes a local Task Scheduler handoff for the governed background update runner without registering a task by itself.
+- `receipts plugins update-task status --manifest artifacts\plugin-update-schedule\plugin-update-schedule.json` queries the generated task name, while `register --accept-task-registration` and `unregister --accept-task-removal` are the explicit scheduler lifecycle commands. Add `--dry-run` to prove register/unregister wiring without mutating Task Scheduler.
+- `receipts plugins stage sample.redaction-note --registry <registry>` downloads or copies the referenced ZIP into Receipts' app-owned staging folder after SHA-256, size, optional RSA SHA-256 package signature, manifest, compatibility, and archive traversal checks.
 
 Registry entries can include `signature`, `signatureAlgorithm`, and `signaturePublicKeyPem` to verify a package signature before staging. Supported algorithms are `rsa-pss-sha256` and `rsa-pkcs1-sha256`; unsigned entries remain checksum-only and are reported with a warning.
 

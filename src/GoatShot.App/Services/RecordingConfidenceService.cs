@@ -146,7 +146,7 @@ public static class RecordingConfidenceService
             signals.Add(new RecordingConfidenceSignal(
                 "Audio sync proof",
                 RecordingConfidenceLevel.Warning,
-                "Requested audio tracks will report metadata-only timing fields after MP4 capture, including requested duration, captured WAV duration, elapsed time, byte count, and duration delta. No private audio content is stored in diagnostics.",
+                "Requested audio tracks are streamed as normalized PCM and mixed in bounded chunks; Receipts does not retain private sample content in diagnostics.",
                 "After a safe short MP4 recording, run `diagnostics recording-media <mp4>` when ffprobe is available and compare the reported A/V duration delta before relying on long-run sync."));
         }
 
@@ -400,7 +400,7 @@ public static class RecordingConfidenceService
             plan.FallbackBlockers.Count == 0
                 ? "FFmpeg fallback is not available."
                 : string.Join(" ", plan.FallbackBlockers),
-            "Install FFmpeg or set GOATSHOT_FFMPEG_PATH when fallback recording/video tools are needed.");
+            "Install FFmpeg or set RECEIPTS_FFMPEG_PATH (or the legacy GOATSHOT_FFMPEG_PATH alias) when fallback recording/video tools are needed.");
     }
 
     private static RecordingConfidenceReport BuildReport(

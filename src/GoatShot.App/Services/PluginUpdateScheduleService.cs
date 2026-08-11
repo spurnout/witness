@@ -5,7 +5,8 @@ namespace GoatShot.App.Services;
 
 public sealed class PluginUpdateScheduleService
 {
-    public const string CurrentSchemaVersion = "goatshot.plugin-update-schedule.v1";
+    public const string CurrentSchemaVersion = "receipts.plugin-update-schedule.v1";
+    public const string LegacySchemaVersion = "goatshot.plugin-update-schedule.v1";
     public const string StatusCommand = "status";
     public const string RegisterCommand = "register";
     public const string UnregisterCommand = "unregister";
@@ -44,7 +45,7 @@ public sealed class PluginUpdateScheduleService
             Mode = mode,
             IntervalHours = intervalHours,
             TaskName = string.IsNullOrWhiteSpace(request.TaskName)
-                ? "GoatShot Plugin Background Updates"
+                ? "Receipts Plugin Background Updates"
                 : request.TaskName.Trim(),
             OutputPath = outputRoot,
             LocalRoot = _paths.LocalRoot,
@@ -231,9 +232,11 @@ public sealed class PluginUpdateScheduleService
         var lines = new List<string>
         {
             "$ErrorActionPreference = 'Stop'",
+            $"$env:RECEIPTS_LOCAL_ROOT = {PowerShellString(result.LocalRoot)}",
+            $"$env:RECEIPTS_LIBRARY_ROOT = {PowerShellString(result.LibraryRoot)}",
             $"$env:GOATSHOT_LOCAL_ROOT = {PowerShellString(result.LocalRoot)}",
             $"$env:GOATSHOT_LIBRARY_ROOT = {PowerShellString(result.LibraryRoot)}",
-            $"$goatShot = {PowerShellString(result.CliPath)}",
+            $"$receipts = {PowerShellString(result.CliPath)}",
             "$arguments = @(",
             "    '--plugin-background-update',",
             "    '--registry',",
@@ -245,7 +248,7 @@ public sealed class PluginUpdateScheduleService
             "    '--state',",
             $"    {PowerShellString(result.StatePath)}",
             ")",
-            $"& $goatShot @arguments *> {PowerShellString(result.LogPath)}",
+            $"& $receipts @arguments *> {PowerShellString(result.LogPath)}",
             "exit $LASTEXITCODE"
         };
         File.WriteAllLines(result.RunScriptPath, lines);
@@ -254,7 +257,7 @@ public sealed class PluginUpdateScheduleService
     private static void WriteRegisterScript(PluginUpdateSchedulePlanResult result)
     {
         var intervalMinutes = Math.Max(1, (int)Math.Ceiling(result.IntervalHours * 60d));
-        var description = "GoatShot governed plugin background update handoff. Runs check-only or stage-only; does not install, trust, enable, allowlist, or execute plugin code.";
+        var description = "Receipts governed plugin background update handoff. Runs check-only or stage-only; does not install, trust, enable, allowlist, or execute plugin code.";
         var lines = new List<string>
         {
             "$ErrorActionPreference = 'Stop'",
@@ -330,7 +333,8 @@ public sealed class PluginUpdateScheduleService
                 return null;
             }
 
-            if (!string.Equals(manifest.SchemaVersion, CurrentSchemaVersion, StringComparison.Ordinal))
+            if (!string.Equals(manifest.SchemaVersion, CurrentSchemaVersion, StringComparison.Ordinal) &&
+                !string.Equals(manifest.SchemaVersion, LegacySchemaVersion, StringComparison.Ordinal))
             {
                 result.Issues.Add($"Schedule manifest schema is unsupported: {manifest.SchemaVersion}.");
                 return null;
@@ -440,10 +444,18 @@ public sealed class PluginUpdateScheduleService
             return Path.GetFullPath(Environment.ExpandEnvironmentVariables(cliPath));
         }
 
-        var installedPath = new PersonalInstallService(new StartupRegistrationService()).InstalledExecutablePath;
-        return File.Exists(installedPath)
-            ? installedPath
-            : Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "GoatShot.exe");
+        var install = new PersonalInstallService(new StartupRegistrationService());
+        if (File.Exists(install.InstalledExecutablePath))
+        {
+            return install.InstalledExecutablePath;
+        }
+
+        if (File.Exists(install.LegacyInstalledExecutablePath))
+        {
+            return install.LegacyInstalledExecutablePath;
+        }
+
+        return Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, BrandIdentity.DesktopExecutableName);
     }
 
     private string ResolveStatePath(string? statePath, string outputRoot)

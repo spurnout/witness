@@ -263,7 +263,7 @@ public sealed class ManualValidationHardwareEvidenceRecordService
     private static string BuildMarkdown(ManualValidationHardwareEvidenceRecordResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Hardware Evidence Record");
+        builder.AppendLine("# Receipts Hardware Evidence Record");
         builder.AppendLine();
         builder.AppendLine($"Lane: `{EmptyIfMissing(result.LaneTitle)}`");
         builder.AppendLine($"Lane id: `{EmptyIfMissing(result.LaneId)}`");

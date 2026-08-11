@@ -9,8 +9,10 @@ public sealed class BundledToolResolver
 {
     private const string PayloadMagic = "GOATSHOTASSET1!!";
     private const int PayloadFooterLength = sizeof(long) + 16;
-    public const string ManifestResourceName = "GoatShot.EmbeddedAssets.Manifest";
-    public const string DistributionManifestResourceName = "GoatShot.EmbeddedAssets.Manifest.Distribution";
+    public const string ManifestResourceName = "Receipts.EmbeddedAssets.Manifest";
+    public const string DistributionManifestResourceName = "Receipts.EmbeddedAssets.Manifest.Distribution";
+    public const string LegacyManifestResourceName = "GoatShot.EmbeddedAssets.Manifest";
+    public const string LegacyDistributionManifestResourceName = "GoatShot.EmbeddedAssets.Manifest.Distribution";
 
     private static readonly SemaphoreSlim ExtractionGate = new(1, 1);
     private readonly string _runtimeRoot;
@@ -180,14 +182,22 @@ public sealed class BundledToolResolver
 
     private EmbeddedAssetManifest ReadManifest()
     {
-        var resourceName = _assembly.GetManifestResourceNames().Contains(DistributionManifestResourceName, StringComparer.Ordinal)
-            ? DistributionManifestResourceName
-            : ManifestResourceName;
+        var resources = _assembly.GetManifestResourceNames();
+        var resourceName = new[]
+            {
+                DistributionManifestResourceName,
+                LegacyDistributionManifestResourceName,
+                ManifestResourceName,
+                LegacyManifestResourceName
+            }
+            .FirstOrDefault(candidate => resources.Contains(candidate, StringComparer.Ordinal))
+            ?? throw new InvalidOperationException("The embedded asset manifest is missing.");
         using var stream = _assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException("The embedded asset manifest is missing.");
         var manifest = JsonSerializer.Deserialize<EmbeddedAssetManifest>(stream, JsonOptions)
             ?? throw new InvalidOperationException("The embedded asset manifest is invalid.");
-        if (!manifest.SchemaVersion.Equals("goatshot.embedded-assets.v1", StringComparison.Ordinal))
+        if (!manifest.SchemaVersion.Equals("receipts.embedded-assets.v1", StringComparison.Ordinal) &&
+            !manifest.SchemaVersion.Equals("goatshot.embedded-assets.v1", StringComparison.Ordinal))
         {
             throw new InvalidOperationException($"Unsupported embedded asset manifest schema: {manifest.SchemaVersion}");
         }

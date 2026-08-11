@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Text.Json;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 
@@ -73,6 +74,59 @@ public sealed class EditorPrivacyToolTests
             using var redacted = new Bitmap(outputPath);
             Assert.AreEqual(Color.Black.ToArgb(), redacted.GetPixel(12, 32).ToArgb());
             Assert.AreEqual(Color.White.ToArgb(), redacted.GetPixel(2, 2).ToArgb());
+        });
+    }
+
+    [TestMethod]
+    public async Task VisualRedactionService_PreservesReceiptLineageTransitively()
+    {
+        await WithTempServicesAsync(async services =>
+        {
+            var item = CreateSensitiveCaptureItem(services.Paths);
+            item.SourceReceiptId = "receipt-parent";
+            item.ArtifactRole = "unique-frame";
+            item.SourceAvailable = true;
+            await File.WriteAllTextAsync(
+                item.FilePath + ".receipt-lineage.json",
+                JsonSerializer.Serialize(new ReceiptDerivativeLineage
+                {
+                    DerivativeId = item.Id,
+                    SourceReceiptId = item.SourceReceiptId,
+                    SourceReceiptPath = Path.Combine(services.Paths.ReceiptsRoot, "receipt-parent"),
+                    ArtifactRole = item.ArtifactRole,
+                    OutputPath = item.FilePath,
+                    SourceSegmentIds = ["segment-1"],
+                    StartMonotonicTicks = 10,
+                    EndMonotonicTicks = 20
+                }));
+
+            var outputPath = Path.Combine(services.Paths.ImagesRoot, "redacted-linked.png");
+            var result = await services.VisualRedactions.RedactSensitiveOcrAsync(
+                item,
+                outputPath,
+                VisualRedactionMode.Solid,
+                addToWorkspace: true);
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.IsNotNull(result.Item);
+            Assert.AreEqual(item.SourceReceiptId, result.Item.SourceReceiptId);
+            Assert.AreEqual("ocr-redacted-image", result.Item.ArtifactRole);
+            Assert.IsFalse(result.Item.IsOriginal);
+            Assert.IsTrue(result.Item.SourceAvailable);
+
+            var lineage = JsonSerializer.Deserialize<ReceiptDerivativeLineage>(
+                await File.ReadAllTextAsync(outputPath + ".receipt-lineage.json"),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.IsNotNull(lineage);
+            Assert.AreEqual(item.SourceReceiptId, lineage.SourceReceiptId);
+            Assert.AreEqual(item.Id, lineage.ParentDerivativeId);
+            Assert.AreEqual(item.FilePath, lineage.ParentDerivativePath);
+            CollectionAssert.AreEqual(new[] { "segment-1" }, lineage.SourceSegmentIds);
+            Assert.AreEqual(10L, lineage.StartMonotonicTicks);
+            Assert.AreEqual(20L, lineage.EndMonotonicTicks);
+
+            var persisted = services.WorkspaceStore.Load().Single(saved => saved.Id == result.Item.Id);
+            Assert.AreEqual(item.SourceReceiptId, persisted.SourceReceiptId);
         });
     }
 

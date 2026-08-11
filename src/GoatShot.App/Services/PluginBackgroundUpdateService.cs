@@ -6,6 +6,8 @@ public sealed class PluginBackgroundUpdateService
 {
     public const string CheckOnlyMode = "check-only";
     public const string StageOnlyMode = "stage-only";
+    public const string CurrentSchemaVersion = "receipts.plugin-background-updates.v1";
+    public const string LegacySchemaVersion = "goatshot.plugin-background-updates.v1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -96,7 +98,7 @@ public sealed class PluginBackgroundUpdateService
         result.NextRunUtc = result.CompletedAtUtc.Value.AddHours(result.IntervalHours);
         result.Succeeded = result.Issues.Count == 0;
         result.NextActions.Add("Review update summaries and staged packages before installing, trusting, enabling, allowlisting, or running plugin actions.");
-        result.NextActions.Add("Use explicit `goatshot plugins install-staged`, trust, enable, and action allowlist steps after review.");
+        result.NextActions.Add("Use explicit `receipts plugins install-staged`, trust, enable, and action allowlist steps after review.");
         result.NextActions.Add("Hosted marketplace accounts, publication, reviews, ratings, payments, and remote execution remain separate later-scope work.");
 
         WriteState(result);
@@ -142,7 +144,12 @@ public sealed class PluginBackgroundUpdateService
                 return null;
             }
 
-            return JsonSerializer.Deserialize<PluginBackgroundUpdateState>(File.ReadAllText(path), JsonOptions);
+            var state = JsonSerializer.Deserialize<PluginBackgroundUpdateState>(File.ReadAllText(path), JsonOptions);
+            return state is not null &&
+                (state.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal) ||
+                 state.SchemaVersion.Equals(LegacySchemaVersion, StringComparison.Ordinal))
+                    ? state
+                    : null;
         }
         catch
         {
@@ -154,7 +161,7 @@ public sealed class PluginBackgroundUpdateService
     {
         var state = new PluginBackgroundUpdateState
         {
-            SchemaVersion = "goatshot.plugin-background-updates.v1",
+            SchemaVersion = CurrentSchemaVersion,
             RegistryLocation = result.RegistryLocation,
             Mode = result.Mode,
             LastRunUtc = result.CompletedAtUtc,
@@ -256,7 +263,7 @@ public sealed class PluginBackgroundUpdateRunResult
 
 public sealed class PluginBackgroundUpdateState
 {
-    public string SchemaVersion { get; set; } = "goatshot.plugin-background-updates.v1";
+    public string SchemaVersion { get; set; } = PluginBackgroundUpdateService.CurrentSchemaVersion;
     public string RegistryLocation { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
     public DateTimeOffset? LastRunUtc { get; set; }

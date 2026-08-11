@@ -4,11 +4,13 @@ namespace GoatShot.App.Services;
 
 public static class SettingsMigrationService
 {
-    public const int CurrentSchemaVersion = 15;
+    public const int CurrentSchemaVersion = 16;
 
     public static SettingsMigrationResult Migrate(AppSettings settings)
     {
         var changed = false;
+
+        changed |= MigrateLegacyBrandingDefaults(settings);
 
         if (settings.SettingsSchemaVersion < CurrentSchemaVersion)
         {
@@ -19,6 +21,12 @@ public static class SettingsMigrationService
         if (settings.Recording is null)
         {
             settings.Recording = new RecordingSettings();
+            changed = true;
+        }
+
+        if (settings.Replay is null)
+        {
+            settings.Replay = new ReplayBufferSettings();
             changed = true;
         }
 
@@ -141,19 +149,19 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.SlackMessageTemplate))
         {
-            settings.SlackMessageTemplate = "GoatShot capture ready: {file} ({bytes} bytes)";
+            settings.SlackMessageTemplate = "Receipts capture ready: {file} ({bytes} bytes)";
             changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.DiscordMessageTemplate))
         {
-            settings.DiscordMessageTemplate = "GoatShot capture: {file}";
+            settings.DiscordMessageTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.TeamsMessageTemplate))
         {
-            settings.TeamsMessageTemplate = "GoatShot capture ready: {file} ({bytes} bytes)";
+            settings.TeamsMessageTemplate = "Receipts capture ready: {file} ({bytes} bytes)";
             changed = true;
         }
 
@@ -188,7 +196,7 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.GitHubIssueTitleTemplate))
         {
-            settings.GitHubIssueTitleTemplate = "GoatShot capture: {file}";
+            settings.GitHubIssueTitleTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
@@ -200,7 +208,7 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.JiraSummaryTemplate))
         {
-            settings.JiraSummaryTemplate = "GoatShot capture: {file}";
+            settings.JiraSummaryTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
@@ -218,7 +226,7 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.AzureDevOpsTitleTemplate))
         {
-            settings.AzureDevOpsTitleTemplate = "GoatShot capture: {file}";
+            settings.AzureDevOpsTitleTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
@@ -230,13 +238,13 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.YouTubeTitleTemplate))
         {
-            settings.YouTubeTitleTemplate = "GoatShot recording: {file}";
+            settings.YouTubeTitleTemplate = "Receipts recording: {file}";
             changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.YouTubeDescriptionTemplate))
         {
-            settings.YouTubeDescriptionTemplate = "Uploaded from GoatShot capture {id}.";
+            settings.YouTubeDescriptionTemplate = "Uploaded from Receipts capture {id}.";
             changed = true;
         }
 
@@ -260,7 +268,7 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.OneNotePageTitleTemplate))
         {
-            settings.OneNotePageTitleTemplate = "GoatShot capture: {file}";
+            settings.OneNotePageTitleTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
@@ -278,7 +286,7 @@ public static class SettingsMigrationService
 
         if (string.IsNullOrWhiteSpace(settings.GooglePhotosDescriptionTemplate))
         {
-            settings.GooglePhotosDescriptionTemplate = "GoatShot capture: {file}";
+            settings.GooglePhotosDescriptionTemplate = "Receipts capture: {file}";
             changed = true;
         }
 
@@ -290,6 +298,52 @@ public static class SettingsMigrationService
         changed |= EnsureOAuthProvider(settings.OAuth, "OneNote", "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", "https://login.microsoftonline.com/common/oauth2/v2.0/token", "Notes.Create Files.Read offline_access");
 
         return new SettingsMigrationResult(changed);
+    }
+
+    private static bool MigrateLegacyBrandingDefaults(AppSettings settings)
+    {
+        var changed = false;
+        changed |= ReplaceExact(
+            settings.SlackMessageTemplate,
+            "GoatShot capture ready: {file} ({bytes} bytes)",
+            "Receipts capture ready: {file} ({bytes} bytes)",
+            value => settings.SlackMessageTemplate = value);
+        changed |= ReplaceExact(
+            settings.DiscordMessageTemplate,
+            "GoatShot capture: {file}",
+            "Receipts capture: {file}",
+            value => settings.DiscordMessageTemplate = value);
+        changed |= ReplaceExact(
+            settings.TeamsMessageTemplate,
+            "GoatShot capture ready: {file} ({bytes} bytes)",
+            "Receipts capture ready: {file} ({bytes} bytes)",
+            value => settings.TeamsMessageTemplate = value);
+        changed |= ReplaceExact(settings.GitHubIssueTitleTemplate, "GoatShot capture: {file}", "Receipts capture: {file}", value => settings.GitHubIssueTitleTemplate = value);
+        changed |= ReplaceExact(settings.JiraSummaryTemplate, "GoatShot capture: {file}", "Receipts capture: {file}", value => settings.JiraSummaryTemplate = value);
+        changed |= ReplaceExact(settings.AzureDevOpsTitleTemplate, "GoatShot capture: {file}", "Receipts capture: {file}", value => settings.AzureDevOpsTitleTemplate = value);
+        changed |= ReplaceExact(settings.YouTubeTitleTemplate, "GoatShot recording: {file}", "Receipts recording: {file}", value => settings.YouTubeTitleTemplate = value);
+        changed |= ReplaceExact(settings.YouTubeDescriptionTemplate, "Uploaded from GoatShot capture {id}.", "Uploaded from Receipts capture {id}.", value => settings.YouTubeDescriptionTemplate = value);
+        changed |= ReplaceExact(settings.OneNotePageTitleTemplate, "GoatShot capture: {file}", "Receipts capture: {file}", value => settings.OneNotePageTitleTemplate = value);
+        changed |= ReplaceExact(settings.GooglePhotosDescriptionTemplate, "GoatShot capture: {file}", "Receipts capture: {file}", value => settings.GooglePhotosDescriptionTemplate = value);
+        changed |= ReplaceExact(settings.S3KeyPrefix, "goatshot/", "receipts/", value => settings.S3KeyPrefix = value);
+        changed |= ReplaceExact(settings.DropboxRemoteFolder, "/GoatShot", "/Receipts", value => settings.DropboxRemoteFolder = value);
+        changed |= ReplaceExact(settings.OneDriveRemoteFolder, "/GoatShot", "/Receipts", value => settings.OneDriveRemoteFolder = value);
+        return changed;
+    }
+
+    private static bool ReplaceExact(
+        string current,
+        string legacyValue,
+        string receiptsValue,
+        Action<string> assign)
+    {
+        if (!string.Equals(current, legacyValue, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        assign(receiptsValue);
+        return true;
     }
 
     private static bool EnsureOAuthProvider(

@@ -6,7 +6,8 @@ namespace GoatShot.App.Services;
 
 public static class ManagedPolicyService
 {
-    public const string PolicyPathEnvironmentVariable = "GOATSHOT_MANAGED_POLICY_PATH";
+    public const string PolicyPathEnvironmentVariable = "RECEIPTS_MANAGED_POLICY_PATH";
+    public const string LegacyPolicyPathEnvironmentVariable = "GOATSHOT_MANAGED_POLICY_PATH";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -331,7 +332,7 @@ public static class ManagedPolicyService
     private static string ResolvePolicyPath(string? policyPath)
     {
         policyPath = string.IsNullOrWhiteSpace(policyPath)
-            ? Environment.GetEnvironmentVariable(PolicyPathEnvironmentVariable)
+            ? BrandEnvironment.Resolve("MANAGED_POLICY_PATH").Value
             : policyPath;
         return string.IsNullOrWhiteSpace(policyPath)
             ? string.Empty

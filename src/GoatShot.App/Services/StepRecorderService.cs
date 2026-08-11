@@ -148,7 +148,7 @@ public sealed class StepRecorderService : IDisposable
             using var captured = await _screenshots.CaptureActiveWindowAsync();
             if (captured.Source?.ProcessName?.Equals(_ownProcessName, StringComparison.OrdinalIgnoreCase) == true)
             {
-                StatusChanged?.Invoke(this, "Ignored GoatShot UI click while step recorder is active.");
+                StatusChanged?.Invoke(this, "Ignored Receipts UI click while step recorder is active.");
                 return;
             }
 
@@ -269,7 +269,7 @@ public sealed class StepRecorderService : IDisposable
     private static string BuildMarkdown(IReadOnlyList<StepRecordingStep> steps)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Step Recording");
+        builder.AppendLine("# Receipts Step Recording");
         builder.AppendLine();
         builder.AppendLine($"Generated: {DateTimeOffset.Now.LocalDateTime:g}");
         builder.AppendLine($"Steps: {steps.Count}");
@@ -313,12 +313,12 @@ public sealed class StepRecorderService : IDisposable
         var builder = new StringBuilder();
         builder.AppendLine("<!doctype html>");
         builder.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">");
-        builder.AppendLine("<title>GoatShot Step Recording</title>");
+        builder.AppendLine("<title>Receipts Step Recording</title>");
         builder.AppendLine("<style>");
         builder.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;max-width:980px;margin:32px auto;padding:0 20px;line-height:1.5;color:#102027;background:#f8fbfc}");
         builder.AppendLine("img{max-width:100%;border:1px solid #c7d6dc;border-radius:6px} pre{white-space:pre-wrap;background:#e9f1f4;border-radius:6px;padding:12px}.meta{color:#31515d}");
         builder.AppendLine("</style></head><body>");
-        builder.AppendLine("<h1>GoatShot Step Recording</h1>");
+        builder.AppendLine("<h1>Receipts Step Recording</h1>");
         builder.AppendLine("<p class=\"meta\">Generated: " + Html(DateTimeOffset.Now.LocalDateTime.ToString("g")) + " · Steps: " + steps.Count + "</p>");
         foreach (var step in steps)
         {

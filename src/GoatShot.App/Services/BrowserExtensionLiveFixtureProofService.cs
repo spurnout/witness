@@ -42,7 +42,7 @@ public sealed class BrowserExtensionLiveFixtureProofService
             ? $"http://127.0.0.1:{DefaultFixturePort}/safe-fixture.html"
             : request.FixtureUrl.Trim();
         var hostExecutable = string.IsNullOrWhiteSpace(request.HostExecutablePath)
-            ? Path.Combine(AppContext.BaseDirectory, "GoatShot.Cli.exe")
+            ? ResolveDefaultHostExecutable()
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.HostExecutablePath));
         var nativeHostInstallCommand = BuildNativeHostInstallCommand(browser, request.ExtensionId, hostExecutable);
         var diagnostics = new BrowserExtensionOperatorDiagnosticsService(_paths).Build(new BrowserExtensionOperatorDiagnosticsRequest
@@ -271,7 +271,14 @@ public sealed class BrowserExtensionLiveFixtureProofService
         var idValue = string.IsNullOrWhiteSpace(extensionId)
             ? "<extension-id>"
             : extensionId.Trim();
-        return $"GoatShot.Cli.exe browser-extension native-host install --browser {browser} {idFlag} {Quote(idValue)} --host-exe {Quote(hostExecutable)} --json";
+        return $"Receipts.Cli.exe browser-extension native-host install --browser {browser} {idFlag} {Quote(idValue)} --host-exe {Quote(hostExecutable)} --json";
+    }
+
+    private static string ResolveDefaultHostExecutable()
+    {
+        var currentPath = Path.Combine(AppContext.BaseDirectory, BrandIdentity.CommandLineExecutableName);
+        var legacyPath = Path.Combine(AppContext.BaseDirectory, $"{BrandIdentity.LegacyProductName}.Cli.exe");
+        return File.Exists(currentPath) || !File.Exists(legacyPath) ? currentPath : legacyPath;
     }
 
     private static string BuildNotes(
@@ -378,7 +385,7 @@ public sealed class BrowserExtensionLiveFixtureProofService
             ? "<downloaded-or-exported-payload.json>"
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.PayloadPath));
         var package = string.IsNullOrWhiteSpace(request.StitchPackagePath)
-            ? "<downloaded-GoatShot-correlationId-folder>"
+            ? "<downloaded-Receipts-correlationId-folder>"
             : Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.StitchPackagePath));
         return string.Join(
             Environment.NewLine,
@@ -429,20 +436,20 @@ public sealed class BrowserExtensionLiveFixtureProofService
                 "Save diagnostics:",
                 string.Empty,
                 "```powershell",
-                $"GoatShot.Cli.exe browser-extension diagnostics --source {Quote(source)} --json *> .\\browser-extension-diagnostics.json",
-                "GoatShot.Cli.exe browser-extension native-host status --json *> .\\native-host-status.json",
+                $"Receipts.Cli.exe browser-extension diagnostics --source {Quote(source)} --json *> .\\browser-extension-diagnostics.json",
+                "Receipts.Cli.exe browser-extension native-host status --json *> .\\native-host-status.json",
                 "```",
                 string.Empty,
                 "Verify/import the downloaded stitch package:",
                 string.Empty,
                 "```powershell",
-                $"GoatShot.Cli.exe browser-extension live-fixture --browser {browser} --source {Quote(source)} --payload {Quote(payload)} --stitch-package {Quote(package)} --output . --force --json *> .\\live-fixture-verify.json",
+                $"Receipts.Cli.exe browser-extension live-fixture --browser {browser} --source {Quote(source)} --payload {Quote(payload)} --stitch-package {Quote(package)} --output . --force --json *> .\\live-fixture-verify.json",
                 "```",
                 string.Empty,
                 "Validate the completed proof folder after screenshots and browser version are recorded:",
                 string.Empty,
                 "```powershell",
-                $"GoatShot.Cli.exe browser-extension proof validate --folder . --source {Quote(source)} --browser {browser} --payload {Quote(payload)} --redacted-payload .\\redacted-payload.json --stitch-package {Quote(package)} --import-result .\\import-result.json --json *> .\\browser-proof-validation-cli.json",
+                $"Receipts.Cli.exe browser-extension proof validate --folder . --source {Quote(source)} --browser {browser} --payload {Quote(payload)} --redacted-payload .\\redacted-payload.json --stitch-package {Quote(package)} --import-result .\\import-result.json --json *> .\\browser-proof-validation-cli.json",
                 "```"
             ]);
     }

@@ -99,8 +99,8 @@ public sealed class BrowserExtensionInstallPlanService
         };
 
         entry.Issues.AddRange(storePackage.Issues);
-        entry.Warnings.Add("GoatShot cannot prove the extension is installed from desktop state alone; browser-side Host Status evidence is still required.");
-        entry.Warnings.Add($"{browser} extension installation is controlled by the browser, browser store, or enterprise policy, not by GoatShot.");
+        entry.Warnings.Add("Receipts cannot prove the extension is installed from desktop state alone; browser-side Host Status evidence is still required.");
+        entry.Warnings.Add($"{browser} extension installation is controlled by the browser, browser store, or enterprise policy, not by Receipts.");
 
         if (!policyAllowed)
         {
@@ -119,8 +119,8 @@ public sealed class BrowserExtensionInstallPlanService
             entry.Status = "manual-install-plan-ready";
         }
 
-        entry.Commands.Add($"goatshot browser-extension install-guide --browser {browserName} --source {Quote(source)}");
-        entry.Commands.Add("goatshot browser-extension native-host status --json");
+        entry.Commands.Add($"receipts browser-extension install-guide --browser {browserName} --source {Quote(source)}");
+        entry.Commands.Add("receipts browser-extension native-host status --json");
         if (!string.IsNullOrWhiteSpace(extensionId))
         {
             entry.Commands.Add(NativeHostInstallCommand(browser, extensionId));
@@ -195,14 +195,16 @@ public sealed class BrowserExtensionInstallPlanService
         var browserRoot = Path.Combine(storePackageRoot, browser);
         if (Directory.Exists(browserRoot))
         {
-            result.ExtensionPackagePath = Directory.GetFiles(browserRoot, $"goatshot-browser-extension-{browser}-v*.zip")
-                .OrderByDescending(File.GetLastWriteTimeUtc)
-                .FirstOrDefault() ?? string.Empty;
+            result.ExtensionPackagePath = FindPreferredArtifact(
+                browserRoot,
+                $"receipts-browser-extension-{browser}-v*.zip",
+                $"goatshot-browser-extension-{browser}-v*.zip");
         }
 
-        result.SubmissionBundlePath = Directory.GetFiles(storePackageRoot, $"goatshot-browser-extension-{browser}-store-submission.zip")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault() ?? string.Empty;
+        result.SubmissionBundlePath = FindPreferredArtifact(
+            storePackageRoot,
+            $"receipts-browser-extension-{browser}-store-submission.zip",
+            $"goatshot-browser-extension-{browser}-store-submission.zip");
 
         if (string.IsNullOrWhiteSpace(result.ExtensionPackagePath) && string.IsNullOrWhiteSpace(result.SubmissionBundlePath))
         {
@@ -210,6 +212,22 @@ public sealed class BrowserExtensionInstallPlanService
         }
 
         return result;
+    }
+
+    private static string FindPreferredArtifact(string root, string currentPattern, string legacyPattern)
+    {
+        foreach (var pattern in new[] { currentPattern, legacyPattern })
+        {
+            var match = Directory.GetFiles(root, pattern)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(match))
+            {
+                return match;
+            }
+        }
+
+        return string.Empty;
     }
 
     private static List<BrowserNativeHostBrowser> NormalizeBrowsers(string? browser)
@@ -251,19 +269,19 @@ public sealed class BrowserExtensionInstallPlanService
         return browser switch
         {
             BrowserNativeHostBrowser.Chrome =>
-                $"goatshot browser-extension native-host install --browser chrome --chrome-extension-id {extensionId} --json",
+                $"receipts browser-extension native-host install --browser chrome --chrome-extension-id {extensionId} --json",
             BrowserNativeHostBrowser.Edge =>
-                $"goatshot browser-extension native-host install --browser edge --edge-extension-id {extensionId} --json",
+                $"receipts browser-extension native-host install --browser edge --edge-extension-id {extensionId} --json",
             BrowserNativeHostBrowser.Firefox =>
-                $"goatshot browser-extension native-host install --browser firefox --firefox-extension-id {extensionId} --json",
-            _ => "goatshot browser-extension native-host install --json"
+                $"receipts browser-extension native-host install --browser firefox --firefox-extension-id {extensionId} --json",
+            _ => "receipts browser-extension native-host install --json"
         };
     }
 
     private static string BuildMarkdown(BrowserExtensionInstallPlanResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Install Plan");
+        builder.AppendLine("# Receipts Browser Extension Install Plan");
         builder.AppendLine();
         builder.AppendLine($"Source: `{result.SourceDirectory}`");
         builder.AppendLine($"Store package root: `{(string.IsNullOrWhiteSpace(result.StorePackageRoot) ? "not supplied" : result.StorePackageRoot)}`");
@@ -347,7 +365,7 @@ public sealed class BrowserExtensionInstallPlanService
     {
         "Chrome and Edge unpacked extension loading is controlled by the browser UI or enterprise policy.",
         "Firefox temporary/permanent add-on installation is controlled by Firefox, AMO signing, or enterprise policy.",
-        "GoatShot can generate local packages, setup notes, native-host manifests, and validation artifacts, but it cannot honestly claim extension installation from desktop state alone.",
+        "Receipts can generate local packages, setup notes, native-host manifests, and validation artifacts, but it cannot honestly claim extension installation from desktop state alone.",
         "Native-host registration still requires the browser-generated extension id before reachability can be proven."
     };
 

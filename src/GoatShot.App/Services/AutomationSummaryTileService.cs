@@ -42,7 +42,7 @@ public sealed class AutomationSummaryTileService
         return new SettingsSummaryTile(
             "Watch folders",
             watchFolders.Count.ToString(CultureInfo.InvariantCulture),
-            watchFoldersEnabled ? "Watching while GoatShot runs" : "Watching disabled",
+            watchFoldersEnabled ? "Watching while Receipts runs" : "Watching disabled",
             watchFoldersEnabled && watchFolders.Count > 0 ? ReadyTone : NeutralTone);
     }
 

@@ -9,26 +9,29 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <ApplicationIcon>Assets\goatshot-icon.ico</ApplicationIcon>
-    <AssemblyName>GoatShot</AssemblyName>
+    <ApplicationIcon>Assets\receipts-icon.ico</ApplicationIcon>
+    <AssemblyName>Receipts</AssemblyName>
     <RootNamespace>GoatShot.App</RootNamespace>
-    <Version Condition="'$(Version)' == ''">0.2.0</Version>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
-    <FileVersion>0.2.0.0</FileVersion>
+    <Version Condition="'$(Version)' == ''">0.3.0</Version>
+    <AssemblyVersion>0.3.0.0</AssemblyVersion>
+    <FileVersion>0.3.0.0</FileVersion>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(GoatShotDistribution)' == 'true'">
+  <ItemGroup Condition="'$(ReceiptsDistribution)' == 'true' or '$(GoatShotDistribution)' == 'true'">
+    <AssemblyMetadata Include="ReceiptsDistribution" Value="true" />
     <AssemblyMetadata Include="GoatShotDistribution" Value="true" />
-    <AssemblyMetadata Include="GoatShotBuildId" Value="$(GoatShotBuildId)" />
+    <AssemblyMetadata Include="ReceiptsBuildId" Value="$(ReceiptsBuildId)" Condition="'$(ReceiptsBuildId)' != ''" />
+    <AssemblyMetadata Include="GoatShotBuildId" Value="$(ReceiptsBuildId)" Condition="'$(ReceiptsBuildId)' != ''" />
+    <AssemblyMetadata Include="GoatShotBuildId" Value="$(GoatShotBuildId)" Condition="'$(ReceiptsBuildId)' == ''" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\goatshot-icon.ico" />
-    <Resource Include="Assets\goatshot-logo.png" />
-    <EmbeddedResource Include="Assets\embedded-assets.manifest.json" LogicalName="GoatShot.EmbeddedAssets.Manifest" />
+    <Resource Include="Assets\receipts-icon.ico" />
+    <Resource Include="Assets\receipts-icon.png" />
+    <EmbeddedResource Include="Assets\embedded-assets.manifest.json" LogicalName="Receipts.EmbeddedAssets.Manifest" />
     <EmbeddedResource Include="$(EmbeddedAssetsRoot)\embedded-assets.manifest.json"
                       Condition="'$(EmbeddedAssetsRoot)' != '' and Exists('$(EmbeddedAssetsRoot)\embedded-assets.manifest.json')"
-                      LogicalName="GoatShot.EmbeddedAssets.Manifest.Distribution" />
+                      LogicalName="Receipts.EmbeddedAssets.Manifest.Distribution" />
   </ItemGroup>
 
   <ItemGroup>

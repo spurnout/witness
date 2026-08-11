@@ -76,7 +76,7 @@ public sealed class ProviderDiagnosticsService
         switch (record.ProviderName)
         {
             case "Local folder":
-                NoteSetting(record, "Local export folder", _settings.LocalExportFolder, "default Desktop\\GoatShot Exports folder");
+                NoteSetting(record, "Local export folder", _settings.LocalExportFolder, "default Desktop\\Receipts Exports folder");
                 break;
             case "Clipboard image":
             case "Clipboard file":
@@ -149,7 +149,7 @@ public sealed class ProviderDiagnosticsService
             case "Dropbox":
                 NoteSetting(record, "Dropbox content API base URL", _settings.DropboxContentApiBaseUrl, "default Dropbox content API endpoint");
                 NoteSetting(record, "Dropbox API base URL", _settings.DropboxApiBaseUrl, "default Dropbox API endpoint");
-                NoteSetting(record, "Dropbox remote folder", _settings.DropboxRemoteFolder, "/GoatShot default");
+                NoteSetting(record, "Dropbox remote folder", _settings.DropboxRemoteFolder, "/Receipts default");
                 RequireSecret(record, "Dropbox access token", _secretStore.HasDropboxAccessToken);
                 NoteOAuthToken(record, "Dropbox");
                 break;
@@ -170,7 +170,7 @@ public sealed class ProviderDiagnosticsService
                 break;
             case "OneDrive":
                 NoteSetting(record, "OneDrive Graph API base URL", _settings.OneDriveGraphApiBaseUrl, "default Microsoft Graph endpoint");
-                NoteSetting(record, "OneDrive remote folder", _settings.OneDriveRemoteFolder, "/GoatShot default");
+                NoteSetting(record, "OneDrive remote folder", _settings.OneDriveRemoteFolder, "/Receipts default");
                 RequireSecret(record, "OneDrive access token", _secretStore.HasOneDriveAccessToken);
                 NoteOAuthToken(record, "OneDrive");
                 break;

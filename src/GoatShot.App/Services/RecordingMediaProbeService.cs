@@ -72,7 +72,7 @@ public static class RecordingMediaProbeService
         var ffprobe = FindFfprobe();
         if (string.IsNullOrWhiteSpace(ffprobe))
         {
-            return Skipped(fullPath, "ffprobe unavailable; recording metadata proof skipped. Install ffprobe.exe beside ffmpeg.exe, add it to PATH, or set GOATSHOT_FFPROBE_PATH.");
+            return Skipped(fullPath, "ffprobe unavailable; recording metadata proof skipped. Install ffprobe.exe beside ffmpeg.exe, add it to PATH, or set RECEIPTS_FFPROBE_PATH (GOATSHOT_FFPROBE_PATH remains a compatibility alias).");
         }
 
         try
@@ -212,7 +212,7 @@ public static class RecordingMediaProbeService
 
     public static string? FindFfprobe()
     {
-        var configured = Environment.GetEnvironmentVariable("GOATSHOT_FFPROBE_PATH");
+        var configured = BrandEnvironment.Resolve("FFPROBE_PATH").Value;
         if (!string.IsNullOrWhiteSpace(configured))
         {
             configured = Environment.ExpandEnvironmentVariables(configured);

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "GoatShot Page Capture",
-  "version": "0.2.0",
-  "description": "Consented page capture and redacted native handoff for GoatShot.",
+  "name": "Receipts Page Capture",
+  "version": "0.3.0",
+  "description": "Consented page capture and redacted native handoff for Receipts.",
   "permissions": [
     "activeTab",
     "downloads",
@@ -26,7 +26,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "GoatShot Capture"
+    "default_title": "Receipts Capture"
   },
   "options_ui": {
     "page": "options.html",

@@ -138,12 +138,12 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
             entry.Status = "enterprise-policy-template-ready";
         }
 
-        entry.Warnings.Add("These files are local templates only; GoatShot did not write HKLM/HKCU policy, Firefox distribution policy, browser profiles, or native-host registrations.");
+        entry.Warnings.Add("These files are local templates only; Receipts did not write HKLM/HKCU policy, Firefox distribution policy, browser profiles, or native-host registrations.");
         entry.Warnings.Add("Enterprise deployment still needs an administrator, MDM, Group Policy, or packaging system plus browser-side policy proof.");
         entry.RequiredEvidence.AddRange(BuildRequiredEvidence(browser));
         entry.ManualSteps.AddRange(BuildManualSteps(browser));
-        entry.Commands.Add("goatshot browser-extension native-host status --json");
-        entry.Commands.Add($"goatshot browser-extension proof validate --folder <enterprise-proof-folder> --browser {browserName} --extension-id <installed-extension-id> --json");
+        entry.Commands.Add("receipts browser-extension native-host status --json");
+        entry.Commands.Add($"receipts browser-extension proof validate --folder <enterprise-proof-folder> --browser {browserName} --extension-id <installed-extension-id> --json");
 
         var fileName = browser switch
         {
@@ -181,8 +181,8 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
 
     private static string BuildFirefoxPoliciesJson(string? extensionId, string? installUrl)
     {
-        var id = string.IsNullOrWhiteSpace(extensionId) ? "goatshot@example.invalid" : extensionId;
-        var url = string.IsNullOrWhiteSpace(installUrl) ? "https://example.invalid/goatshot-extension.xpi" : installUrl;
+        var id = string.IsNullOrWhiteSpace(extensionId) ? "receipts@example.invalid" : extensionId;
+        var url = string.IsNullOrWhiteSpace(installUrl) ? "https://example.invalid/receipts-extension.xpi" : installUrl;
         var policy = new
         {
             policies = new Dictionary<string, object>
@@ -203,7 +203,7 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
     private static string BuildMarkdown(BrowserExtensionEnterprisePolicyPlanResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Browser Extension Enterprise Policy Plan");
+        builder.AppendLine("# Receipts Browser Extension Enterprise Policy Plan");
         builder.AppendLine();
         builder.AppendLine($"Source: `{result.SourceDirectory}`");
         builder.AppendLine($"Policy allowed: `{result.PolicyAllowed}`");
@@ -255,7 +255,7 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
         {
             $"Review the generated {browserName} policy template and replace any placeholder values before enterprise use.",
             "Deploy policy through an administrator-controlled Group Policy, MDM, Intune, or packaging system.",
-            "Deploy or verify the GoatShot native messaging host manifest separately for the managed browser.",
+            "Deploy or verify the Receipts native messaging host manifest separately for the managed browser.",
             $"Open {browserName} policy/status pages on a managed test profile and save screenshots showing the policy is active.",
             "Use the extension popup Host Status button and safe fixture capture/import proof before claiming live compatibility."
         };
@@ -267,7 +267,7 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
         return new[]
         {
             $"{browserName} enterprise policy page screenshot showing force-install policy applied.",
-            $"{browserName} extension details screenshot showing the managed GoatShot extension installed and locked.",
+            $"{browserName} extension details screenshot showing the managed Receipts extension installed and locked.",
             $"{browserName} popup Host Status success screenshot.",
             "Native-host registration status for the same browser and extension id.",
             "Safe-fixture capture/export/import proof from the managed profile.",
@@ -279,7 +279,7 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
     {
         "Chrome and Edge ExtensionInstallForcelist policy deployment is owned by enterprise policy channels such as Group Policy or MDM.",
         "Firefox ExtensionSettings deployment is owned by Firefox Enterprise Policies through policies.json, Group Policy templates, or MDM.",
-        "GoatShot can generate local templates and commands, but cannot claim enterprise deployment until browser policy pages and managed profile behavior are observed.",
+        "Receipts can generate local templates and commands, but cannot claim enterprise deployment until browser policy pages and managed profile behavior are observed.",
         "Native-host deployment remains separate from extension force-install policy and must be proven independently."
     };
 
@@ -289,7 +289,7 @@ public sealed class BrowserExtensionEnterprisePolicyPlanService
         "This plan does not write Firefox distribution policies into a browser install.",
         "This plan does not contact Chrome Web Store, Microsoft Edge Add-ons, Firefox AMO, or an MDM service.",
         "This plan does not install, sign, approve, publish, or update browser extensions.",
-        "This plan does not register the GoatShot native messaging host.",
+        "This plan does not register the Receipts native messaging host.",
         "This plan does not prove live browser Host Status, safe fixture capture, or automatic enterprise deployment."
     };
 

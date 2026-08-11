@@ -70,7 +70,7 @@ public sealed class ManualValidationCleanMachineEvidenceRecordServiceTests
             Assert.IsFalse(generatedText.Contains("super-secret-token", StringComparison.Ordinal));
             StringAssert.Contains(generatedText, "REDACTED");
             StringAssert.Contains(generatedText, "Proof complete: `True`");
-            StringAssert.Contains(generatedText, "Would launch GoatShot: `False`");
+            StringAssert.Contains(generatedText, "Would launch Receipts: `False`");
         }
         finally
         {

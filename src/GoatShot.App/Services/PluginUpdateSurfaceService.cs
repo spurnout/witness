@@ -27,7 +27,7 @@ public sealed class PluginUpdateSurfaceService
             RegistryLocation = result.RegistryLocation,
             CountsText = FormatCounts(result),
             MutationBoundary = "Passive check only: install=false, trust=false, enable=false, allowlist=false, execute=false.",
-            CliCommand = $"goatshot plugins updates --registry {QuoteCliArgument(registryForCommand)} --json",
+            CliCommand = $"receipts plugins updates --registry {QuoteCliArgument(registryForCommand)} --json",
             PluginsRoot = result.PluginsRoot,
             StagingRoot = result.StagingRoot,
             Issues = result.Issues.ToList(),

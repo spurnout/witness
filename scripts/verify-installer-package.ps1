@@ -1,13 +1,14 @@
 param(
     [string]$PackageScript = "scripts\package-release.ps1",
     [string]$InstallerScript = "packaging\GoatShot.iss",
-    [string]$PublishDir = "artifacts\publish\GoatShot-win-x64",
+    [string]$PublishDir = "artifacts\publish\Receipts-win-x64",
     [string]$DistRoot = "artifacts\dist",
-    [string]$Version = "0.1.0",
+    [string]$Version = "0.3.0",
     [string]$OutputRoot = "artifacts\installer-package-verification",
     [string]$InstallerPath = "",
     [switch]$BuildInstaller,
     [switch]$RunSilentInstallSmoke,
+    [switch]$AllowCurrentProfileMutation,
     [switch]$Json
 )
 
@@ -79,6 +80,8 @@ function Find-InnoCompiler {
     }
 
     $candidates += @(
+        "${env:LOCALAPPDATA}\Programs\Inno Setup 6\ISCC.exe",
+        "${env:LOCALAPPDATA}\Inno Setup 6\ISCC.exe",
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
         "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
     )
@@ -101,15 +104,19 @@ function Test-InnoScript {
     $content = Get-Content -LiteralPath $PathValue -Raw
     $required = @(
         @{ name = "Setup section"; pattern = '(?im)^\[Setup\]\s*$' },
-        @{ name = "AppName"; pattern = '(?im)^AppName\s*=\s*GoatShot\s*$' },
+        @{ name = "Stable upgrade AppId"; pattern = '(?im)^AppId\s*=\s*\{\{4E86AB11-3D28-4D42-BD31-05C48CF751D6\}\s*$' },
+        @{ name = "AppName"; pattern = '(?im)^AppName\s*=\s*Receipts\s*$' },
         @{ name = "Version macro"; pattern = '(?im)^AppVersion\s*=\s*\{#AppVersion\}\s*$' },
-        @{ name = "User-local install root"; pattern = '(?im)^DefaultDirName\s*=\s*\{localappdata\}\\Programs\\GoatShot\s*$' },
+        @{ name = "User-local install root"; pattern = '(?im)^DefaultDirName\s*=\s*\{localappdata\}\\Programs\\Receipts\s*$' },
         @{ name = "Lowest privilege default"; pattern = '(?im)^PrivilegesRequired\s*=\s*lowest\s*$' },
-        @{ name = "Output filename"; pattern = '(?im)^OutputBaseFilename\s*=\s*GoatShot-Setup-\{#AppVersion\}-win-x64\s*$' },
+        @{ name = "Output filename"; pattern = '(?im)^OutputBaseFilename\s*=\s*Receipts-\{#AppVersion\}-win-x64\s*$' },
         @{ name = "Published file tree"; pattern = '(?im)^Source:\s*"\{#PublishDir\}\\\*";\s*DestDir:\s*"\{app\}"' },
-        @{ name = "Uninstall display icon"; pattern = '(?im)^UninstallDisplayIcon\s*=\s*\{app\}\\GoatShot\.exe\s*$' },
-        @{ name = "Optional startup task"; pattern = '(?im)^Name:\s*"startup";.*Start GoatShot when I sign in' },
-        @{ name = "Post-install launch is user-visible"; pattern = '(?im)^Filename:\s*"\{app\}\\GoatShot\.exe";.*postinstall' }
+        @{ name = "Uninstall display icon"; pattern = '(?im)^UninstallDisplayIcon\s*=\s*\{app\}\\Receipts\.exe\s*$' },
+        @{ name = "Optional startup task"; pattern = '(?im)^Name:\s*"startup";.*Start Receipts when I sign in' },
+        @{ name = "Current Chrome native host cleanup"; pattern = '(?im)^Root:\s*HKCU;.*Chrome\\NativeMessagingHosts\\com\.receipts\.bridge' },
+        @{ name = "Legacy Chrome native host cleanup"; pattern = '(?im)^Root:\s*HKCU;.*Chrome\\NativeMessagingHosts\\com\.goatshot\.bridge' },
+        @{ name = "Legacy startup cleanup after install"; pattern = '(?is)ssPostInstall.*RegDeleteValue\([^\r\n]+GoatShot' },
+        @{ name = "Post-install launch is user-visible"; pattern = '(?im)^Filename:\s*"\{app\}\\Receipts\.exe";.*postinstall' }
     )
 
     foreach ($item in $required) {
@@ -131,7 +138,7 @@ function Build-Markdown {
     param([pscustomobject]$Result)
 
     $lines = New-Object System.Collections.Generic.List[string]
-    [void]$lines.Add("# GoatShot Installer Package Verification")
+    [void]$lines.Add("# Receipts Installer Package Verification")
     [void]$lines.Add("")
     [void]$lines.Add("Installer script: ``$($Result.installerScript)``")
     [void]$lines.Add("Package script: ``$($Result.packageScript)``")
@@ -166,6 +173,7 @@ function Build-Markdown {
     [void]$lines.Add("")
     [void]$lines.Add("- Requested: ``$($Result.installSmoke.requested)``")
     [void]$lines.Add("- Status: ``$($Result.installSmoke.status)``")
+    [void]$lines.Add("- Current-profile mutation acknowledged: ``$($Result.installSmoke.currentProfileMutationAcknowledged)``")
     [void]$lines.Add("- Install root: ``$($Result.installSmoke.installRoot)``")
     [void]$lines.Add("- Log: ``$($Result.installSmoke.log)``")
     [void]$lines.Add("")
@@ -193,7 +201,7 @@ function Build-Markdown {
     [void]$lines.Add("")
     [void]$lines.Add("## Boundary")
     [void]$lines.Add("")
-    [void]$lines.Add("This verifier is command/static evidence. Clean Windows VM/profile proof and human GUI install/uninstall observation remain manual unless a silent install smoke was explicitly requested and reviewed.")
+    [void]$lines.Add("This verifier checks a real installer artifact when one is supplied. The production installer keeps the stable upgrade AppId and removes current/legacy startup and native-host registrations during install or uninstall. Silent install smoke is therefore blocked unless ``-AllowCurrentProfileMutation`` is also supplied, and should only be run in a disposable VM/profile.")
 
     return ($lines -join [Environment]::NewLine) + [Environment]::NewLine
 }
@@ -219,7 +227,7 @@ if ([string]::IsNullOrWhiteSpace($innoCompiler)) {
 }
 
 $expectedInstaller = if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
-    Join-Path $distFullPath "GoatShot-Setup-$Version-win-x64.exe"
+    Join-Path $distFullPath "Receipts-$Version-win-x64.exe"
 }
 else {
     Resolve-FullPath $InstallerPath
@@ -264,7 +272,11 @@ $installSmokeLog = Join-Path $outputFullPath "silent-install-smoke.log"
 $installRoot = Join-Path $outputFullPath "silent-install-root"
 
 if ($RunSilentInstallSmoke) {
-    if (-not $installerExists) {
+    if (-not $AllowCurrentProfileMutation) {
+        $installSmokeStatus = "blocked-profile-mutation-not-acknowledged"
+        Add-Message $issues "Silent install smoke is blocked because the production installer can modify the current profile's stable uninstall registration, startup entry, shortcuts, and browser native-host manifests. Run it only in a disposable VM/profile and explicitly pass -AllowCurrentProfileMutation."
+    }
+    elseif (-not $installerExists) {
         $installSmokeStatus = "blocked-missing-installer"
         Add-Message $issues "Silent install smoke was requested, but the installer artifact was not found."
     }
@@ -286,10 +298,10 @@ if ($RunSilentInstallSmoke) {
             Add-Message $issues "Silent install failed with exit code $installExit. See $installSmokeLog"
         }
         else {
-            $installedExe = Join-Path $installRoot "GoatShot.exe"
+            $installedExe = Join-Path $installRoot "Receipts.exe"
             if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
                 $installSmokeStatus = "failed-missing-exe"
-                Add-Message $issues "Silent install did not create GoatShot.exe under $installRoot"
+                Add-Message $issues "Silent install did not create Receipts.exe under $installRoot"
             }
             else {
                 $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File | Select-Object -First 1
@@ -320,7 +332,7 @@ if ($RunSilentInstallSmoke) {
 
                         if (Test-Path -LiteralPath $installedExe) {
                             $installSmokeStatus = "failed-uninstall-residue"
-                            Add-Message $issues "Silent uninstall exited 0 but GoatShot.exe was still present after 30 seconds."
+                            Add-Message $issues "Silent uninstall exited 0 but Receipts.exe was still present after 30 seconds."
                         }
                         else {
                             $installSmokeStatus = "passed"
@@ -359,6 +371,7 @@ $result = [pscustomobject]@{
     installSmoke = [pscustomobject]@{
         requested = [bool]$RunSilentInstallSmoke
         status = $installSmokeStatus
+        currentProfileMutationAcknowledged = [bool]$AllowCurrentProfileMutation
         installRoot = if ($RunSilentInstallSmoke) { $installRoot } else { "" }
         log = if (Test-Path -LiteralPath $installSmokeLog -PathType Leaf) { $installSmokeLog } else { "" }
     }

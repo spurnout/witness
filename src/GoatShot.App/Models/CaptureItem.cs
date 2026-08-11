@@ -23,6 +23,12 @@ public sealed class CaptureItem
     public DateTimeOffset? OcrRecognizedAt { get; set; }
     public List<OcrRecognizedWord> OcrWords { get; set; } = new();
     public string? Notes { get; set; }
+    public string? ReceiptId { get; set; }
+    public string? SourceReceiptId { get; set; }
+    public string? ArtifactRole { get; set; }
+    public bool IsOriginal { get; set; }
+    public bool SourceAvailable { get; set; } = true;
+    public string? IntegrityStatus { get; set; }
 
     [JsonIgnore]
     public string Title => $"{Kind} - {CreatedAt:MMM d, h:mm tt}";

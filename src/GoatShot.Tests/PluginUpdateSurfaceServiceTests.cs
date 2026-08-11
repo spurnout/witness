@@ -53,7 +53,7 @@ public sealed class PluginUpdateSurfaceServiceTests
         StringAssert.Contains(surface.Rows[0].VersionText, "installed 1.0.0");
         StringAssert.Contains(surface.Rows[0].GateText, "Plugin is not trusted.");
         StringAssert.Contains(surface.Rows[3].GateText, "policy blocked");
-        StringAssert.Contains(surface.CliCommand, "goatshot plugins updates --registry samples\\local-plugins\\registry.json --json");
+        StringAssert.Contains(surface.CliCommand, "receipts plugins updates --registry samples\\local-plugins\\registry.json --json");
     }
 
     [TestMethod]

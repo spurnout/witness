@@ -39,6 +39,12 @@ public sealed partial class WorkspaceMetadataIndex
                     source_app TEXT,
                     hotkey_profile TEXT,
                     ocr_text TEXT,
+                    receipt_id TEXT,
+                    source_receipt_id TEXT,
+                    artifact_role TEXT,
+                    is_original INTEGER NOT NULL DEFAULT 0,
+                    source_available INTEGER NOT NULL DEFAULT 1,
+                    integrity_status TEXT,
                     notes TEXT
                 );
                 CREATE VIRTUAL TABLE IF NOT EXISTS captures_fts USING fts5(
@@ -54,6 +60,12 @@ public sealed partial class WorkspaceMetadataIndex
                 """;
             command.ExecuteNonQuery();
             EnsureColumn(connection, "captures", "hotkey_profile", "TEXT");
+            EnsureColumn(connection, "captures", "receipt_id", "TEXT");
+            EnsureColumn(connection, "captures", "source_receipt_id", "TEXT");
+            EnsureColumn(connection, "captures", "artifact_role", "TEXT");
+            EnsureColumn(connection, "captures", "is_original", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(connection, "captures", "source_available", "INTEGER NOT NULL DEFAULT 1");
+            EnsureColumn(connection, "captures", "integrity_status", "TEXT");
             EnsureFtsSchema(connection);
         }
     }
@@ -202,11 +214,15 @@ public sealed partial class WorkspaceMetadataIndex
                 """
                 INSERT INTO captures (
                     id, kind, created_at, file_path, thumbnail_path, width, height, bytes,
-                    is_private, source_app, hotkey_profile, ocr_text, notes
+                    is_private, source_app, hotkey_profile, ocr_text, receipt_id,
+                    source_receipt_id, artifact_role, is_original, source_available,
+                    integrity_status, notes
                 )
                 VALUES (
                     $id, $kind, $created_at, $file_path, $thumbnail_path, $width, $height, $bytes,
-                    $is_private, $source_app, $hotkey_profile, $ocr_text, $notes
+                    $is_private, $source_app, $hotkey_profile, $ocr_text, $receipt_id,
+                    $source_receipt_id, $artifact_role, $is_original, $source_available,
+                    $integrity_status, $notes
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     kind = excluded.kind,
@@ -220,6 +236,12 @@ public sealed partial class WorkspaceMetadataIndex
                     source_app = excluded.source_app,
                     hotkey_profile = excluded.hotkey_profile,
                     ocr_text = excluded.ocr_text,
+                    receipt_id = excluded.receipt_id,
+                    source_receipt_id = excluded.source_receipt_id,
+                    artifact_role = excluded.artifact_role,
+                    is_original = excluded.is_original,
+                    source_available = excluded.source_available,
+                    integrity_status = excluded.integrity_status,
                     notes = excluded.notes;
                 """;
             AddCaptureParameters(command, item);
@@ -271,6 +293,12 @@ public sealed partial class WorkspaceMetadataIndex
         command.Parameters.AddWithValue("$source_app", item.SourceApp ?? string.Empty);
         command.Parameters.AddWithValue("$hotkey_profile", item.HotkeyProfile ?? string.Empty);
         command.Parameters.AddWithValue("$ocr_text", item.OcrText ?? string.Empty);
+        command.Parameters.AddWithValue("$receipt_id", item.ReceiptId ?? string.Empty);
+        command.Parameters.AddWithValue("$source_receipt_id", item.SourceReceiptId ?? string.Empty);
+        command.Parameters.AddWithValue("$artifact_role", item.ArtifactRole ?? string.Empty);
+        command.Parameters.AddWithValue("$is_original", item.IsOriginal ? 1 : 0);
+        command.Parameters.AddWithValue("$source_available", item.SourceAvailable ? 1 : 0);
+        command.Parameters.AddWithValue("$integrity_status", item.IntegrityStatus ?? string.Empty);
         command.Parameters.AddWithValue("$notes", item.Notes ?? string.Empty);
     }
 

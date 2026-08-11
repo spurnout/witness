@@ -291,7 +291,7 @@ public sealed class LinearShareProvider : IShareProvider
             input = new
             {
                 issueId,
-                title = $"GoatShot capture: {FileName(request)}",
+                title = $"Receipts capture: {FileName(request)}",
                 subtitle = $"{request.CaptureType} capture, {MetadataValue(request, "width")}x{MetadataValue(request, "height")}, {FormatBytes(MetadataValue(request, "bytes"))}",
                 url = assetUrl
             }
@@ -365,7 +365,7 @@ public sealed class LinearShareProvider : IShareProvider
     private string BuildIssueTitle(ShareUploadRequest request)
     {
         var template = string.IsNullOrWhiteSpace(_settings.LinearIssueTitleTemplate)
-            ? "GoatShot capture: {file}"
+            ? "Receipts capture: {file}"
             : _settings.LinearIssueTitleTemplate.Trim();
         var createdAt = ParseCreatedAt(MetadataValue(request, "createdAt"));
         return template
@@ -383,7 +383,7 @@ public sealed class LinearShareProvider : IShareProvider
     private static string BuildIssueDescription(ShareUploadRequest request, string assetUrl)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Created from GoatShot.");
+        builder.AppendLine("Created from Receipts.");
         builder.AppendLine();
         if (ShareProviderPayloads.DetectContentType(request.FilePath).StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {

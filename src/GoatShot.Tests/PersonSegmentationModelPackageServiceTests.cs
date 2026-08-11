@@ -35,6 +35,22 @@ public sealed class PersonSegmentationModelPackageServiceTests
     }
 
     [TestMethod]
+    public async Task ValidateManifestAsync_AcceptsLegacyGoatShotSchema()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var fixture = await WriteLocalModelManifestAsync(
+                paths,
+                schemaVersion: PersonSegmentationModelPackageService.LegacyManifestSchemaVersion);
+
+            var result = await new PersonSegmentationModelPackageService(paths)
+                .ValidateManifestAsync(fixture.ManifestPath);
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Issues));
+        });
+    }
+
+    [TestMethod]
     public async Task StageModelAsync_CopiesLocalModelAndWritesStageManifest()
     {
         await WithTempPathsAsync(async paths =>
@@ -63,7 +79,8 @@ public sealed class PersonSegmentationModelPackageServiceTests
                 await File.ReadAllTextAsync(result.StagedManifestPath),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             Assert.IsNotNull(stageManifest);
-            Assert.IsFalse(stageManifest!.WouldRunModel);
+            Assert.AreEqual(PersonSegmentationModelPackageService.CurrentStageSchemaVersion, stageManifest!.SchemaVersion);
+            Assert.IsFalse(stageManifest.WouldRunModel);
             Assert.IsFalse(stageManifest.WouldTrustModel);
             Assert.IsFalse(stageManifest.WouldEnableModel);
             Assert.IsFalse(stageManifest.WouldRegisterRunner);
@@ -167,7 +184,8 @@ public sealed class PersonSegmentationModelPackageServiceTests
 
     private static async Task<ModelFixture> WriteLocalModelManifestAsync(
         AppPaths paths,
-        string? sha256 = null)
+        string? sha256 = null,
+        string? schemaVersion = null)
     {
         var root = Path.Combine(paths.LocalRoot, "model-fixtures");
         Directory.CreateDirectory(root);
@@ -179,7 +197,8 @@ public sealed class PersonSegmentationModelPackageServiceTests
             paths,
             modelUri: Path.GetFileName(modelPath),
             sha256: digest,
-            sizeBytes: bytes.Length);
+            sizeBytes: bytes.Length,
+            schemaVersion: schemaVersion);
         return new ModelFixture(bytes, digest, modelPath, manifestPath);
     }
 
@@ -187,7 +206,8 @@ public sealed class PersonSegmentationModelPackageServiceTests
         AppPaths paths,
         string modelUri,
         string sha256,
-        long sizeBytes)
+        long sizeBytes,
+        string? schemaVersion = null)
     {
         var root = Path.Combine(paths.LocalRoot, "model-fixtures");
         Directory.CreateDirectory(root);
@@ -196,7 +216,7 @@ public sealed class PersonSegmentationModelPackageServiceTests
             manifestPath,
             $$"""
             {
-              "schemaVersion": "goatshot.person-segmentation-model.v1",
+              "schemaVersion": "{{schemaVersion ?? PersonSegmentationModelPackageService.CurrentManifestSchemaVersion}}",
               "modelId": "sample.person-segmentation",
               "name": "Sample Person Segmentation Model",
               "version": "0.1.0",

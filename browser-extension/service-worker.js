@@ -1,4 +1,5 @@
-const GOATSHOT_NATIVE_HOST = "com.goatshot.bridge";
+const RECEIPTS_NATIVE_HOST = "com.receipts.bridge";
+const LEGACY_NATIVE_HOST = "com.goatshot.bridge";
 
 function classifyNativeError(message) {
   const text = String(message || "").toLowerCase();
@@ -23,6 +24,57 @@ function classifyNativeResponse(response) {
   }
 
   return "ready";
+}
+
+function sendNativeMessage(payload, sendResponse) {
+  chrome.runtime.sendNativeMessage(RECEIPTS_NATIVE_HOST, payload, response => {
+    const primaryError = chrome.runtime.lastError?.message || "";
+    if (!primaryError) {
+      sendResponse({
+        ...(response || {}),
+        diagnosticCode: classifyNativeResponse(response),
+        nativeHost: RECEIPTS_NATIVE_HOST,
+        usedLegacyHost: false,
+        message: response?.message || "Native host responded."
+      });
+      return;
+    }
+
+    if (classifyNativeError(primaryError) !== "native-host-missing") {
+      sendResponse({
+        succeeded: false,
+        diagnosticCode: classifyNativeError(primaryError),
+        nativeHost: RECEIPTS_NATIVE_HOST,
+        usedLegacyHost: false,
+        message: primaryError
+      });
+      return;
+    }
+
+    // Installed GoatShot builds register only the old host name. Falling back
+    // here keeps the updated extension usable throughout the Receipts upgrade.
+    chrome.runtime.sendNativeMessage(LEGACY_NATIVE_HOST, payload, legacyResponse => {
+      const legacyError = chrome.runtime.lastError?.message || "";
+      if (legacyError) {
+        sendResponse({
+          succeeded: false,
+          diagnosticCode: classifyNativeError(legacyError),
+          nativeHost: LEGACY_NATIVE_HOST,
+          usedLegacyHost: true,
+          message: legacyError
+        });
+        return;
+      }
+
+      sendResponse({
+        ...(legacyResponse || {}),
+        diagnosticCode: classifyNativeResponse(legacyResponse),
+        nativeHost: LEGACY_NATIVE_HOST,
+        usedLegacyHost: true,
+        message: legacyResponse?.message || "Native host responded through the legacy compatibility alias."
+      });
+    });
+  });
 }
 
 function downloadStitchFile(message, sendResponse) {
@@ -142,28 +194,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "GOATSHOT_NATIVE_STATUS") {
-    chrome.runtime.sendNativeMessage(
-      GOATSHOT_NATIVE_HOST,
-      {
-        type: "GOATSHOT_PING"
-      },
-      response => {
-        if (chrome.runtime.lastError) {
-          sendResponse({
-            succeeded: false,
-            diagnosticCode: classifyNativeError(chrome.runtime.lastError.message),
-            message: chrome.runtime.lastError.message
-          });
-          return;
-        }
-
-        sendResponse({
-          ...(response || {}),
-          diagnosticCode: classifyNativeResponse(response),
-          message: response?.message || "Native host responded."
-        });
-      }
-    );
+    sendNativeMessage({ type: "GOATSHOT_PING" }, sendResponse);
 
     return true;
   }
@@ -172,28 +203,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  chrome.runtime.sendNativeMessage(
-    GOATSHOT_NATIVE_HOST,
-    {
-      payload: message.payload
-    },
-    response => {
-      if (chrome.runtime.lastError) {
-        sendResponse({
-          succeeded: false,
-          diagnosticCode: classifyNativeError(chrome.runtime.lastError.message),
-          message: chrome.runtime.lastError.message
-        });
-        return;
-      }
-
-      sendResponse({
-        ...(response || {}),
-        diagnosticCode: classifyNativeResponse(response),
-        message: response?.message || "Payload sent to GoatShot native host."
-      });
-    }
-  );
+  sendNativeMessage({ payload: message.payload }, sendResponse);
 
   return true;
 });

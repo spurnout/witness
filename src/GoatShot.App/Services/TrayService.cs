@@ -6,6 +6,7 @@ public sealed class TrayService : IDisposable
 {
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly System.Drawing.Icon _trayIcon;
+    private readonly Dictionary<TrayMenuActionKind, Forms.ToolStripItem> _actionItems = new();
 
     public TrayService(MainWindow window)
     {
@@ -19,13 +20,14 @@ public sealed class TrayService : IDisposable
             }
 
             var actionKind = definition.ActionKind ?? throw new InvalidOperationException("Tray action is missing an action kind.");
-            menu.Items.Add(definition.Label, null, (_, _) => Dispatch(window, actionKind));
+            var item = menu.Items.Add(definition.Label, null, (_, _) => Dispatch(window, actionKind));
+            _actionItems[actionKind] = item;
         }
 
         _trayIcon = LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
-            Text = "GoatShot",
+            Text = BrandIdentity.ProductName,
             Icon = _trayIcon,
             Visible = true,
             ContextMenuStrip = menu
@@ -88,6 +90,12 @@ public sealed class TrayService : IDisposable
                 case TrayMenuActionKind.RecordShortMp4:
                     window.RecordShortMp4Command();
                     break;
+                case TrayMenuActionKind.ToggleReplay:
+                    window.ToggleReplayCommand();
+                    break;
+                case TrayMenuActionKind.SaveReplay:
+                    window.SaveReplayCommand();
+                    break;
                 case TrayMenuActionKind.ToggleStepRecorder:
                     window.ToggleStepRecorderCommand();
                     break;
@@ -113,6 +121,42 @@ public sealed class TrayService : IDisposable
                     throw new ArgumentOutOfRangeException(nameof(actionKind), actionKind, "Unknown tray action.");
             }
         });
+    }
+
+    public void UpdateReplayStatus(GoatShot.App.Models.ReplayBufferStatus status)
+    {
+        if (_actionItems.TryGetValue(TrayMenuActionKind.ToggleReplay, out var toggle))
+        {
+            var isSystemSuspended = status.SystemSuspended &&
+                status.State is GoatShot.App.Models.ReplayBufferState.Armed or
+                    GoatShot.App.Models.ReplayBufferState.Saving;
+            toggle.Text = isSystemSuspended
+                ? "Replay suspended by Windows"
+                : status.State switch
+            {
+                GoatShot.App.Models.ReplayBufferState.Armed => "Pause Replay",
+                GoatShot.App.Models.ReplayBufferState.Paused => "Resume Replay",
+                GoatShot.App.Models.ReplayBufferState.Saving => "Replay saving…",
+                GoatShot.App.Models.ReplayBufferState.Error => "Retry Replay",
+                _ => "Arm Replay"
+            };
+            toggle.Enabled = status.State != GoatShot.App.Models.ReplayBufferState.Saving;
+        }
+
+        if (_actionItems.TryGetValue(TrayMenuActionKind.SaveReplay, out var save))
+        {
+            save.Enabled = status.State is GoatShot.App.Models.ReplayBufferState.Armed or
+                GoatShot.App.Models.ReplayBufferState.Paused;
+        }
+
+        var replayLabel = status.SystemSuspended &&
+            status.State is GoatShot.App.Models.ReplayBufferState.Armed or
+                GoatShot.App.Models.ReplayBufferState.Saving
+            ? "Suspended"
+            : status.State.ToString();
+        _notifyIcon.Text = status.State == GoatShot.App.Models.ReplayBufferState.Off
+            ? BrandIdentity.ProductName
+            : $"{BrandIdentity.ProductName} — Replay {replayLabel}";
     }
 
     public void Dispose()

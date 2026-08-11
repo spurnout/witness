@@ -4,7 +4,8 @@ namespace GoatShot.App.Services;
 
 public static class BrowserExtensionPayloadContractService
 {
-    public const string CurrentSchemaVersion = "goatshot.browser-capture.v1";
+    public const string CurrentSchemaVersion = "receipts.browser-capture.v1";
+    public const string LegacySchemaVersion = "goatshot.browser-capture.v1";
 
     private static readonly HashSet<string> SensitiveQueryKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -31,9 +32,10 @@ public static class BrowserExtensionPayloadContractService
             return result;
         }
 
-        if (!payload.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal))
+        if (!payload.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal) &&
+            !payload.SchemaVersion.Equals(LegacySchemaVersion, StringComparison.Ordinal))
         {
-            result.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}.");
+            result.Issues.Add($"Unsupported schemaVersion. Expected {CurrentSchemaVersion}; legacy {LegacySchemaVersion} is also accepted.");
         }
 
         if (!payload.Consent.ScreenshotConsented)

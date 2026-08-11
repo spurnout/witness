@@ -46,7 +46,7 @@ public sealed class AutomationSummaryTileServiceTests
         Assert.AreEqual("Capture to document, Upload notify, +1 more", tiles[0].Detail);
         Assert.AreEqual("Ready", tiles[0].Tone);
         Assert.AreEqual("2", tiles[1].Value);
-        Assert.AreEqual("Watching while GoatShot runs", tiles[1].Detail);
+        Assert.AreEqual("Watching while Receipts runs", tiles[1].Detail);
         Assert.AreEqual("Ready", tiles[1].Tone);
     }
 
@@ -80,7 +80,7 @@ public sealed class AutomationSummaryTileServiceTests
         Assert.AreEqual("0/1", tiles[0].Value);
         Assert.AreEqual("Only draft", tiles[0].Detail);
         Assert.AreEqual("Neutral", tiles[0].Tone);
-        Assert.AreEqual("Watching while GoatShot runs", tiles[1].Detail);
+        Assert.AreEqual("Watching while Receipts runs", tiles[1].Detail);
         Assert.AreEqual("Neutral", tiles[1].Tone);
         Assert.AreEqual("No active triggers", tiles[2].Detail);
         Assert.AreEqual("Neutral", tiles[2].Tone);

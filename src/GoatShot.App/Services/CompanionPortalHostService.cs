@@ -221,7 +221,7 @@ public sealed class CompanionPortalHostService
                 "Authentication required.",
                 headOnly,
                 cancellationToken,
-                "WWW-Authenticate: Basic realm=\"GoatShot Companion Portal\"\r\n");
+                "WWW-Authenticate: Basic realm=\"Receipts Companion Portal\"\r\n");
             return;
         }
 
@@ -410,6 +410,7 @@ public sealed class CompanionPortalHostService
             $"Content-Type: {contentType}\r\n" +
             $"Content-Length: {bytes.Length}\r\n" +
             "Cache-Control: no-store\r\n" +
+            "X-Receipts-Portal-Boundary: read-only\r\n" +
             "X-GoatShot-Portal-Boundary: read-only\r\n" +
             extraHeaders +
             "Connection: close\r\n\r\n");
@@ -435,6 +436,7 @@ public sealed class CompanionPortalHostService
             $"Content-Type: {contentType}\r\n" +
             $"Content-Length: {body.Length}\r\n" +
             "Cache-Control: no-store\r\n" +
+            "X-Receipts-Portal-Boundary: read-only\r\n" +
             "X-GoatShot-Portal-Boundary: read-only\r\n" +
             extraHeaders +
             "Connection: close\r\n\r\n");

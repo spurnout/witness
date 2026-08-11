@@ -6,7 +6,7 @@ namespace GoatShot.App.Models;
 public sealed class WorkflowProfile
 {
     public int SchemaVersion { get; set; } = 1;
-    public string Name { get; set; } = "GoatShot workflow profile";
+    public string Name { get; set; } = "Receipts workflow profile";
     public DateTimeOffset ExportedAt { get; set; } = DateTimeOffset.Now;
     public bool IncludesSensitiveValues { get; set; }
     public WorkflowProfileSharing Sharing { get; set; } = new();

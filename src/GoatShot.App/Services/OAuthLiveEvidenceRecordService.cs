@@ -192,7 +192,7 @@ public sealed class OAuthLiveEvidenceRecordService
     private static string BuildMarkdown(OAuthLiveEvidenceRecordResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot OAuth Live Evidence Record");
+        builder.AppendLine("# Receipts OAuth Live Evidence Record");
         builder.AppendLine();
         builder.AppendLine($"Provider: `{result.ProviderName}`");
         builder.AppendLine($"Provider kind: `{result.ProviderKind}`");

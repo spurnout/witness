@@ -1,31 +1,30 @@
-# GoatShot
+# Receipts
 
-GoatShot is a local-first screenshot, screen-recording, annotation, and capture-library app for Windows. It is designed for fast keyboard-driven capture, useful privacy tools, and explicit control over anything that leaves your device.
+Receipts is a local-first screenshot, screen-recording, annotation, and capture-library app for Windows. It is designed for fast keyboard-driven capture, useful privacy tools, and explicit control over anything that leaves your device. Its evidence features help people preserve and review what appeared on their own screen—for example, possible message edits or deletions—without claiming independent service-side truth.
 
 > [!IMPORTANT]
-> GoatShot `0.2.0` is a personal preview release. The executable is unsigned, so Windows SmartScreen may warn. Verify its SHA-256 checksum before running it.
+> Receipts `0.3.0` is the current personal-preview development target. Release executables are unsigned, so Windows SmartScreen may warn. Verify the published SHA-256 checksum before running one.
 
 ## Download and install
 
-Download the current Windows x64 preview from the [`v0.2.0` release](https://github.com/spurnout/witness/releases/tag/v0.2.0):
+When `v0.3.0` is published, the Windows x64 release contains:
 
-- [`GoatShot-0.2.0-win-x64.exe`](https://github.com/spurnout/witness/releases/download/v0.2.0/GoatShot-0.2.0-win-x64.exe)
-- [`SHA-256 checksum`](https://github.com/spurnout/witness/releases/download/v0.2.0/GoatShot-0.2.0-win-x64.exe.sha256)
-- [`Build metadata`](https://github.com/spurnout/witness/releases/download/v0.2.0/GoatShot-0.2.0-win-x64.build.json)
-- [`SPDX SBOM`](https://github.com/spurnout/witness/releases/download/v0.2.0/GoatShot-0.2.0-win-x64.spdx.json)
-- [`Third-party notices`](https://github.com/spurnout/witness/releases/download/v0.2.0/GoatShot-0.2.0-THIRD-PARTY-NOTICES.txt)
+- `Receipts-0.3.0-win-x64-single-exe.exe` — self-contained standalone executable
+- `Receipts-0.3.0-win-x64-portable.zip` — portable desktop and CLI bundle
+- `Receipts-0.3.0-win-x64.exe` — per-user installer when built with Inno Setup
+- SHA-256 checksum, build metadata, SPDX SBOM, and third-party notices
 
 Verify the executable in PowerShell:
 
 ```powershell
-Get-FileHash .\GoatShot-0.2.0-win-x64.exe -Algorithm SHA256
+Get-FileHash .\Receipts-0.3.0-win-x64.exe -Algorithm SHA256
 ```
 
 Run the downloaded executable:
 
-- Choose **Yes** to install GoatShot for the current Windows user at `%LOCALAPPDATA%\Programs\GoatShot\GoatShot.exe` and start it in the tray at sign-in.
+- Choose **Yes** to install Receipts for the current Windows user and start it in the tray at sign-in.
 - Choose **No** to open the downloaded copy without installing it.
-- Run a newer downloaded GoatShot executable to update an installed copy.
+- Run a newer downloaded Receipts executable to update an installed copy.
 
 Installation does not require administrator rights. Repair, startup, and uninstall controls are available in Settings. Uninstall preserves captures and settings unless those are removed separately.
 
@@ -34,14 +33,14 @@ Installation does not require administrator rights. Repair, startup, and uninsta
 - Windows 10 version 2004 or newer, or Windows 11
 - x64 processor
 
-The release is self-contained. A separate .NET, FFmpeg, segmentation, or Whisper installation is not required for normal capture and editing. Whisper is optional and is never bundled or downloaded by GoatShot.
+The release is self-contained. A separate .NET, FFmpeg, segmentation, or Whisper installation is not required for normal capture and editing. Whisper is optional and is never bundled or downloaded by Receipts.
 
 ## What it does
 
 ### Capture and recording
 
 - Region, window, monitor, all-monitor, fixed-size, last-region, delayed, and scrolling screenshots
-- Print Screen hotkeys that work while GoatShot is in the tray
+- Print Screen hotkeys that work while Receipts is in the tray
 - Auto-copy after capture by default
 - GIF and MP4 recording with monitor, window, and region targets
 - Optional microphone, system-audio, webcam, cursor, timer, and keystroke overlays
@@ -64,21 +63,23 @@ The release is self-contained. A separate .NET, FFmpeg, segmentation, or Whisper
 - Upload confirmation, result, retry, history, and redacted diagnostics surfaces
 - Watch folders, workflow rules, profiles, local plugins, browser native messaging, and governed background runtime verbs
 
-The full `GoatShot.Cli` project remains a developer and proof surface. The shipped executable exposes only the governed runtime verbs needed for installation, diagnostics, browser native messaging, and background jobs.
+The internal `GoatShot.Cli` project path remains unchanged for source compatibility; its distribution executable is `Receipts.Cli.exe`. The shipped desktop executable exposes only the governed runtime verbs needed for installation, diagnostics, browser native messaging, and background jobs.
 
 ## Privacy and transcription
 
-GoatShot stores captures and application state locally by default. Nothing is uploaded until you choose a configured external destination or explicitly invoke a provider-backed action.
+Receipts stores captures and application state locally by default. Nothing is uploaded until you choose a configured external destination or explicitly invoke a provider-backed action.
 
-- Captures: `%USERPROFILE%\Pictures\GoatShot`
-- Settings, index, thumbnails, and runtime assets: `%LOCALAPPDATA%\GoatShot`
-- Installed executable: `%LOCALAPPDATA%\Programs\GoatShot\GoatShot.exe`
+- New-install captures: `%USERPROFILE%\Pictures\Receipts`
+- Settings, index, thumbnails, and runtime assets: `%LOCALAPPDATA%\Receipts`
+- Installed executable: `%LOCALAPPDATA%\Programs\Receipts\Receipts.exe`
+
+An upgrade copies small durable state without overwriting newer Receipts files. It does not move an existing capture library; the configured legacy library path remains in use until the user explicitly changes it.
 
 Transcription options are deliberately explicit:
 
 - Embedded subtitles and supplied SRT files stay local.
 - External Whisper requires paths to a user-supplied executable and model.
-- GoatShot does not bundle or download Whisper.
+- Receipts does not bundle or download Whisper.
 - Gemini speech-to-text requires a configured key and consent for each action.
 - Gemini is never an automatic fallback.
 
@@ -86,7 +87,9 @@ Cloud accounts, credentials, browser installations, hardware drivers, Android de
 
 ## Release status
 
-`0.2.0` is published as a prerelease so people can install and evaluate the current build without turning incomplete proof into a stable-readiness claim.
+`0.3.0` remains a prerelease target so people can evaluate the current build without turning incomplete proof into a stable-readiness claim.
+
+Tamper-evident receipts can prove that locally signed artifacts have not changed since signing. They do not independently attest the device clock, remote-service state, message author, operator identity, or legal/forensic authenticity. OCR-based additions, edits, and deletions are review suggestions, not proven facts.
 
 Locally automated proof covers the full solution build and test suite, single-executable packaging, isolated launch, embedded-asset extraction, deliberate asset corruption and repair, checksum/build metadata, SBOM generation, browser native-host framing, plugin runtime verbs, FFmpeg resolution, SFTP host-key rejection, deterministic ADB protocol behavior, segmentation output, and transcription consent boundaries.
 
@@ -123,9 +126,13 @@ dotnet list GoatShot.slnx package --vulnerable --include-transitive
 Build and verify the self-contained release:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 0.2.0
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-single-exe-package.ps1 -Version 0.2.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 0.3.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-portable-package.ps1 -PackagePath .\artifacts\dist\Receipts-0.3.0-win-x64-portable.zip -RunCliSmoke
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-single-exe-package.ps1 -Version 0.3.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-installer-package.ps1 -Version 0.3.0
 ```
+
+The portable package also carries the optional browser companion. Use `Receipts.Cli.exe browser-extension publication-plan` to create a read-only checklist for manual browser-store submission; it does not contact a store, upload an extension, or claim publication.
 
 The locked FFmpeg and segmentation inputs are declared in [`packaging/embedded-assets.lock.json`](packaging/embedded-assets.lock.json). The packaging script verifies every download by SHA-256 before embedding it.
 

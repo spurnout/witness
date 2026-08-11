@@ -55,7 +55,7 @@ public sealed class LocalFolderShareProvider : IShareProvider
     private string ResolveExportFolder()
     {
         return string.IsNullOrWhiteSpace(_settings.LocalExportFolder)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "GoatShot Exports")
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Receipts Exports")
             : Environment.ExpandEnvironmentVariables(_settings.LocalExportFolder);
     }
 

@@ -49,12 +49,12 @@ public sealed class OAuthLiveProofPlanServiceTests
                 result,
                 "OneDrive",
                 "onedrive",
-                "--onedrive-folder /GoatShotProof");
+                "--onedrive-folder /ReceiptsProof");
             AssertProviderProfile(
                 result,
                 "Dropbox",
                 "dropbox",
-                "--dropbox-folder /GoatShotProof");
+                "--dropbox-folder /ReceiptsProof");
             AssertProviderProfile(
                 result,
                 "YouTube",
@@ -79,7 +79,7 @@ public sealed class OAuthLiveProofPlanServiceTests
             StringAssert.Contains(markdown, "OneNote");
             StringAssert.Contains(markdown, "--google-drive-folder-id <safe-proof-folder-id>");
             StringAssert.Contains(markdown, "--google-photos-album-id <safe-proof-album-id>");
-            StringAssert.Contains(markdown, "goatshot oauth exchange");
+            StringAssert.Contains(markdown, "receipts oauth exchange");
         }
         finally
         {

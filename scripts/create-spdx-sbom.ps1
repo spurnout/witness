@@ -1,7 +1,7 @@
 param(
-    [string] $Version = "0.2.0",
+    [string] $Version = "0.3.0",
     [string] $Runtime = "win-x64",
-    [string] $OutputPath = "artifacts\dist\GoatShot-0.2.0-win-x64.spdx.json",
+    [string] $OutputPath = "artifacts\dist\Receipts-0.3.0-win-x64.spdx.json",
     [string] $EmbeddedManifestPath = "artifacts\embedded-assets\embedded-assets.manifest.json"
 )
 
@@ -18,8 +18,8 @@ if (-not (Test-Path -LiteralPath $assetsPath)) { throw "Restore assets were not 
 $assets = Get-Content -Raw -LiteralPath $assetsPath | ConvertFrom-Json
 $packages = [System.Collections.Generic.List[object]]::new()
 $relationships = [System.Collections.Generic.List[object]]::new()
-$appId = "SPDXRef-GoatShot"
-$packages.Add([ordered]@{ SPDXID = $appId; name = "GoatShot"; versionInfo = $Version; downloadLocation = "NOASSERTION"; filesAnalyzed = $false; licenseConcluded = "NOASSERTION"; licenseDeclared = "NOASSERTION"; supplier = "NOASSERTION" })
+$appId = "SPDXRef-Receipts"
+$packages.Add([ordered]@{ SPDXID = $appId; name = "Receipts"; versionInfo = $Version; downloadLocation = "NOASSERTION"; filesAnalyzed = $false; licenseConcluded = "NOASSERTION"; licenseDeclared = "NOASSERTION"; supplier = "NOASSERTION" })
 
 foreach ($libraryProperty in $assets.libraries.PSObject.Properties | Sort-Object Name) {
     if ($libraryProperty.Value.type -ne "package") { continue }
@@ -46,9 +46,9 @@ $document = [ordered]@{
     spdxVersion = "SPDX-2.3"
     dataLicense = "CC0-1.0"
     SPDXID = "SPDXRef-DOCUMENT"
-    name = "GoatShot-$Version-$Runtime"
-    documentNamespace = "https://goatshot.local/spdx/$namespaceSeed"
-    creationInfo = [ordered]@{ created = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"); creators = @("Tool: GoatShot create-spdx-sbom.ps1") }
+    name = "Receipts-$Version-$Runtime"
+    documentNamespace = "https://github.com/spurnout/witness/spdx/$namespaceSeed"
+    creationInfo = [ordered]@{ created = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"); creators = @("Tool: Receipts create-spdx-sbom.ps1") }
     documentDescribes = @($appId)
     packages = $packages
     relationships = $relationships

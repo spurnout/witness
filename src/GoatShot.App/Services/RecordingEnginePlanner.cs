@@ -117,15 +117,15 @@ public static class RecordingEnginePlanner
         if (normalized.IncludeMicrophone)
         {
             warnings.Add(productionAudioMixingImplemented
-                ? "The native production recorder can mux captured microphone WAV payloads as AAC when payload bytes are available."
-                : "The FFmpeg fallback captures requested microphone audio through a temporary WASAPI WAV file and muxes it when payload bytes are available; production audio sync/mixing remains pending.");
+                ? "The native production recorder streams normalized microphone PCM into the shared AAC muxing session when samples are available."
+                : "The FFmpeg fallback streams normalized microphone PCM and muxes it as AAC when samples are available.");
         }
 
         if (normalized.IncludeSystemAudio)
         {
             warnings.Add(productionAudioMixingImplemented
-                ? "The native production recorder can mux captured system-audio loopback WAV payloads as AAC when payload bytes are available."
-                : "The FFmpeg fallback captures requested system audio through a temporary WASAPI loopback WAV file and muxes it when payload bytes are available; production audio sync/mixing remains pending.");
+                ? "The native production recorder streams normalized system audio loopback PCM into the shared AAC muxing session when samples are available."
+                : "The FFmpeg fallback streams normalized system audio loopback PCM and muxes it as AAC when samples are available.");
         }
 
         if (normalized.EnableWebcamOverlay)

@@ -33,7 +33,7 @@ public static class UploadTaskWindowRenderer
             Id = "upload-task-preview",
             Kind = CaptureKind.ActiveWindow,
             CreatedAt = DateTimeOffset.Parse("2026-06-14T12:00:00-07:00", CultureInfo.InvariantCulture),
-            FilePath = @"C:\Users\you\Pictures\GoatShot\issue-checkout.png",
+            FilePath = @"C:\Users\you\Pictures\Receipts\issue-checkout.png",
             Bytes = 384_512,
             Width = 1440,
             Height = 900,

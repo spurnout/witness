@@ -277,8 +277,10 @@ public sealed class AndroidAdbCaptureServiceTests
             Assert.AreEqual(1, store.Load().Count);
 
             CollectionAssert.AreEqual(
-                new[] { "-s", "phone-1", "shell", "mkdir", "-p", "/sdcard/Movies/GoatShot" },
+                new[] { "-s", "phone-1", "shell", "mkdir", "-p", "/sdcard/Movies/Receipts" },
                 runner.TextCalls[1].ToArray());
+
+            StringAssert.Contains(result.RemotePath, "/receipts-");
 
             var screenrecord = runner.TextCalls.Single(call => call.Contains("screenrecord", StringComparer.OrdinalIgnoreCase));
             CollectionAssert.AreEqual(
@@ -701,6 +703,7 @@ public sealed class AndroidAdbCaptureServiceTests
                 result.Summary.RemuxStatus);
             StringAssert.Contains(string.Join(" ", result.Warnings), "Contact-sheet");
             var manifest = await File.ReadAllTextAsync(result.ManifestPath!);
+            Assert.AreEqual("receipts-android-preview-manifest.json", Path.GetFileName(result.ManifestPath));
             StringAssert.Contains(manifest, "\"strategy\": \"H264Stream\"");
             StringAssert.Contains(manifest, "\"streamFileName\": \"android-preview-stream.h264\"");
             StringAssert.Contains(manifest, $"\"streamBytes\": {h264Bytes.Length}");
@@ -850,6 +853,7 @@ public sealed class AndroidAdbCaptureServiceTests
             Assert.AreEqual(1, result.Summary.ContactSheetFrameCount);
             Assert.IsTrue(result.FramePaths.All(File.Exists));
             var manifest = await File.ReadAllTextAsync(result.ManifestPath!);
+            Assert.AreEqual("receipts-android-preview-manifest.json", Path.GetFileName(result.ManifestPath));
             StringAssert.Contains(manifest, "\"schemaVersion\": 1");
             StringAssert.Contains(manifest, "phone-1");
             StringAssert.Contains(manifest, "\"contactSheetFileName\": \"android-preview-contact-sheet.png\"");

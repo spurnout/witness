@@ -31,6 +31,8 @@ public sealed class BrowserExtensionStorePackageServiceTests
             Assert.AreEqual("store-package-created-manual-submission-required", target.Status);
             Assert.IsTrue(File.Exists(target.ExtensionPackagePath), "Extension package was not created.");
             Assert.IsTrue(File.Exists(target.SubmissionBundlePath), "Submission bundle was not created.");
+            StringAssert.Contains(Path.GetFileName(target.ExtensionPackagePath), "receipts-browser-extension-");
+            StringAssert.Contains(Path.GetFileName(target.SubmissionBundlePath), "receipts-browser-extension-");
             Assert.IsTrue(File.Exists(target.SubmissionManifestPath), "Submission manifest was not created.");
             Assert.AreEqual(64, target.ExtensionPackageSha256.Length);
             Assert.AreEqual(64, target.SubmissionBundleSha256.Length);

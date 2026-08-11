@@ -152,10 +152,10 @@ public sealed class ManualValidationDesktopEvidenceRecordService
             result.MissingRequiredCategories.Count == 0;
         result.Succeeded = result.Issues.Count == 0;
         result.Message = result.ProofComplete
-            ? $"{result.LaneTitle} evidence recorded as passed. The recorder did not launch GoatShot, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility."
+            ? $"{result.LaneTitle} evidence recorded as passed. The recorder did not launch Receipts, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility."
             : result.Succeeded
-                ? $"{result.LaneTitle} evidence recorded as {result.Status}. The recorder did not launch GoatShot, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility."
-                : $"{EmptyIfMissing(result.LaneTitle)} evidence record has blockers. The recorder did not launch GoatShot, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility.";
+                ? $"{result.LaneTitle} evidence recorded as {result.Status}. The recorder did not launch Receipts, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility."
+                : $"{EmptyIfMissing(result.LaneTitle)} evidence record has blockers. The recorder did not launch Receipts, change Windows settings, capture or record the screen, update the manual lane, or certify accessibility.";
 
         Directory.CreateDirectory(outputRoot);
         var slug = string.IsNullOrWhiteSpace(result.LaneId) ? "desktop" : result.LaneId;
@@ -270,7 +270,7 @@ public sealed class ManualValidationDesktopEvidenceRecordService
     private static string BuildMarkdown(ManualValidationDesktopEvidenceRecordResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Required Desktop Evidence Record");
+        builder.AppendLine("# Receipts Required Desktop Evidence Record");
         builder.AppendLine();
         builder.AppendLine($"Lane: `{EmptyIfMissing(result.LaneTitle)}`");
         builder.AppendLine($"Lane id: `{EmptyIfMissing(result.LaneId)}`");
@@ -292,7 +292,7 @@ public sealed class ManualValidationDesktopEvidenceRecordService
         builder.AppendLine();
         builder.AppendLine("## Mutation Boundary");
         builder.AppendLine();
-        builder.AppendLine($"- Would launch GoatShot: `{result.WouldLaunchApp}`");
+        builder.AppendLine($"- Would launch Receipts: `{result.WouldLaunchApp}`");
         builder.AppendLine($"- Would change Windows settings: `{result.WouldChangeWindowsSettings}`");
         builder.AppendLine($"- Would capture screen: `{result.WouldCaptureScreen}`");
         builder.AppendLine($"- Would record screen: `{result.WouldRecordScreen}`");
@@ -322,7 +322,7 @@ public sealed class ManualValidationDesktopEvidenceRecordService
         builder.AppendLine();
         builder.AppendLine("## Claim Boundary");
         builder.AppendLine("- This record captures operator-reviewed evidence references only.");
-        builder.AppendLine("- The recorder does not launch GoatShot, change Windows settings, capture screenshots, record videos, certify accessibility, mutate user profiles, or update the manual-validation lane.");
+        builder.AppendLine("- The recorder does not launch Receipts, change Windows settings, capture screenshots, record videos, certify accessibility, mutate user profiles, or update the manual-validation lane.");
         builder.AppendLine("- A `passed` status is only accepted when the lane-specific required evidence categories are present.");
         builder.AppendLine("- After reviewing this record, use `manual-validation record-lane` only if the operator-owned desktop pass was actually performed and accepted.");
         return builder.ToString();

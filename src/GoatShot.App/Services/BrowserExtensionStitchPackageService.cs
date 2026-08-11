@@ -4,7 +4,8 @@ namespace GoatShot.App.Services;
 
 public sealed class BrowserExtensionStitchPackageService
 {
-    public const string CurrentSchemaVersion = "goatshot.browser-stitch-package.v1";
+    public const string CurrentSchemaVersion = "receipts.browser-stitch-package.v1";
+    public const string LegacySchemaVersion = "goatshot.browser-stitch-package.v1";
     public const long DefaultMaximumStitchedImageBytes = 250L * 1024 * 1024;
     public const long DefaultMaximumTileBytes = 50L * 1024 * 1024;
     public const long DefaultMaximumTotalTileBytes = 500L * 1024 * 1024;
@@ -97,13 +98,14 @@ public sealed class BrowserExtensionStitchPackageService
 
         var candidates = new[]
         {
+            Path.Combine(fullPath, "receipts-stitch-package.json"),
+            Path.Combine(fullPath, "stitch-package.json"),
             Path.Combine(fullPath, "goatshot-stitch-package.json"),
-            Path.Combine(fullPath, "stitch-package.json")
         };
         var manifestPath = candidates.FirstOrDefault(File.Exists);
         if (manifestPath is null)
         {
-            result.Issues.Add("Stitch package directory must contain goatshot-stitch-package.json or stitch-package.json.");
+            result.Issues.Add("Stitch package directory must contain receipts-stitch-package.json or stitch-package.json (legacy goatshot-stitch-package.json is also accepted).");
         }
 
         return manifestPath;
@@ -114,9 +116,10 @@ public sealed class BrowserExtensionStitchPackageService
         string? expectedCorrelationId,
         BrowserExtensionStitchPackageValidationResult result)
     {
-        if (!manifest.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal))
+        if (!manifest.SchemaVersion.Equals(CurrentSchemaVersion, StringComparison.Ordinal) &&
+            !manifest.SchemaVersion.Equals(LegacySchemaVersion, StringComparison.Ordinal))
         {
-            result.Issues.Add($"Unsupported stitch package schemaVersion. Expected {CurrentSchemaVersion}.");
+            result.Issues.Add($"Unsupported stitch package schemaVersion. Expected {CurrentSchemaVersion}; legacy {LegacySchemaVersion} is also accepted.");
         }
 
         if (!string.IsNullOrWhiteSpace(expectedCorrelationId) &&

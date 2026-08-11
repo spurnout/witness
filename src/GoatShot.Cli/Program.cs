@@ -23,7 +23,7 @@ internal static class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"goatshot: {ex.Message}");
+                Console.Error.WriteLine($"receipts: {ex.Message}");
                 return 1;
             }
         }
@@ -39,7 +39,7 @@ internal static class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"goatshot: {ex.Message}");
+                    Console.Error.WriteLine($"receipts: {ex.Message}");
                     return 1;
                 }
             }
@@ -50,6 +50,12 @@ internal static class Program
 
         try
         {
+            if (args[0].Equals("receipt", StringComparison.OrdinalIgnoreCase) ||
+                args[0].Equals("receipts", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ReceiptAsync(args.Skip(1).ToArray());
+            }
+
             using var services = AppServices.Create();
             return args[0].ToLowerInvariant() switch
             {
@@ -95,9 +101,64 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"goatshot: {ex.Message}");
+            Console.Error.WriteLine($"receipts: {ex.Message}");
             return 1;
         }
+    }
+
+    private static async Task<int> ReceiptAsync(string[] args)
+    {
+        if (args.Length >= 2 &&
+            args[0].Equals("key", StringComparison.OrdinalIgnoreCase) &&
+            args[1].Equals("rotate", StringComparison.OrdinalIgnoreCase))
+        {
+            var rotated = new ReceiptDeviceKeyService().Rotate(ResolveReceiptKeyPath(args));
+            Console.WriteLine("Receipts device signing key rotated.");
+            Console.WriteLine($"fingerprint-sha256={rotated.FingerprintSha256}");
+            return 0;
+        }
+
+        if (args.Length < 2 || !args[0].Equals("verify", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine("Usage: Receipts.Cli receipt verify <package> [--key-path path]");
+            Console.Error.WriteLine("       Receipts.Cli receipt key rotate [--key-path path]");
+            return 2;
+        }
+
+        var expandedPackagePath = Environment.ExpandEnvironmentVariables(args[1]);
+        var suppliedPath = Path.GetFullPath(expandedPackagePath);
+        var packageRoot = Path.GetFileName(suppliedPath)
+            .Equals(ReceiptIntegrityService.ManifestFileName, StringComparison.OrdinalIgnoreCase)
+            ? Path.GetDirectoryName(suppliedPath)
+            : suppliedPath;
+        if (string.IsNullOrWhiteSpace(packageRoot))
+        {
+            Console.Error.WriteLine("Receipts: receipt package path is invalid.");
+            return 2;
+        }
+
+        var result = await new ReceiptIntegrityService()
+            .VerifyPackageAsync(packageRoot, ResolveReceiptKeyPath(args))
+            .ConfigureAwait(false);
+
+        Console.WriteLine(ReceiptVerificationPresentation.FormatStatus(result.Status));
+        foreach (var issue in result.Issues)
+        {
+            Console.Error.WriteLine($"Receipts: {issue}");
+        }
+
+        return ReceiptVerificationPresentation.ExitCode(result.Status);
+    }
+
+    private static string ResolveReceiptKeyPath(string[] args)
+    {
+        var keyPathArgument = Value(args, "--key-path");
+        return string.IsNullOrWhiteSpace(keyPathArgument)
+            ? Path.Combine(
+                AppPaths.DefaultLocalRoot(),
+                "secrets",
+                ReceiptDeviceKeyService.DefaultKeyFileName)
+            : Path.GetFullPath(Environment.ExpandEnvironmentVariables(keyPathArgument));
     }
 
     private static async Task<int> CaptureAsync(AppServices services, string[] args)
@@ -177,8 +238,8 @@ internal static class Program
                     path,
                     captured.Kind,
                     string.IsNullOrWhiteSpace(hotkeyProfile)
-                        ? "Imported from goatshot CLI capture command."
-                        : $"Imported from goatshot CLI capture command. Hotkey/workflow profile: {hotkeyProfile}.",
+                        ? "Imported from Receipts CLI capture command."
+                        : $"Imported from Receipts CLI capture command. Hotkey/workflow profile: {hotkeyProfile}.",
                     captured.Source,
                     hotkeyProfile);
             }
@@ -308,7 +369,7 @@ internal static class Program
             }
             else
             {
-                Console.WriteLine("GoatShot Android live-preview execution");
+                Console.WriteLine("Receipts Android live-preview execution");
                 Console.WriteLine($"status={result.Status}");
                 Console.WriteLine($"succeeded={result.Succeeded}");
                 Console.WriteLine($"executed={result.Executed}");
@@ -417,7 +478,7 @@ internal static class Program
         }
         else
         {
-            Console.WriteLine("GoatShot Android live-preview dry-run plan");
+            Console.WriteLine("Receipts Android live-preview dry-run plan");
             Console.WriteLine($"status={plan.Status}");
             Console.WriteLine($"ready={plan.Succeeded}");
             Console.WriteLine($"strategy={plan.Strategy}");
@@ -794,7 +855,7 @@ internal static class Program
 
         if (string.IsNullOrWhiteSpace(output))
         {
-            output = Path.Combine(services.Paths.VideosRoot, $"goatshot-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.{format}");
+            output = Path.Combine(services.Paths.VideosRoot, $"receipts-recording-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.{format}");
         }
 
         var recordingSettings = ResolveRecordingSettingsForCommand(services, args);
@@ -873,7 +934,7 @@ internal static class Program
             return 0;
         }
 
-        Console.WriteLine("GoatShot recording profiles");
+        Console.WriteLine("Receipts recording profiles");
         if (profiles.Count == 0)
         {
             Console.WriteLine("(none)");
@@ -1125,7 +1186,7 @@ internal static class Program
         var output = Value(args, "--output") ?? Value(args, "-o");
         if (string.IsNullOrWhiteSpace(output))
         {
-            output = Path.Combine(services.Paths.VideosRoot, $"goatshot-audio-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.wav");
+            output = Path.Combine(services.Paths.VideosRoot, $"receipts-audio-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.wav");
         }
 
         var deviceId = Value(args, "--device") ??
@@ -1181,7 +1242,7 @@ internal static class Program
             return 2;
         }
 
-        var item = await services.WorkspaceStore.AddImageFileAsync(path, CaptureKind.Imported, "Imported from goatshot CLI.");
+        var item = await services.WorkspaceStore.AddImageFileAsync(path, CaptureKind.Imported, "Imported from Receipts CLI.");
         Console.WriteLine(item.Id);
         return 0;
     }
@@ -2526,7 +2587,7 @@ internal static class Program
 
     private static void PrintQueueDiagnostics(UploadQueueDiagnostics diagnostics)
     {
-        Console.WriteLine("GoatShot upload queue diagnostics");
+        Console.WriteLine("Receipts upload queue diagnostics");
         Console.WriteLine(diagnostics.Summary);
         Console.WriteLine($"queue-path={diagnostics.QueuePath}");
         Console.WriteLine($"background-processing={(diagnostics.BackgroundProcessingEnabled ? "enabled" : "disabled")}");
@@ -3051,7 +3112,7 @@ internal static class Program
             return 1;
         }
 
-        Console.WriteLine("GoatShot provider diagnostics");
+        Console.WriteLine("Receipts provider diagnostics");
         foreach (var record in list)
         {
             Console.WriteLine($"{record.ProviderName}: {record.Status} ({record.AuthType})");
@@ -5143,7 +5204,7 @@ internal static class Program
                 var index = await http.GetStringAsync(session.Result.Url);
                 var health = await http.GetStringAsync(new Uri(new Uri(session.Result.Url), "health.json"));
                 var report = await http.GetStringAsync(new Uri(new Uri(session.Result.Url), CompanionPortalExportService.ReportJsonFileName));
-                var checkSucceeded = index.Contains("GoatShot", StringComparison.OrdinalIgnoreCase) &&
+                var checkSucceeded = index.Contains("Receipts", StringComparison.OrdinalIgnoreCase) &&
                     health.Contains("\"status\": \"ready\"", StringComparison.OrdinalIgnoreCase) &&
                     report.Contains("\"mode\":", StringComparison.OrdinalIgnoreCase);
                 if (Has(args, "--json"))
@@ -5315,7 +5376,7 @@ internal static class Program
             return;
         }
 
-        Console.WriteLine("GoatShot companion portal read-only local export");
+        Console.WriteLine("Receipts companion portal read-only local export");
         Console.WriteLine($"succeeded={result.Succeeded}");
         Console.WriteLine($"output={result.OutputRoot}");
         Console.WriteLine($"report-json={result.ReportJsonPath}");
@@ -5358,7 +5419,7 @@ internal static class Program
             return;
         }
 
-        Console.WriteLine("GoatShot companion portal loopback preview");
+        Console.WriteLine("Receipts companion portal loopback preview");
         Console.WriteLine($"succeeded={result.Succeeded}");
         Console.WriteLine($"url={result.Url}");
         Console.WriteLine($"host={result.Host}");
@@ -5879,7 +5940,7 @@ internal static class Program
 
             var output = Value(args, "--output") ??
                 Value(args, "-o") ??
-                Path.Combine("artifacts", "browser-extension", "goatshot-browser-extension.zip");
+                Path.Combine("artifacts", "browser-extension", "receipts-browser-extension.zip");
             var result = await new BrowserExtensionPackageService().PackageAsync(source, output);
             if (Has(args, "--json"))
             {
@@ -7257,7 +7318,7 @@ internal static class Program
     {
         return Environment.ProcessPath ??
             Process.GetCurrentProcess().MainModule?.FileName ??
-            throw new InvalidOperationException("Could not resolve GoatShot CLI executable path for native messaging host registration.");
+            throw new InvalidOperationException("Could not resolve Receipts CLI executable path for native messaging host registration.");
     }
 
     private static bool IsBrowserNativeHostLaunch(IReadOnlyList<string> args)
@@ -7339,7 +7400,7 @@ internal static class Program
             }
             else
             {
-                Console.WriteLine("GoatShot print-import setup");
+                Console.WriteLine("Receipts print-import setup");
                 Console.WriteLine($"succeeded={setupResult.Succeeded}");
                 Console.WriteLine($"settings-saved={setupResult.SettingsSaved}");
                 Console.WriteLine($"enabled={setupResult.Enabled}");
@@ -7408,7 +7469,7 @@ internal static class Program
             }
             else
             {
-                Console.WriteLine("GoatShot virtual printer/file-drop import contract");
+                Console.WriteLine("Receipts virtual printer/file-drop import contract");
                 Console.WriteLine($"enabled={contract.Enabled}");
                 Console.WriteLine($"drop-folder={contract.DropFolder}");
                 Console.WriteLine($"include-subdirectories={contract.IncludeSubdirectories}");
@@ -7448,7 +7509,7 @@ internal static class Program
             }
             else
             {
-                Console.WriteLine("GoatShot virtual printer/file-drop diagnostics");
+                Console.WriteLine("Receipts virtual printer/file-drop diagnostics");
                 Console.WriteLine($"enabled={diagnostics.Enabled}");
                 Console.WriteLine($"watched-folder-state={diagnostics.WatchedFolderState}");
                 Console.WriteLine($"policy-status={diagnostics.PolicyStatus}");
@@ -7571,7 +7632,7 @@ internal static class Program
         if (args.Length == 0 || args[0].Equals("print", StringComparison.OrdinalIgnoreCase))
         {
             var snapshot = services.Diagnostics.GetSnapshot();
-            Console.WriteLine("GoatShot diagnostics");
+            Console.WriteLine("Receipts diagnostics");
             Console.WriteLine($"OS: {snapshot.OsDescription}");
             Console.WriteLine($"Runtime: {snapshot.RuntimeDescription}");
             Console.WriteLine();
@@ -7689,7 +7750,7 @@ internal static class Program
             return 0;
         }
 
-        Console.WriteLine("GoatShot Android ADB diagnostics");
+        Console.WriteLine("Receipts Android ADB diagnostics");
         Console.WriteLine($"status={diagnostics.Status}");
         Console.WriteLine($"ready={diagnostics.Ready}");
         Console.WriteLine($"adb-path={(string.IsNullOrWhiteSpace(diagnostics.AdbPath) ? "not-found" : diagnostics.AdbPath)}");
@@ -9588,7 +9649,7 @@ internal static class Program
             return health.IsHealthy ? 0 : 1;
         }
 
-        Console.WriteLine("GoatShot capture engine diagnostics");
+        Console.WriteLine("Receipts capture engine diagnostics");
         Console.WriteLine($"Production engine: {record.EngineName}");
         Console.WriteLine($"Scope: {record.Scope}");
         Console.WriteLine($"Desktop session: {record.DesktopSessionStatus}");
@@ -9741,7 +9802,7 @@ internal static class Program
             var saved = await services.WorkspaceStore.AddImageFileAsync(
                 item.FilePath,
                 item.Kind,
-                "Imported from goatshot CLI OCR command.");
+                "Imported from Receipts CLI OCR command.");
             saved.OcrText = item.OcrText;
             saved.OcrLanguageTag = item.OcrLanguageTag;
             saved.OcrRecognizedAt = item.OcrRecognizedAt;
@@ -9912,7 +9973,7 @@ internal static class Program
             SupportsTextOutput = true,
             Source = model.Source,
             Notes = model.SupportsImageEdit
-                ? "Usable for GoatShot image edit/analyze flows when Gemini credentials are configured."
+                ? "Usable for Receipts image edit/analyze flows when Gemini credentials are configured."
                 : "Listed by Gemini but image-edit capability was not advertised."
         }).ToList();
 
@@ -10098,7 +10159,7 @@ internal static class Program
         if (Has(args, "--workspace"))
         {
             var item = FindWorkspaceItem(services, file) ??
-                await services.WorkspaceStore.AddImageFileAsync(file, CaptureKind.Imported, "Imported from goatshot CLI AI analysis command.");
+                await services.WorkspaceStore.AddImageFileAsync(file, CaptureKind.Imported, "Imported from Receipts CLI AI analysis command.");
             item.Notes = MergePrefixedNote(
                 item.Notes,
                 "AI analysis:",
@@ -11171,7 +11232,7 @@ internal static class Program
             return 0;
         }
 
-        Console.WriteLine("GoatShot recording devices");
+        Console.WriteLine("Receipts recording devices");
         Console.WriteLine(snapshot.SelectionSummary);
         if (!string.IsNullOrWhiteSpace(snapshot.AudioCaptureSummary))
         {
@@ -11220,7 +11281,7 @@ internal static class Program
             return plan.CanRecord ? 0 : 1;
         }
 
-        Console.WriteLine("GoatShot recording preflight");
+        Console.WriteLine("Receipts recording preflight");
         Console.WriteLine($"Selected engine: {plan.ChoiceLabel}");
         Console.WriteLine($"Can record MP4 now: {(plan.CanRecord ? "yes" : "no")}");
         Console.WriteLine($"Production requested: {(plan.ProductionRequested ? "yes" : "no")}");
@@ -11262,7 +11323,7 @@ internal static class Program
             return result.Succeeded || result.Skipped ? 0 : 1;
         }
 
-        Console.WriteLine("GoatShot recording media metadata");
+        Console.WriteLine("Receipts recording media metadata");
         Console.WriteLine($"File: {result.FilePath}");
         Console.WriteLine($"ffprobe: {(result.FfprobeAvailable ? result.FfprobePath : "unavailable")}");
         Console.WriteLine(result.Message);
@@ -11487,11 +11548,13 @@ internal static class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine(
+        var help =
             """
-            GoatShot CLI
+            Receipts CLI
 
             Usage:
+              Receipts.Cli receipt verify <package> [--key-path path]
+              Receipts.Cli receipt key rotate [--key-path path]
               goatshot capture fullscreen --output shot.png [--delay 2] [--engine default|production|wgc] [--copy] [--workspace] [--profile ClientSupport]
               goatshot capture all-monitors --output shot.png [--delay 2] [--engine default|production|wgc]
               goatshot capture monitor --output shot.png [--delay 2] [--engine default|production|wgc|dxgi]
@@ -11540,7 +11603,7 @@ internal static class Program
               goatshot video apply-composite --plan composite-plan.json --accept-plan [--screen screen.mp4] [--camera webcam.mp4] [--audio screen|camera|none] --output composite.mp4 [--workspace] [--json]
               goatshot video generate-mask webcam.mp4 [--method keyed|alpha|luma] [--key-color 0x00ff00] [--similarity 0.18] [--blend 0.08] [--luma-threshold 128] [--invert-mask] [--output foreground-mask.mp4] [--workspace] [--json]
               goatshot video person-mask webcam.mp4 --runner segmenter.exe --runner-args ""--input {input} --output {output}"" [--model model.onnx] [--timeout-seconds 600] --accept-external-runner [--output person-mask.mp4] [--workspace] [--json]
-              goatshot video hosted-person-mask webcam.mp4 --endpoint https://segmenter.example.test/mask --accept-hosted-service [--api-key-env GOATSHOT_SEGMENTER_TOKEN] [--model person-v1] --output person-mask.mp4 [--workspace] [--json]
+              goatshot video hosted-person-mask webcam.mp4 --endpoint https://segmenter.example.test/mask --accept-hosted-service [--api-key-env RECEIPTS_SEGMENTER_TOKEN] [--model person-v1] --output person-mask.mp4 [--workspace] [--json]
               goatshot video person-model validate --manifest person-segmentation-model.json [--json]
               goatshot video person-model stage --manifest person-segmentation-model.json [--accept-download] [--json]
               goatshot video mask-quality --generated-mask person-mask-frame.png --reference-mask reviewed-mask-frame.png [--threshold 128] [--min-iou 0.9 --min-precision 0.9 --min-recall 0.9] [--output artifacts\video-mask-quality] [--json]
@@ -11659,7 +11722,7 @@ internal static class Program
               goatshot companion-portal export --output artifacts\companion-portal-readonly [--manual-validation artifacts\manual-validation\yyyy-mm-dd] [--proof-root artifacts] [--share-history-limit 200] [--json]
               goatshot companion-portal media-review --output artifacts\companion-portal-media-review --media shot.png --accept-media-copy [--json]
               goatshot companion-portal serve --output artifacts\companion-portal-preview [--host 127.0.0.1] [--port 0] [--media shot.png --accept-media-copy] [--check] [--json]
-              goatshot companion-portal serve --output artifacts\companion-portal-self-hosted --host 0.0.0.0 --self-hosted --accept-remote-clients --auth-token-env GOATSHOT_PORTAL_TOKEN [--check] [--json]
+              goatshot companion-portal serve --output artifacts\companion-portal-self-hosted --host 0.0.0.0 --self-hosted --accept-remote-clients --auth-token-env RECEIPTS_PORTAL_TOKEN [--check] [--json]
               goatshot print-import setup [--folder .\PrintDrop] [--enable] [--include-subdirectories] [--setup-note setup.md] [--json]
               goatshot print-import contract [--folder .\PrintDrop] [--ensure-folder] [--json]
               goatshot print-import diagnostics [--folder .\PrintDrop] [--ensure-folder] [--json]
@@ -11678,7 +11741,7 @@ internal static class Program
               goatshot manual-validation desktop-proof --folder artifacts\manual-validation\yyyy-mm-dd [--run-commands] [--repo-root .] [--app-path path\GoatShot.exe] [--timeout-seconds 120] [--json]
               goatshot manual-validation hardware-proof --folder artifacts\manual-validation\yyyy-mm-dd [--run-commands] [--repo-root .] [--cli-path path\GoatShot.Cli.exe] [--timeout-seconds 120] [--json]
               goatshot manual-validation operator-pack --folder artifacts\manual-validation\yyyy-mm-dd [--output artifacts\manual-validation\yyyy-mm-dd\required-desktop-operator-pack] [--cli-path path\GoatShot.Cli.exe] [--app-path path\GoatShot.exe] [--json]
-              goatshot manual-validation clean-machine-kit --folder artifacts\manual-validation\yyyy-mm-dd [--output artifacts\manual-validation\yyyy-mm-dd\clean-machine-proof-kit] [--portable-zip artifacts\dist\GoatShot-0.1.0-win-x64-portable.zip] [--installer artifacts\dist\GoatShot-Setup-0.1.0-win-x64.exe] [--copy-package] [--json]
+              goatshot manual-validation clean-machine-kit --folder artifacts\manual-validation\yyyy-mm-dd [--output artifacts\manual-validation\yyyy-mm-dd\clean-machine-proof-kit] [--portable-zip artifacts\dist\GoatShot-0.1.0-win-x64-portable.zip] [--installer artifacts\dist\Receipts-0.3.0-win-x64.exe] [--copy-package] [--json]
               goatshot manual-validation record-clean-machine-evidence --folder artifacts\manual-validation\yyyy-mm-dd --status passed --machine-evidence clean-machine-evidence\machine-info.txt --package-evidence clean-machine-proof-kit\clean-machine-proof-manifest.json --hash-evidence clean-machine-evidence\portable-hash.txt --diagnostics-evidence clean-machine-evidence\diagnostics-print.txt --paths-evidence clean-machine-evidence\paths.txt --first-launch-evidence clean-machine-evidence\main-window-render.png --settings-evidence clean-machine-evidence\settings-save-proof.png --capture-export-evidence clean-machine-evidence\capture-import-edit-export-proof.png --installer-evidence clean-machine-evidence\installer-build-or-skipped.md --privacy-evidence clean-machine-evidence\privacy-review.md [--script-result-evidence clean-machine-evidence\clean-machine-script-result.json] [--json]
               goatshot manual-validation record-desktop-evidence --folder artifacts\manual-validation\yyyy-mm-dd --lane keyboard --status passed --notes-evidence required-desktop-operator-pack\keyboard-traversal\notes.md --surface-coverage-evidence required-desktop-operator-pack\keyboard-traversal\coverage.md --focus-order-evidence required-desktop-operator-pack\keyboard-traversal\focus-order.md --result-evidence required-desktop-operator-pack\keyboard-traversal\result.md --privacy-evidence required-desktop-operator-pack\keyboard-traversal\privacy-review.md [--json]
               goatshot manual-validation record-hardware-evidence --folder artifacts\manual-validation\yyyy-mm-dd --lane multi-monitor-capture --status passed --notes-evidence hardware-evidence\multi-monitor-capture\notes.md --safe-content-evidence hardware-evidence\multi-monitor-capture\safe-content.md --topology-evidence hardware-proof\environment.md --capture-output-evidence hardware-evidence\multi-monitor-capture\capture-output.md --dimensions-evidence hardware-evidence\multi-monitor-capture\dimensions.md --privacy-evidence hardware-evidence\multi-monitor-capture\privacy-review.md [--json]
@@ -11706,7 +11769,9 @@ internal static class Program
               goatshot ai-history reject <id> [--reason "..."]
               goatshot ai-history iterate <id> [--reason "..."]
               goatshot ai-history retry <id> [--model MODEL] [--profile PROFILE] [--prompt "..."] [--transcript transcript.txt] [--srt captions.srt] [--output output.md] [--json]
-            """);
+            """;
+
+        Console.WriteLine(BrandIdentity.RenderCliHelpTemplate(help));
     }
 
     private static JsonSerializerOptions CliJsonOptions()

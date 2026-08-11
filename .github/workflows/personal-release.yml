@@ -6,7 +6,7 @@ on:
       version:
         description: Semantic version without v prefix
         required: true
-        default: 0.2.0
+        default: 0.3.0
   push:
     tags: ['v*']
 
@@ -36,12 +36,18 @@ jobs:
           dotnet build GoatShot.slnx -c Release --no-restore
           dotnet test GoatShot.slnx -c Release --no-build --logger "console;verbosity=minimal"
           dotnet list GoatShot.slnx package --vulnerable --include-transitive
-      - name: Package locked Personal V1 assets
+      - name: Package Receipts release assets
         shell: powershell
         run: .\scripts\package-release.ps1 -Version '${{ steps.version.outputs.value }}' -BuildId '${{ github.sha }}'
+      - name: Verify portable package
+        shell: powershell
+        run: .\scripts\verify-portable-package.ps1 -PackagePath '.\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64-portable.zip' -RunCliSmoke
       - name: Verify single executable
         shell: powershell
         run: .\scripts\verify-single-exe-package.ps1 -Version '${{ steps.version.outputs.value }}'
+      - name: Verify installer package
+        shell: powershell
+        run: .\scripts\verify-installer-package.ps1 -Version '${{ steps.version.outputs.value }}'
       - name: Create public release proof bundle
         shell: powershell
         run: |
@@ -53,27 +59,45 @@ jobs:
             -AdditionalArtifactPath @(
               '.\artifacts\single-exe-package-verification\single-exe-package-verification.json',
               '.\artifacts\single-exe-package-verification\single-exe-package-verification.md',
-              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.exe.sha256",
-              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.build.json",
-              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.spdx.json",
-              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt",
-              '.\artifacts\v1-readiness-summary.md'
+              '.\artifacts\portable-package-verification\portable-package-verification.json',
+              '.\artifacts\portable-package-verification\portable-package-verification.md',
+              '.\artifacts\installer-package-verification\installer-package-verification.json',
+              '.\artifacts\installer-package-verification\installer-package-verification.md',
+              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe.sha256",
+              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.exe.sha256",
+              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.build.json",
+              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.spdx.json",
+              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt"
             )
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: GoatShot-${{ steps.version.outputs.value }}-win-x64
+          name: Receipts-${{ steps.version.outputs.value }}-win-x64
           path: |
-            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.exe
-            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.exe.sha256
-            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.build.json
-            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.spdx.json
-            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-portable.zip
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe.sha256
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.exe
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.exe.sha256
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.build.json
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.spdx.json
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt
+            artifacts/portable-package-verification/**
             artifacts/single-exe-package-verification/**
-            artifacts/tag-release-proof/GoatShot-release-proof-*.zip
+            artifacts/installer-package-verification/**
+            artifacts/tag-release-proof/Receipts-release-proof-*.zip
+          if-no-files-found: error
       - name: Publish GitHub prerelease for tag builds
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.ref_name }}' artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-* artifacts/tag-release-proof/GoatShot-release-proof-*.zip --prerelease --title 'GoatShot ${{ github.ref_name }}' --notes 'Unsigned Windows x64 personal preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live Android-device proof remain open.'
+          $version = '${{ steps.version.outputs.value }}'
+          $releaseAssets = @(
+            Get-ChildItem -LiteralPath '.\artifacts\dist' -Filter "Receipts-$version-*" -File
+            Get-ChildItem -LiteralPath '.\artifacts\tag-release-proof' -Filter 'Receipts-release-proof-*.zip' -File
+          ) | ForEach-Object FullName
+          if ($releaseAssets.Count -eq 0) {
+            throw 'No Receipts release assets were found.'
+          }
+          gh release create '${{ github.ref_name }}' @releaseAssets --prerelease --title 'Receipts ${{ github.ref_name }}' --notes 'Unsigned Windows x64 Receipts preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'

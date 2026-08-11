@@ -52,6 +52,8 @@ public sealed class CompanionPortalExportServiceTests
             Assert.IsTrue(result.Report.ManualValidation.Included);
             Assert.IsTrue(result.Report.ManualValidation.StatusCounts.ContainsKey(nameof(ManualValidationLaneStatus.Passed)));
             Assert.IsTrue(result.Report.ReleaseProof.Included);
+            Assert.AreEqual(2, result.Report.ReleaseProof.ZipCount);
+            StringAssert.Contains(result.Report.ReleaseProof.LatestZip?.RelativePath ?? string.Empty, "Receipts-release-proof-");
             Assert.AreEqual(2, result.Report.ReleaseProof.CommandCount);
             Assert.AreEqual(2, result.Report.ReleaseProof.PassedCommands);
             StringAssert.Contains(File.ReadAllText(result.ReportHtmlPath), "would sync: false");
@@ -251,7 +253,7 @@ public sealed class CompanionPortalExportServiceTests
             var report = await http.GetStringAsync(new Uri(new Uri(session.Result.Url), CompanionPortalExportService.ReportJsonFileName));
             var health = await http.GetStringAsync(new Uri(new Uri(session.Result.Url), "health.json"));
 
-            StringAssert.Contains(index, "GoatShot companion portal loopback preview");
+            StringAssert.Contains(index, "Receipts companion portal loopback preview");
             StringAssert.Contains(index, "would sync: false");
             StringAssert.Contains(report, "\"mode\": \"local-loopback-companion-portal-preview-v0\"");
             StringAssert.Contains(report, "\"wouldHostPortal\": true");
@@ -301,7 +303,7 @@ public sealed class CompanionPortalExportServiceTests
             var health = await http.GetStringAsync(new Uri(new Uri(session.Result.Url), "health.json"));
             var media = await http.GetByteArrayAsync(new Uri(new Uri(session.Result.Url), item.ReviewRelativePath));
             CollectionAssert.AreEqual(mediaBytes, media);
-            StringAssert.Contains(mediaReview, "GoatShot companion portal media review");
+            StringAssert.Contains(mediaReview, "Receipts companion portal media review");
             StringAssert.Contains(manifest, "\"itemCount\": 1");
             StringAssert.Contains(health, "\"mediaReviewPagesEnabled\": true");
 
@@ -358,7 +360,7 @@ public sealed class CompanionPortalExportServiceTests
             var report = await authed.GetStringAsync(new Uri(new Uri(session.Result.Url), CompanionPortalExportService.ReportJsonFileName));
             var health = await authed.GetStringAsync(new Uri(new Uri(session.Result.Url), "health.json"));
 
-            StringAssert.Contains(index, "GoatShot companion portal self-hosted preview");
+            StringAssert.Contains(index, "Receipts companion portal self-hosted preview");
             StringAssert.Contains(report, "\"mode\": \"self-hosted-read-only-companion-portal-preview-v0\"");
             StringAssert.Contains(report, "\"remoteClientsAllowed\": true");
             Assert.IsFalse(report.Contains(token, StringComparison.OrdinalIgnoreCase));
@@ -558,6 +560,7 @@ public sealed class CompanionPortalExportServiceTests
             }
         };
         await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(manifest, JsonOptions));
+        await File.WriteAllBytesAsync(Path.Combine(root, "Receipts-release-proof-test.zip"), [5, 6, 7, 8]);
         await File.WriteAllBytesAsync(Path.Combine(root, "GoatShot-release-proof-test.zip"), [1, 2, 3, 4]);
         return root;
     }

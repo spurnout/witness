@@ -100,7 +100,7 @@ public static class ShareHistoryWindowRenderer
             Bytes = new FileInfo(path).Length,
             Width = 960,
             Height = 540,
-            SourceApp = "GoatShot preview",
+            SourceApp = "Receipts preview",
             SourceWindowTitle = "Share history render proof",
             Notes = "Synthetic share history render item."
         };

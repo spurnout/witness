@@ -116,10 +116,10 @@ public sealed class ManualValidationCleanMachineEvidenceRecordService
             result.MissingRequiredCategories.Count == 0;
         result.Succeeded = result.Issues.Count == 0;
         result.Message = result.ProofComplete
-            ? "Clean-machine evidence recorded as passed. The recorder did not launch GoatShot, run installers, mutate profiles, capture the screen, or update the manual lane."
+            ? "Clean-machine evidence recorded as passed. The recorder did not launch Receipts, run installers, mutate profiles, capture the screen, or update the manual lane."
             : result.Succeeded
-                ? $"Clean-machine evidence recorded as {result.Status}. The recorder did not launch GoatShot, run installers, mutate profiles, capture the screen, or update the manual lane."
-                : "Clean-machine evidence record has blockers. The recorder did not launch GoatShot, run installers, mutate profiles, capture the screen, or update the manual lane.";
+                ? $"Clean-machine evidence recorded as {result.Status}. The recorder did not launch Receipts, run installers, mutate profiles, capture the screen, or update the manual lane."
+                : "Clean-machine evidence record has blockers. The recorder did not launch Receipts, run installers, mutate profiles, capture the screen, or update the manual lane.";
 
         Directory.CreateDirectory(outputRoot);
         result.GeneratedFiles.Add(await WriteFileAsync(
@@ -233,7 +233,7 @@ public sealed class ManualValidationCleanMachineEvidenceRecordService
     private static string BuildMarkdown(ManualValidationCleanMachineEvidenceRecordResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# GoatShot Clean-Machine Evidence Record");
+        builder.AppendLine("# Receipts Clean-Machine Evidence Record");
         builder.AppendLine();
         builder.AppendLine($"Status: `{result.Status}`");
         builder.AppendLine($"Proof complete: `{result.ProofComplete}`");
@@ -253,7 +253,7 @@ public sealed class ManualValidationCleanMachineEvidenceRecordService
         builder.AppendLine();
         builder.AppendLine("## Mutation Boundary");
         builder.AppendLine();
-        builder.AppendLine($"- Would launch GoatShot: `{result.WouldLaunchApp}`");
+        builder.AppendLine($"- Would launch Receipts: `{result.WouldLaunchApp}`");
         builder.AppendLine($"- Would run installer: `{result.WouldRunInstaller}`");
         builder.AppendLine($"- Would install or uninstall: `{result.WouldInstallOrUninstall}`");
         builder.AppendLine($"- Would mutate user profile: `{result.WouldMutateUserProfile}`");
@@ -283,7 +283,7 @@ public sealed class ManualValidationCleanMachineEvidenceRecordService
         builder.AppendLine();
         builder.AppendLine("## Claim Boundary");
         builder.AppendLine("- This record captures operator-reviewed evidence references only.");
-        builder.AppendLine("- The recorder does not launch GoatShot, run the clean-machine helper, install or uninstall software, mutate user profiles, capture screenshots, certify a clean Windows environment, or update the manual-validation lane.");
+        builder.AppendLine("- The recorder does not launch Receipts, run the clean-machine helper, install or uninstall software, mutate user profiles, capture screenshots, certify a clean Windows environment, or update the manual-validation lane.");
         builder.AppendLine("- A `passed` status is only accepted when machine/profile, package, hash, diagnostics, paths, first-launch, settings, capture/export, installer, and privacy-review evidence are all present.");
         builder.AppendLine("- After reviewing this record, use `manual-validation record-lane --lane clean-machine-install` only if the operator-owned clean-machine pass was actually performed and accepted.");
         return builder.ToString();

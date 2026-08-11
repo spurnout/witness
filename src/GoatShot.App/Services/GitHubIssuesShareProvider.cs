@@ -99,7 +99,7 @@ public sealed class GitHubIssuesShareProvider : IShareProvider
         {
             Content = ShareProviderPayloads.JsonContent(requestBody)
         };
-        httpRequest.Headers.UserAgent.ParseAdd("GoatShot/0.1");
+        httpRequest.Headers.UserAgent.ParseAdd($"Receipts/{BrandIdentity.ReleaseVersion}");
         httpRequest.Headers.Accept.ParseAdd("application/vnd.github+json");
         httpRequest.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Trim());
@@ -139,7 +139,7 @@ public sealed class GitHubIssuesShareProvider : IShareProvider
     private static string BuildIssueMarkdownBody(ShareUploadRequest request)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Created from GoatShot.");
+        builder.AppendLine("Created from Receipts.");
         builder.AppendLine();
         builder.AppendLine("| Field | Value |");
         builder.AppendLine("|---|---|");

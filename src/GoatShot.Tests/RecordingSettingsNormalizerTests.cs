@@ -132,8 +132,8 @@ public sealed class RecordingSettingsNormalizerTests
 
         StringAssert.Contains(summary, "microphone");
         StringAssert.Contains(summary, "system audio");
-        StringAssert.Contains(summary, "WASAPI WAV inputs");
-        StringAssert.Contains(summary, "mixed into the MP4");
+        StringAssert.Contains(summary, "normalized WASAPI PCM");
+        StringAssert.Contains(summary, "mixed within a bounded buffer");
         StringAssert.Contains(summary, "DirectShow webcam overlay");
         StringAssert.Contains(summary, "matching camera can be probed");
         StringAssert.Contains(summary, "mic gain 1.5x");

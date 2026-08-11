@@ -1,5 +1,5 @@
 param(
-    [string]$PackagePath = "artifacts\dist\GoatShot-0.1.0-win-x64-portable.zip",
+    [string]$PackagePath = "artifacts\dist\Receipts-0.3.0-win-x64-portable.zip",
     [string]$OutputRoot = "artifacts\portable-package-verification",
     [switch]$RunCliSmoke,
     [switch]$Json
@@ -49,9 +49,15 @@ function Invoke-PackagedCli {
         [string]$CleanLibraryRoot
     )
 
-    $oldLocal = $env:GOATSHOT_LOCAL_ROOT
-    $oldLibrary = $env:GOATSHOT_LIBRARY_ROOT
+    $oldReceiptsLocal = $env:RECEIPTS_LOCAL_ROOT
+    $oldReceiptsLibrary = $env:RECEIPTS_LIBRARY_ROOT
+    $oldGoatShotLocal = $env:GOATSHOT_LOCAL_ROOT
+    $oldGoatShotLibrary = $env:GOATSHOT_LIBRARY_ROOT
     try {
+        $env:RECEIPTS_LOCAL_ROOT = $CleanLocalRoot
+        $env:RECEIPTS_LIBRARY_ROOT = $CleanLibraryRoot
+        # Set both names to the same isolated roots so this verifier is safe
+        # against both Receipts builds and pre-migration compatibility builds.
         $env:GOATSHOT_LOCAL_ROOT = $CleanLocalRoot
         $env:GOATSHOT_LIBRARY_ROOT = $CleanLibraryRoot
         & $CliPath @Arguments *> $LogPath
@@ -61,14 +67,16 @@ function Invoke-PackagedCli {
         }
 
         return [pscustomobject]@{
-            command = "GoatShot.Cli.exe " + ($Arguments -join " ")
+            command = [IO.Path]::GetFileName($CliPath) + " " + ($Arguments -join " ")
             exitCode = $exitCode
             log = $LogPath
         }
     }
     finally {
-        $env:GOATSHOT_LOCAL_ROOT = $oldLocal
-        $env:GOATSHOT_LIBRARY_ROOT = $oldLibrary
+        $env:RECEIPTS_LOCAL_ROOT = $oldReceiptsLocal
+        $env:RECEIPTS_LIBRARY_ROOT = $oldReceiptsLibrary
+        $env:GOATSHOT_LOCAL_ROOT = $oldGoatShotLocal
+        $env:GOATSHOT_LIBRARY_ROOT = $oldGoatShotLibrary
     }
 }
 
@@ -76,7 +84,7 @@ function Build-Markdown {
     param([pscustomobject]$Result)
 
     $lines = New-Object System.Collections.Generic.List[string]
-    [void]$lines.Add("# GoatShot Portable Package Verification")
+    [void]$lines.Add("# Receipts Portable Package Verification")
     [void]$lines.Add("")
     [void]$lines.Add("Package: ``$($Result.packagePath)``")
     [void]$lines.Add("Extracted to: ``$($Result.extractRoot)``")
@@ -158,11 +166,11 @@ if ($issues.Count -eq 0) {
     Expand-Archive -LiteralPath $packageFullPath -DestinationPath $extractRoot -Force
 }
 
-$requiredPaths = @(
-    "GoatShot.exe",
-    "GoatShot.dll",
-    "GoatShot.Cli.exe",
-    "GoatShot.Cli.dll",
+$receiptsRequiredPaths = @(
+    "Receipts.exe",
+    "Receipts.dll",
+    "Receipts.Cli.exe",
+    "Receipts.Cli.dll",
     "README.md",
     "browser-extension/README.md",
     "browser-extension/bridge-contract.md",
@@ -175,6 +183,33 @@ $requiredPaths = @(
     "browser-extension/options.js",
     "browser-extension/samples/safe-fixture.html"
 )
+$legacyRequiredPaths = @(
+    "GoatShot.exe",
+    "GoatShot.dll",
+    "GoatShot.Cli.exe",
+    "GoatShot.Cli.dll"
+) + $receiptsRequiredPaths[4..($receiptsRequiredPaths.Count - 1)]
+
+$hasCompleteReceiptsLayout = @($receiptsRequiredPaths | Where-Object {
+    $required = $_
+    -not ($entries | Where-Object { $_.fullName.Equals($required, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1)
+}).Count -eq 0
+$hasCompleteLegacyLayout = @($legacyRequiredPaths | Where-Object {
+    $required = $_
+    -not ($entries | Where-Object { $_.fullName.Equals($required, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1)
+}).Count -eq 0
+$packageBrand = if ($hasCompleteReceiptsLayout) { "Receipts" } elseif ($hasCompleteLegacyLayout) { "GoatShot compatibility" } else { "Receipts" }
+$requiredPaths = if ($hasCompleteLegacyLayout -and -not $hasCompleteReceiptsLayout) { $legacyRequiredPaths } else { $receiptsRequiredPaths }
+if ($hasCompleteLegacyLayout -and -not $hasCompleteReceiptsLayout) {
+    [void]$warnings.Add("Verifying a legacy GoatShot portable layout through the compatibility reader; new packages must use Receipts filenames.")
+}
+elseif ($hasCompleteReceiptsLayout) {
+    foreach ($legacyBinary in $legacyRequiredPaths[0..3]) {
+        if ($entries | Where-Object { $_.fullName.Equals($legacyBinary, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1) {
+            Add-Issue $issues "Receipts package contains an obsolete legacy binary entry: $legacyBinary"
+        }
+    }
+}
 
 $requiredResults = New-Object System.Collections.Generic.List[object]
 foreach ($required in $requiredPaths) {
@@ -243,7 +278,7 @@ if ($issues.Count -eq 0) {
 }
 
 if ($RunCliSmoke -and $issues.Count -eq 0) {
-    $cliPath = Join-Path $extractRoot "GoatShot.Cli.exe"
+    $cliPath = Join-Path $extractRoot $(if ($packageBrand -eq "GoatShot compatibility") { "GoatShot.Cli.exe" } else { "Receipts.Cli.exe" })
     $cleanLocalRoot = Join-Path $outputFullPath "clean-localappdata"
     $cleanLibraryRoot = Join-Path $outputFullPath "clean-library"
     New-Item -ItemType Directory -Force -Path $cleanLocalRoot | Out-Null
@@ -273,6 +308,7 @@ if ($RunCliSmoke -and $issues.Count -eq 0) {
 
 $result = [pscustomobject]@{
     succeeded = $issues.Count -eq 0
+    packageBrand = $packageBrand
     packagePath = $packageFullPath
     outputRoot = $outputFullPath
     extractRoot = $extractRoot

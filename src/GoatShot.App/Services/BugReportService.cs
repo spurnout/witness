@@ -112,7 +112,7 @@ public sealed class BugReportService
         AppendRecordingEnrichmentMarkdown(builder, enrichment);
         builder.AppendLine("## Privacy");
         builder.AppendLine();
-        builder.AppendLine("Notes, OCR/text context, transcript previews, recording context, and AI history previews above are passed through GoatShot sensitive-text redaction before export. The attached media file is referenced by path and is not modified by this report export.");
+        builder.AppendLine("Notes, OCR/text context, transcript previews, recording context, and AI history previews above are passed through Receipts sensitive-text redaction before export. The attached media file is referenced by path and is not modified by this report export.");
         return builder.ToString();
     }
 
@@ -174,7 +174,7 @@ public sealed class BugReportService
 
         AppendRecordingEnrichmentHtml(builder, enrichment);
         builder.AppendLine("<h2>Privacy</h2>");
-        builder.AppendLine("<p>Notes, OCR/text context, transcript previews, recording context, and AI history previews above are passed through GoatShot sensitive-text redaction before export. The attached media file is referenced by path and is not modified by this report export.</p>");
+        builder.AppendLine("<p>Notes, OCR/text context, transcript previews, recording context, and AI history previews above are passed through Receipts sensitive-text redaction before export. The attached media file is referenced by path and is not modified by this report export.</p>");
         builder.AppendLine("</body></html>");
         return builder.ToString();
     }

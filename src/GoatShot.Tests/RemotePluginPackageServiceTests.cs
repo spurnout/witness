@@ -30,6 +30,25 @@ public sealed class RemotePluginPackageServiceTests
     }
 
     [TestMethod]
+    public async Task ValidateRegistryAsync_AcceptsLegacyGoatShotRegistrySchema()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var package = CreatePluginPackage();
+            var registryPath = await WriteRegistryAsync(
+                paths,
+                package,
+                RemotePluginPackageService.LegacyRegistrySchemaVersion);
+            var service = CreateService(paths);
+
+            var result = await service.ValidateRegistryAsync(registryPath);
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Issues));
+            Assert.AreEqual(1, result.PluginCount);
+        });
+    }
+
+    [TestMethod]
     public async Task PlanInstallAsync_StagesPackageWithoutTrustingOrEnablingPlugin()
     {
         await WithTempPathsAsync(async paths =>
@@ -57,6 +76,26 @@ public sealed class RemotePluginPackageServiceTests
     }
 
     [TestMethod]
+    public async Task PlanInstallAsync_AcceptsLegacyPackagedPluginSchema()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var package = CreatePluginPackage(
+                [("plugin.json", ValidPluginManifest(
+                    "sample.redaction-note",
+                    "0.2.0",
+                    LocalPluginService.LegacySchemaVersion))]);
+            var registryPath = await WriteRegistryAsync(paths, package);
+            var service = CreateService(paths);
+
+            var result = await service.PlanInstallAsync("sample.redaction-note", registryPath, stagePackage: true);
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Issues));
+            Assert.IsTrue(result.Staged);
+        });
+    }
+
+    [TestMethod]
     public async Task PlanInstallAsync_VerifiesSignedPackageBeforeStaging()
     {
         await WithTempPathsAsync(async paths =>
@@ -78,6 +117,7 @@ public sealed class RemotePluginPackageServiceTests
                 await File.ReadAllTextAsync(Path.Combine(Path.GetDirectoryName(result.StagedPackagePath)!, "stage-manifest.json")),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             Assert.IsNotNull(stageManifest);
+            Assert.AreEqual(RemotePluginPackageService.CurrentStageSchemaVersion, stageManifest!.SchemaVersion);
             Assert.IsTrue(stageManifest!.SignatureVerified);
             Assert.AreEqual(result.SignaturePublicKeyFingerprint, stageManifest.SignaturePublicKeyFingerprint);
         });
@@ -153,7 +193,13 @@ public sealed class RemotePluginPackageServiceTests
             Assert.IsFalse(install.WouldEnable);
             Assert.IsFalse(install.WouldExecute);
             Assert.IsTrue(File.Exists(Path.Combine(paths.PluginsRoot, "sample.redaction-note", "plugin.json")));
-            Assert.IsTrue(File.Exists(Path.Combine(paths.PluginsRoot, "sample.redaction-note", "goatshot-plugin-install.json")));
+            var installManifestPath = Path.Combine(paths.PluginsRoot, "sample.redaction-note", "receipts-plugin-install.json");
+            Assert.IsTrue(File.Exists(installManifestPath));
+            var installManifest = JsonSerializer.Deserialize<RemotePluginInstallManifest>(
+                await File.ReadAllTextAsync(installManifestPath),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.IsNotNull(installManifest);
+            Assert.AreEqual(RemotePluginPackageService.CurrentInstallSchemaVersion, installManifest!.SchemaVersion);
 
             var plugin = localPlugins.Discover().Single(item =>
                 item.PluginId.Equals("sample.redaction-note", StringComparison.OrdinalIgnoreCase));
@@ -736,25 +782,28 @@ public sealed class RemotePluginPackageServiceTests
         return new RemotePluginPackageService(paths, new LocalPluginService(paths, new AppSettings()));
     }
 
-    private static async Task<string> WriteRegistryAsync(AppPaths paths, PackageFixture package)
+    private static async Task<string> WriteRegistryAsync(
+        AppPaths paths,
+        PackageFixture package,
+        string? schemaVersion = null)
     {
         var packageFolder = Path.Combine(paths.LocalRoot, "registry-fixtures");
         Directory.CreateDirectory(packageFolder);
         var packagePath = Path.Combine(packageFolder, "sample.redaction-note-0.2.0.zip");
         await File.WriteAllBytesAsync(packagePath, package.Bytes);
         var registryPath = Path.Combine(packageFolder, "registry.json");
-            await File.WriteAllTextAsync(registryPath, RegistryJson(package with
+        await File.WriteAllTextAsync(registryPath, RegistryJson(package with
         {
             PackageUri = Path.GetFileName(packagePath)
-        }));
+        }, schemaVersion));
         return registryPath;
     }
 
-    private static string RegistryJson(PackageFixture package)
+    private static string RegistryJson(PackageFixture package, string? schemaVersion = null)
     {
         return $$"""
             {
-              "schemaVersion": "goatshot.plugin-registry.v1",
+              "schemaVersion": "{{schemaVersion ?? RemotePluginPackageService.CurrentRegistrySchemaVersion}}",
               "source": "local test registry",
               "plugins": [
                 {
@@ -824,11 +873,11 @@ public sealed class RemotePluginPackageServiceTests
         };
     }
 
-    private static string ValidPluginManifest(string id, string version)
+    private static string ValidPluginManifest(string id, string version, string? schemaVersion = null)
     {
         return $$"""
             {
-              "schemaVersion": "goatshot.plugin.v1",
+              "schemaVersion": "{{schemaVersion ?? LocalPluginService.CurrentSchemaVersion}}",
               "id": "{{id}}",
               "name": "Sample Redaction Note",
               "version": "{{version}}",

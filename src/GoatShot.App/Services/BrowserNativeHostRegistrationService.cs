@@ -6,9 +6,12 @@ namespace GoatShot.App.Services;
 
 public sealed class BrowserNativeHostRegistrationService
 {
-    public const string HostName = "com.goatshot.bridge";
+    public const string HostName = BrandIdentity.NativeMessagingHostName;
+    public const string LegacyHostName = BrandIdentity.LegacyNativeMessagingHostName;
     private const string ChromeRegistrySubKey = @"Software\Google\Chrome\NativeMessagingHosts\" + HostName;
     private const string EdgeRegistrySubKey = @"Software\Microsoft\Edge\NativeMessagingHosts\" + HostName;
+    private const string LegacyChromeRegistrySubKey = @"Software\Google\Chrome\NativeMessagingHosts\" + LegacyHostName;
+    private const string LegacyEdgeRegistrySubKey = @"Software\Microsoft\Edge\NativeMessagingHosts\" + LegacyHostName;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -38,7 +41,7 @@ public sealed class BrowserNativeHostRegistrationService
     {
         var status = GetStatus();
         var installed = status.Registrations.Count(entry => entry.Installed);
-        return $"Browser native messaging host {HostName}: {installed}/{status.Registrations.Count} browser registration(s) installed. Manifests root: {status.ManifestRoot}. Registration uses HKCU for Chromium/Edge and the user Firefox NativeMessagingHosts folder; local extension ZIP packaging is available through CLI, while browser-store publication and automatic extension installation remain separate proof lanes.";
+        return $"Browser native messaging host {HostName}: {installed}/{status.Registrations.Count} primary browser registration(s) installed. Install and uninstall operations manage {LegacyHostName} as a compatibility alias; the count reports the primary name only. Manifests root: {status.ManifestRoot}. Registration uses HKCU for Chromium/Edge and the user Firefox NativeMessagingHosts folder; local extension ZIP packaging is available through CLI, while browser-store publication and automatic extension installation remain separate proof lanes.";
     }
 
     public BrowserNativeHostStatus GetStatus()
@@ -68,15 +71,17 @@ public sealed class BrowserNativeHostRegistrationService
         var results = new List<BrowserNativeHostInstallResult>();
         foreach (var browser in NormalizeBrowsers(request.Browsers))
         {
-            var manifest = CreateManifest(browser, request);
+            var manifest = CreateManifest(browser, request, HostName);
             var path = Path.Combine(outputRoot, browser.ToString().ToLowerInvariant(), $"{HostName}.json");
             await WriteManifestAsync(path, manifest, cancellationToken);
+            var legacyPath = Path.Combine(outputRoot, browser.ToString().ToLowerInvariant(), $"{LegacyHostName}.json");
+            await WriteManifestAsync(legacyPath, CreateManifest(browser, request, LegacyHostName), cancellationToken);
             results.Add(new BrowserNativeHostInstallResult
             {
                 Browser = browser,
                 Succeeded = true,
                 ManifestPath = path,
-                Message = $"Native messaging manifest written for {browser}: {path}"
+                Message = $"Receipts native messaging manifest and GoatShot compatibility alias written for {browser}: {path}"
             });
         }
 
@@ -91,19 +96,28 @@ public sealed class BrowserNativeHostRegistrationService
         var results = new List<BrowserNativeHostInstallResult>();
         foreach (var browser in NormalizeBrowsers(request.Browsers))
         {
-            var manifest = CreateManifest(browser, request);
+            var manifest = CreateManifest(browser, request, HostName);
             var manifestPath = browser == BrowserNativeHostBrowser.Firefox
                 ? Path.Combine(_firefoxManifestRoot, $"{HostName}.json")
                 : Path.Combine(ManifestRoot, browser.ToString().ToLowerInvariant(), $"{HostName}.json");
             await WriteManifestAsync(manifestPath, manifest, cancellationToken);
+            var legacyManifestPath = browser == BrowserNativeHostBrowser.Firefox
+                ? Path.Combine(_firefoxManifestRoot, $"{LegacyHostName}.json")
+                : Path.Combine(ManifestRoot, browser.ToString().ToLowerInvariant(), $"{LegacyHostName}.json");
+            await WriteManifestAsync(
+                legacyManifestPath,
+                CreateManifest(browser, request, LegacyHostName),
+                cancellationToken);
 
             if (browser == BrowserNativeHostBrowser.Chrome)
             {
                 _registry.SetDefaultValue(ChromeRegistrySubKey, manifestPath);
+                _registry.SetDefaultValue(LegacyChromeRegistrySubKey, legacyManifestPath);
             }
             else if (browser == BrowserNativeHostBrowser.Edge)
             {
                 _registry.SetDefaultValue(EdgeRegistrySubKey, manifestPath);
+                _registry.SetDefaultValue(LegacyEdgeRegistrySubKey, legacyManifestPath);
             }
 
             results.Add(new BrowserNativeHostInstallResult
@@ -118,8 +132,8 @@ public sealed class BrowserNativeHostRegistrationService
                     _ => string.Empty
                 },
                 Message = browser == BrowserNativeHostBrowser.Firefox
-                    ? $"Firefox native messaging manifest installed: {manifestPath}"
-                    : $"{browser} native messaging host registered in HKCU: {manifestPath}"
+                    ? $"Firefox Receipts native messaging manifest and GoatShot compatibility alias installed: {manifestPath}"
+                    : $"{browser} Receipts native messaging host and GoatShot compatibility alias registered in HKCU: {manifestPath}"
             });
         }
 
@@ -134,11 +148,13 @@ public sealed class BrowserNativeHostRegistrationService
             if (browser == BrowserNativeHostBrowser.Chrome)
             {
                 _registry.DeleteSubKeyTree(ChromeRegistrySubKey);
+                _registry.DeleteSubKeyTree(LegacyChromeRegistrySubKey);
                 results.Add(Removed(browser, ChromeRegistrySubKey, "Chrome native messaging host registration removed from HKCU."));
             }
             else if (browser == BrowserNativeHostBrowser.Edge)
             {
                 _registry.DeleteSubKeyTree(EdgeRegistrySubKey);
+                _registry.DeleteSubKeyTree(LegacyEdgeRegistrySubKey);
                 results.Add(Removed(browser, EdgeRegistrySubKey, "Edge native messaging host registration removed from HKCU."));
             }
             else
@@ -147,6 +163,12 @@ public sealed class BrowserNativeHostRegistrationService
                 if (File.Exists(path))
                 {
                     File.Delete(path);
+                }
+
+                var legacyPath = Path.Combine(_firefoxManifestRoot, $"{LegacyHostName}.json");
+                if (File.Exists(legacyPath))
+                {
+                    File.Delete(legacyPath);
                 }
 
                 results.Add(new BrowserNativeHostInstallResult
@@ -220,12 +242,15 @@ public sealed class BrowserNativeHostRegistrationService
 
     private static BrowserNativeHostManifest CreateManifest(
         BrowserNativeHostBrowser browser,
-        BrowserNativeHostInstallRequest request)
+        BrowserNativeHostInstallRequest request,
+        string hostName)
     {
         var manifest = new BrowserNativeHostManifest
         {
-            Name = HostName,
-            Description = "GoatShot browser capture native messaging host.",
+            Name = hostName,
+            Description = hostName == HostName
+                ? "Receipts browser capture native messaging host."
+                : "Receipts browser capture native messaging host (GoatShot compatibility alias).",
             Path = Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.HostExecutablePath)),
             Type = "stdio"
         };
@@ -279,7 +304,7 @@ public sealed class BrowserNativeHostRegistrationService
     private static string NormalizeFirefoxExtensionId(string? extensionId)
     {
         extensionId = string.IsNullOrWhiteSpace(extensionId)
-            ? "goatshot-page-capture@goatshot.local"
+            ? "receipts-page-capture@receipts.local"
             : extensionId.Trim();
         if (extensionId.Length > 0 && !extensionId.Any(char.IsWhiteSpace))
         {
