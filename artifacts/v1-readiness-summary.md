@@ -1,5 +1,8 @@
 # GoatShot V1 Readiness Summary
 
+> [!IMPORTANT]
+> **Historical document:** This report preserves GoatShot `0.2.0`-era readiness evidence and is no longer the current product status. See the [Receipts 0.3.0 Readiness Summary](receipts-0.3.0-readiness-summary.md) for the active release-candidate assessment.
+
 Date: 2026-08-10
 
 Purpose: summarize what is implemented, what is locally proven, what remains manual, what is parked for OAuth/live accounts, and what belongs to later modules.
