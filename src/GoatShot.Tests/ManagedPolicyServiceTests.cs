@@ -195,9 +195,8 @@ public sealed class ManagedPolicyServiceTests
             StringAssert.Contains(snapshot.AiStatus, "AI is disabled by managed policy");
             StringAssert.Contains(snapshot.UploadQueueStatus, "blocked by managed policy");
             StringAssert.Contains(snapshot.RecordingEngine, "video hosted-person-mask");
-            StringAssert.Contains(snapshot.RecordingEngine, "video person-model");
-            StringAssert.Contains(snapshot.RecordingEngine, "video mask-quality");
-            StringAssert.Contains(snapshot.RecordingEngine, "still does not bundle, trust, enable, register, run inference from");
+            StringAssert.Contains(snapshot.RecordingEngine, "hash-pinned embedded ONNX model");
+            StringAssert.Contains(snapshot.RecordingEngine, "DirectML with CPU fallback");
             return Task.CompletedTask;
         });
     }

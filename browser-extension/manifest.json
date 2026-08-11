@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "GoatShot Page Capture Prototype",
-  "version": "0.1.0",
-  "description": "Prototype content script for GoatShot page geometry and consented telemetry handoff.",
+  "name": "GoatShot Page Capture",
+  "version": "0.2.0",
+  "description": "Consented page capture and redacted native handoff for GoatShot.",
   "permissions": [
     "activeTab",
     "downloads",

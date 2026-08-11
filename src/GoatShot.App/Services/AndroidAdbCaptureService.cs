@@ -12,6 +12,7 @@ namespace GoatShot.App.Services;
 
 public sealed class AndroidAdbCaptureService
 {
+    private const string InProcessTransportId = "in-process-winusb";
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     public const int DefaultScreenrecordDurationSeconds = 10;
     public const int MinimumScreenrecordDurationSeconds = 1;
@@ -40,17 +41,20 @@ public sealed class AndroidAdbCaptureService
     private readonly AppPaths _paths;
     private readonly WorkspaceStore _workspaceStore;
     private readonly IAdbProcessRunner _runner;
+    private readonly IAndroidDeviceTransport _transport;
     private readonly int _diagnosticsDevicesTimeoutSeconds;
 
     public AndroidAdbCaptureService(
         AppPaths paths,
         WorkspaceStore workspaceStore,
         IAdbProcessRunner? runner = null,
-        int diagnosticsDevicesTimeoutSeconds = DefaultDiagnosticsDevicesTimeoutSeconds)
+        int diagnosticsDevicesTimeoutSeconds = DefaultDiagnosticsDevicesTimeoutSeconds,
+        IAndroidDeviceTransport? transport = null)
     {
         _paths = paths;
         _workspaceStore = workspaceStore;
         _runner = runner ?? new AdbProcessRunner();
+        _transport = transport ?? new WindowsUsbAdbTransport(paths.LocalRoot);
         _diagnosticsDevicesTimeoutSeconds = Math.Max(1, diagnosticsDevicesTimeoutSeconds);
     }
 
@@ -58,13 +62,45 @@ public sealed class AndroidAdbCaptureService
         string? adbPath = null,
         CancellationToken cancellationToken = default)
     {
-        var resolved = ResolveAdbPath(adbPath);
+        var configuredExternal = FirstNonEmpty(adbPath, Environment.GetEnvironmentVariable("GOATSHOT_ADB_PATH"));
+        if (string.IsNullOrWhiteSpace(configuredExternal))
+        {
+            try
+            {
+                var discovered = await _transport.DiscoverAsync(cancellationToken);
+                var transportDevices = discovered.Select(device => new AndroidAdbDevice
+                {
+                    Serial = device.Id,
+                    State = device.Authorized ? "device" : "unauthorized",
+                    Product = device.Product,
+                    Model = string.IsNullOrWhiteSpace(device.Model) ? device.Name : device.Model,
+                    Device = device.Device,
+                    TransportId = InProcessTransportId
+                }).ToList();
+                var diagnostics = BuildDiagnostics(InProcessTransportId, transportDevices);
+                diagnostics.Message = transportDevices.Count == 0
+                    ? "No Android ADB WinUSB interfaces were found. Connect a device with USB debugging enabled and a compatible Windows user-mode driver."
+                    : diagnostics.Message.Replace("ADB", "in-process WinUSB ADB", StringComparison.OrdinalIgnoreCase);
+                return diagnostics;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return new AndroidAdbDiagnostics
+                {
+                    Status = AndroidAdbStatus.AdbFailed,
+                    AdbPath = InProcessTransportId,
+                    Message = $"In-process WinUSB ADB discovery failed: {SensitiveTextDetector.Redact(exception.Message)}"
+                };
+            }
+        }
+
+        var resolved = ResolveAdbPath(configuredExternal);
         if (resolved is null)
         {
             return new AndroidAdbDiagnostics
             {
                 Status = AndroidAdbStatus.MissingAdb,
-                Message = "adb.exe was not found. Install Android platform-tools or set GOATSHOT_ADB_PATH.",
+                Message = "The explicitly configured external adb.exe was not found.",
                 AdbPath = string.Empty
             };
         }
@@ -99,7 +135,9 @@ public sealed class AndroidAdbCaptureService
         }
 
         args.AddRange(["exec-out", "screencap", "-p"]);
-        var capture = await _runner.RunBinaryAsync(diagnostics.AdbPath, args, cancellationToken);
+        var capture = diagnostics.AdbPath == InProcessTransportId
+            ? await RunTransportBinaryAsync(selected.Device, "screencap -p", DefaultLivePreviewMaxBytes, TimeSpan.FromSeconds(30), cancellationToken)
+            : await _runner.RunBinaryAsync(diagnostics.AdbPath, args, cancellationToken);
         if (capture.ExitCode != 0)
         {
             return Failed(diagnostics, $"ADB screencap failed with exit code {capture.ExitCode}. {ShortOutput(capture.StandardError, capture.StandardOutputText)}");
@@ -171,6 +209,11 @@ public sealed class AndroidAdbCaptureService
             var failed = Failed(diagnostics, selected.Message);
             failed.DurationSeconds = durationSeconds;
             return failed;
+        }
+
+        if (diagnostics.AdbPath == InProcessTransportId)
+        {
+            return await CaptureScreenrecordWithTransportAsync(request, diagnostics, selected.Device, durationSeconds, cancellationToken);
         }
 
         var output = ResolveVideoOutputPath(request.OutputPath, selected.Device.Serial);
@@ -459,7 +502,9 @@ public sealed class AndroidAdbCaptureService
             {
                 timeout.Token.ThrowIfCancellationRequested();
 
-                var capture = await _runner.RunBinaryAsync(plan.Diagnostics.AdbPath, command.Arguments, timeout.Token);
+                var capture = plan.Diagnostics.AdbPath == InProcessTransportId
+                    ? await RunTransportBinaryAsync(plan.Device, "screencap -p", maxBytes - result.BytesCaptured, TimeSpan.FromSeconds(plan.TimeoutSeconds), timeout.Token)
+                    : await _runner.RunBinaryAsync(plan.Diagnostics.AdbPath, command.Arguments, timeout.Token);
                 if (capture.ExitCode != 0)
                 {
                     return CleanupFailedLivePreviewExecution(
@@ -576,11 +621,18 @@ public sealed class AndroidAdbCaptureService
 
             var command = plan.PlannedCommands.Single(command =>
                 command.Name.Equals("adb-h264-stream", StringComparison.OrdinalIgnoreCase));
-            var capture = await _runner.RunBinaryLimitedAsync(
-                plan.Diagnostics!.AdbPath,
-                command.Arguments,
-                maxBytes,
-                timeout.Token);
+            var capture = plan.Diagnostics!.AdbPath == InProcessTransportId
+                ? await RunTransportBinaryAsync(
+                    plan.Device!,
+                    $"screenrecord --output-format=h264 - --time-limit {durationSeconds.ToString(CultureInfo.InvariantCulture)}",
+                    maxBytes,
+                    TimeSpan.FromSeconds(plan.TimeoutSeconds),
+                    timeout.Token)
+                : await _runner.RunBinaryLimitedAsync(
+                    plan.Diagnostics.AdbPath,
+                    command.Arguments,
+                    maxBytes,
+                    timeout.Token);
             if (capture.ExitCode != 0)
             {
                 return CleanupFailedLivePreviewExecution(
@@ -732,6 +784,78 @@ public sealed class AndroidAdbCaptureService
             Devices = devices.ToList()
         };
     }
+
+    private async Task<AndroidAdbCaptureResult> CaptureScreenrecordWithTransportAsync(
+        AndroidAdbScreenrecordRequest request,
+        AndroidAdbDiagnostics diagnostics,
+        AndroidAdbDevice device,
+        int durationSeconds,
+        CancellationToken cancellationToken)
+    {
+        var output = ResolveVideoOutputPath(request.OutputPath, device.Serial);
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        var remotePath = $"/sdcard/Movies/GoatShot/goatshot-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
+        var command = $"sh -c 'mkdir -p /sdcard/Movies/GoatShot && screenrecord --time-limit {durationSeconds.ToString(CultureInfo.InvariantCulture)} {remotePath} >/dev/null 2>&1; cat {remotePath}; rm -f {remotePath}'";
+        var capture = await RunTransportBinaryAsync(
+            device,
+            command,
+            512L * 1024L * 1024L,
+            TimeSpan.FromSeconds(durationSeconds + 120),
+            cancellationToken);
+        if (capture.ExitCode != 0 || capture.StandardOutput.Length == 0)
+        {
+            return FailedVideo(
+                diagnostics,
+                durationSeconds,
+                remotePath,
+                capture.ExitCode == 0 ? "In-process ADB screenrecord returned no MP4 bytes." : capture.StandardError);
+        }
+
+        await File.WriteAllBytesAsync(output, capture.StandardOutput, cancellationToken);
+        CaptureItem? item = null;
+        if (request.AddToWorkspace || string.IsNullOrWhiteSpace(request.OutputPath))
+        {
+            item = await _workspaceStore.AddImageFileAsync(
+                output,
+                CaptureKind.AndroidRecording,
+                $"Android in-process WinUSB screenrecord imported from {device.DisplayLabel}. Duration limit: {durationSeconds} seconds.",
+                new CaptureSource
+                {
+                    ProcessName = "GoatShot WinUSB ADB",
+                    WindowTitle = device.DisplayLabel,
+                    MonitorName = "Android device"
+                });
+        }
+
+        return new AndroidAdbCaptureResult
+        {
+            Succeeded = true,
+            Status = AndroidAdbStatus.Ready,
+            Message = item is null ? $"Android screenrecord captured: {output}" : $"Android screenrecord captured and indexed: {item.FileName}",
+            OutputPath = output,
+            Item = item,
+            Diagnostics = diagnostics,
+            Device = device,
+            DurationSeconds = durationSeconds,
+            RemotePath = remotePath
+        };
+    }
+
+    private async Task<AdbProcessResult> RunTransportBinaryAsync(
+        AndroidAdbDevice device,
+        string command,
+        long maxBytes,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var result = await _transport.ExecuteAsync(device.Serial, command, maxBytes, timeout, cancellationToken);
+        return result.Succeeded
+            ? new AdbProcessResult(0, string.Empty, string.Empty, result.Output)
+            : new AdbProcessResult(1, string.Empty, result.Message, []);
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
     private async Task<AdbProcessResult> QueryDevicesAsync(string adbPath, CancellationToken cancellationToken)
     {

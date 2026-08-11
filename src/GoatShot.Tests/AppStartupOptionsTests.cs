@@ -6,6 +6,30 @@ namespace GoatShot.Tests;
 public sealed class AppStartupOptionsTests
 {
     [TestMethod]
+    public void Parse_BackgroundSelectsBackgroundMode()
+    {
+        var options = AppStartupOptions.Parse(["--background"]);
+
+        Assert.AreEqual(AppStartupMode.Background, options.Mode);
+        Assert.AreEqual(string.Empty, options.RuntimeVerb);
+    }
+
+    [TestMethod]
+    public void Parse_RuntimeVerbPreservesArguments()
+    {
+        var options = AppStartupOptions.Parse([
+            "--plugin-background-update",
+            "--registry",
+            "plugins.json",
+            "--force"
+        ]);
+
+        Assert.AreEqual(AppStartupMode.RuntimeVerb, options.Mode);
+        Assert.AreEqual("--plugin-background-update", options.RuntimeVerb);
+        CollectionAssert.Contains(options.RuntimeArguments.ToList(), "plugins.json");
+    }
+
+    [TestMethod]
     public void Parse_OpensSettingsWithoutSection()
     {
         var options = AppStartupOptions.Parse(["--open-settings"]);

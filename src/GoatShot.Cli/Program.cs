@@ -1739,6 +1739,7 @@ internal static class Program
                     Value(args, "--arg-template"),
                 ModelPath = Value(args, "--model") ?? Value(args, "--model-path"),
                 TimeoutSeconds = ParseOptionalInt(args, "--timeout-seconds") ?? ParseOptionalInt(args, "--timeout"),
+                MaxFrames = ParseOptionalInt(args, "--max-frames"),
                 AcceptExternalRunner = Has(args, "--accept-external-runner")
             },
             Value(args, "--output") ?? Value(args, "-o"),

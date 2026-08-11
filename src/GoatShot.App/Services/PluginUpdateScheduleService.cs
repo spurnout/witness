@@ -233,10 +233,9 @@ public sealed class PluginUpdateScheduleService
             "$ErrorActionPreference = 'Stop'",
             $"$env:GOATSHOT_LOCAL_ROOT = {PowerShellString(result.LocalRoot)}",
             $"$env:GOATSHOT_LIBRARY_ROOT = {PowerShellString(result.LibraryRoot)}",
-            $"$cli = {PowerShellString(result.CliPath)}",
+            $"$goatShot = {PowerShellString(result.CliPath)}",
             "$arguments = @(",
-            "    'plugins',",
-            "    'background-updates',",
+            "    '--plugin-background-update',",
             "    '--registry',",
             $"    {PowerShellString(registryLocation)},",
             "    '--mode',",
@@ -244,10 +243,9 @@ public sealed class PluginUpdateScheduleService
             "    '--interval-hours',",
             $"    {PowerShellString(result.IntervalHours.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture))},",
             "    '--state',",
-            $"    {PowerShellString(result.StatePath)},",
-            "    '--json'",
+            $"    {PowerShellString(result.StatePath)}",
             ")",
-            $"& $cli @arguments *> {PowerShellString(result.LogPath)}",
+            $"& $goatShot @arguments *> {PowerShellString(result.LogPath)}",
             "exit $LASTEXITCODE"
         };
         File.WriteAllLines(result.RunScriptPath, lines);
@@ -442,7 +440,10 @@ public sealed class PluginUpdateScheduleService
             return Path.GetFullPath(Environment.ExpandEnvironmentVariables(cliPath));
         }
 
-        return Path.Combine(AppContext.BaseDirectory, "GoatShot.Cli.exe");
+        var installedPath = new PersonalInstallService(new StartupRegistrationService()).InstalledExecutablePath;
+        return File.Exists(installedPath)
+            ? installedPath
+            : Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "GoatShot.exe");
     }
 
     private string ResolveStatePath(string? statePath, string outputRoot)

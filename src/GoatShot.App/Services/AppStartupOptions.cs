@@ -37,6 +37,10 @@ public sealed record AppStartupOptions(
     string AuditWpfSurface,
     string AuditWpfOutputPath)
 {
+    public AppStartupMode Mode { get; init; } = AppStartupMode.Interactive;
+    public string RuntimeVerb { get; init; } = string.Empty;
+    public IReadOnlyList<string> RuntimeArguments { get; init; } = Array.Empty<string>();
+
     public static AppStartupOptions Parse(
         IEnumerable<string> args,
         string? openSettingsEnvironment = null,
@@ -567,6 +571,13 @@ public sealed record AppStartupOptions(
             }
         }
 
+        var runtimeVerb = GetRuntimeVerb(list);
+        var mode = list.Any(arg => arg.Equals("--background", StringComparison.OrdinalIgnoreCase))
+            ? AppStartupMode.Background
+            : string.IsNullOrWhiteSpace(runtimeVerb)
+                ? AppStartupMode.Interactive
+                : AppStartupMode.RuntimeVerb;
+
         return new AppStartupOptions(
             openSettings,
             settingsSection,
@@ -602,7 +613,28 @@ public sealed record AppStartupOptions(
             recordProofSceneDurationSeconds,
             auditWpf,
             auditWpfSurface,
-            auditWpfOutputPath);
+            auditWpfOutputPath)
+        {
+            Mode = mode,
+            RuntimeVerb = runtimeVerb,
+            RuntimeArguments = list
+        };
+    }
+
+    private static string GetRuntimeVerb(IReadOnlyList<string> args)
+    {
+        var knownVerbs = new[]
+        {
+            "--install",
+            "--repair",
+            "--uninstall",
+            "--complete-uninstall",
+            "--browser-native-host",
+            "--plugin-background-update",
+            "--runtime-diagnostics"
+        };
+
+        return args.FirstOrDefault(arg => knownVerbs.Contains(arg, StringComparer.OrdinalIgnoreCase)) ?? string.Empty;
     }
 
     private static bool IsTruthy(string? value)
@@ -620,4 +652,11 @@ public sealed record AppStartupOptions(
             ? parsed
             : fallback;
     }
+}
+
+public enum AppStartupMode
+{
+    Interactive,
+    Background,
+    RuntimeVerb
 }

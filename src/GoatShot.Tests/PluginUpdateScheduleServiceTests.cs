@@ -21,7 +21,7 @@ public sealed class PluginUpdateScheduleServiceTests
                 Mode = "stage-only",
                 IntervalHours = 6,
                 OutputPath = output,
-                CliPath = "C:\\Tools\\GoatShot.Cli.exe",
+                CliPath = "C:\\Tools\\GoatShot.exe",
                 TaskName = "GoatShot Test Plugin Updates"
             });
 
@@ -39,7 +39,7 @@ public sealed class PluginUpdateScheduleServiceTests
             Assert.IsTrue(File.Exists(result.ManifestPath));
 
             var runScript = File.ReadAllText(result.RunScriptPath);
-            StringAssert.Contains(runScript, "background-updates");
+            StringAssert.Contains(runScript, "--plugin-background-update");
             StringAssert.Contains(runScript, "stage-only");
             Assert.IsFalse(runScript.Contains("install-staged", StringComparison.OrdinalIgnoreCase));
             Assert.IsFalse(runScript.Contains("plugins run", StringComparison.OrdinalIgnoreCase));

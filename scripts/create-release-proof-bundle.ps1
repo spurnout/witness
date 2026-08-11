@@ -1,13 +1,24 @@
 param(
     [string] $Configuration = "Release",
     [string] $Runtime = "win-x64",
-    [string] $Version = "0.1.0",
+    [string] $Version = "0.2.0",
     [string] $OutputRoot = "",
     [switch] $SkipCommands,
+    [switch] $SkipTrancheNotes,
     [string[]] $AdditionalArtifactPath = @()
 )
 
 $ErrorActionPreference = "Stop"
+
+function Get-Sha256Hex([string] $PathValue) {
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [IO.File]::OpenRead($PathValue)
+        try { return ([BitConverter]::ToString($sha256.ComputeHash($stream)) -replace '-', '').ToLowerInvariant() }
+        finally { $stream.Dispose() }
+    }
+    finally { $sha256.Dispose() }
+}
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -21,7 +32,7 @@ else {
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = "0.1.0"
+    $Version = "0.2.0"
 }
 
 $bundleContentRoot = Join-Path $OutputRoot "bundle-content"
@@ -71,6 +82,26 @@ function Redact-Text {
     }
 
     $redacted = $Text
+    foreach ($privateRoot in @([string]$repoRoot, [string]$OutputRoot, [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile))) {
+        if (-not [string]::IsNullOrWhiteSpace($privateRoot)) {
+            $replacement = if ($privateRoot -eq [string]$repoRoot) {
+                "[REPO]"
+            }
+            elseif ($privateRoot -eq [string]$OutputRoot) {
+                "[OUTPUT]"
+            }
+            else {
+                "%USERPROFILE%"
+            }
+            foreach ($privateRootForm in @($privateRoot.Replace('\', '\\'), $privateRoot)) {
+                $redacted = [regex]::Replace(
+                    $redacted,
+                    [regex]::Escape($privateRootForm),
+                    $replacement,
+                    [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            }
+        }
+    }
     $redacted = [regex]::Replace($redacted, '(?i)(Authorization\s*[:=]\s*Bearer\s+)[^\s,;"]+', '$1[REDACTED]')
     $redacted = [regex]::Replace($redacted, '(?i)(Authorization\s*[:=]\s*Basic\s+)[^\s,;"]+', '$1[REDACTED]')
     $redacted = [regex]::Replace($redacted, '(?i)(access_token|refresh_token|id_token|api_key|apikey|password|secret|client_secret|token|authorization_code|oauth_code)=([^&\s]+)', '$1=[REDACTED]')
@@ -89,7 +120,7 @@ function Test-TextArtifact {
     param([string] $Path)
 
     $extension = [System.IO.Path]::GetExtension($Path)
-    return @(".txt", ".md", ".json", ".log", ".csv", ".xml", ".ps1") -contains $extension.ToLowerInvariant()
+    return @(".txt", ".md", ".json", ".log", ".csv", ".xml", ".ps1", ".sha256") -contains $extension.ToLowerInvariant()
 }
 
 function Test-ExcludedArtifact {
@@ -238,7 +269,7 @@ Copy-TextArtifact -Source (Join-Path $repoRoot "spec.md") -Destination (Join-Pat
 
 $trancheNoteSources = @()
 $artifactRoot = Join-Path $repoRoot "artifacts"
-if (Test-Path $artifactRoot) {
+if (-not $SkipTrancheNotes -and (Test-Path $artifactRoot)) {
     $trancheNoteSources = @(Get-ChildItem -LiteralPath $artifactRoot -Directory -Filter "tranche-*" |
             ForEach-Object {
                 $note = Join-Path $_.FullName "notes.md"
@@ -289,15 +320,17 @@ Invoke-ProofCommand -Name "CLI help" -FileName $cliPath -Arguments @("--help") -
 Invoke-ProofCommand -Name "CLI diagnostics print" -FileName $cliPath -Arguments @("diagnostics", "print") -LogFile (Join-Path $commandLogRoot "diagnostics-print.txt")
 Invoke-ProofCommand -Name "CLI diagnostics bundle" -FileName $cliPath -Arguments @("diagnostics", "bundle", "--output", (Join-Path $diagnosticsRoot "goatshot-diagnostics.zip")) -LogFile (Join-Path $commandLogRoot "diagnostics-bundle.txt")
 
-Invoke-ProofCommand -Name "Portable package" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\package-release.ps1", "-SkipInstaller", "-Configuration", $Configuration, "-Runtime", $Runtime, "-Version", $Version) -LogFile (Join-Path $commandLogRoot "package-release.txt")
+Invoke-ProofCommand -Name "Personal single-exe package" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\package-release.ps1", "-Configuration", $Configuration, "-Runtime", $Runtime, "-Version", $Version) -LogFile (Join-Path $commandLogRoot "package-release.txt")
+Invoke-ProofCommand -Name "Personal single-exe verification" -FileName "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\scripts\verify-single-exe-package.ps1", "-Version", $Version, "-Runtime", $Runtime) -LogFile (Join-Path $commandLogRoot "verify-single-exe-package.txt")
 
-$distZip = Join-Path $repoRoot "artifacts\dist\GoatShot-$Version-$Runtime-portable.zip"
-if (Test-Path $distZip) {
+$distExe = Join-Path $repoRoot "artifacts\dist\GoatShot-$Version-$Runtime.exe"
+if (Test-Path $distExe) {
     $packageInfoPath = Join-Path $bundleContentRoot "package.json"
-    $packageFile = Get-Item -LiteralPath $distZip
+    $packageFile = Get-Item -LiteralPath $distExe
     ConvertTo-Json -Depth 4 -InputObject ([pscustomobject]@{
-            portableZip = $packageFile.FullName
+            executable = $packageFile.Name
             bytes = $packageFile.Length
+            sha256 = Get-Sha256Hex $packageFile.FullName
             lastWriteTimeUtc = $packageFile.LastWriteTimeUtc
         }) | Set-Content -LiteralPath $packageInfoPath -Encoding UTF8
     Add-IncludedFile -Path $packageInfoPath
@@ -313,7 +346,7 @@ $unverifiedLanes = @(
     "Refresh-token expiry recovery against live cloud accounts",
     "Live keyboard/screen-reader/high-contrast accessibility pass",
     "Live multi-monitor and long recording proof with safe desktop content",
-    "Clean-machine installer proof when Inno Setup is unavailable or skipped"
+    "Clean-profile Windows Sandbox install, update, repair, and uninstall proof"
 )
 
 $bundleManifestPath = Join-Path $bundleContentRoot "manifest.json"
@@ -326,17 +359,17 @@ $manifest = [pscustomobject]@{
     version = $Version
     configuration = $Configuration
     runtime = $Runtime
-    repoRoot = "$repoRoot"
-    outputRoot = "$OutputRoot"
-    zipPath = "$zipPath"
+    repoRoot = "."
+    outputRoot = "artifacts/release-proof"
+    zipPath = [System.IO.Path]::GetFileName($zipPath)
     commands = $commands
     includedFiles = @($includedFiles)
     excludedByPolicy = @($excludedByPolicy)
-    privacyBoundary = "Release proof bundle includes command logs, source snapshots, tranche notes, diagnostics bundle metadata, and package metadata. It excludes capture media, thumbnails, OCR text dumps, AI payloads, DPAPI secret files, raw tokens, upload session URLs, and private desktop recordings."
+    privacyBoundary = "Release proof bundle includes allowlisted command status, public source snapshots, verifier output, release companions, and package metadata. It excludes capture media, thumbnails, OCR text dumps, AI payloads, DPAPI secret files, raw tokens, upload session URLs, private desktop recordings, and local tranche caches."
     unverifiedLanes = $unverifiedLanes
 }
 
-$manifestJson = ConvertTo-Json -InputObject $manifest -Depth 12
+$manifestJson = Redact-Text -Text (ConvertTo-Json -InputObject $manifest -Depth 12)
 Set-Content -LiteralPath $manifestPath -Value $manifestJson -Encoding UTF8
 Copy-Item -LiteralPath $manifestPath -Destination $bundleManifestPath -Force
 

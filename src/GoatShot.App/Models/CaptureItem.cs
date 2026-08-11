@@ -37,4 +37,8 @@ public sealed class CaptureItem
     public string BytesLabel => Bytes < 1024 * 1024
         ? $"{Bytes / 1024d:0.#} KB"
         : $"{Bytes / 1024d / 1024d:0.##} MB";
+
+    [JsonIgnore]
+    public string AccessibilityName =>
+        $"{Kind} capture, {Title}, {Width} by {Height} pixels, {CreatedAt:f}";
 }

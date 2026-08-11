@@ -12,21 +12,35 @@
     <ApplicationIcon>Assets\goatshot-icon.ico</ApplicationIcon>
     <AssemblyName>GoatShot</AssemblyName>
     <RootNamespace>GoatShot.App</RootNamespace>
+    <Version Condition="'$(Version)' == ''">0.2.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(GoatShotDistribution)' == 'true'">
+    <AssemblyMetadata Include="GoatShotDistribution" Value="true" />
+    <AssemblyMetadata Include="GoatShotBuildId" Value="$(GoatShotBuildId)" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\goatshot-icon.ico" />
     <Resource Include="Assets\goatshot-logo.png" />
+    <EmbeddedResource Include="Assets\embedded-assets.manifest.json" LogicalName="GoatShot.EmbeddedAssets.Manifest" />
+    <EmbeddedResource Include="$(EmbeddedAssetsRoot)\embedded-assets.manifest.json"
+                      Condition="'$(EmbeddedAssetsRoot)' != '' and Exists('$(EmbeddedAssetsRoot)\embedded-assets.manifest.json')"
+                      LogicalName="GoatShot.EmbeddedAssets.Manifest.Distribution" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AnimatedGif" Version="1.0.5" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
     <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.14" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
   </ItemGroup>
 
 </Project>

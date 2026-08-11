@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "goatshot.embedded-asset-lock.v1",
+  "ffmpeg": {
+    "version": "8.1.2-34-g9b6c8969e0",
+    "source": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-10-13-17/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
+    "sha256": "bf54421a41a11eafdcff3241aeba812f5ab526d4d6942a5a83a9d4588b26cb6d",
+    "license": "LGPL-2.1-or-later",
+    "build": "win64-lgpl-shared"
+  },
+  "personSegmentation": {
+    "version": "fcn-resnet50-12-int8@03eb11e82715bb59c9077cf21576e5ce76a6bf7e",
+    "source": "https://huggingface.co/onnxmodelzoo/fcn-resnet50-12-int8/resolve/03eb11e82715bb59c9077cf21576e5ce76a6bf7e/fcn-resnet50-12-int8.onnx",
+    "sha256": "67fcba8ebd435c2fb6b297d2e7c084f3c3b9ae6bc7ae41453b748ae4ed8c0331",
+    "license": "Apache-2.0",
+    "build": "ONNX opset 12 INT8, Pascal VOC person class"
+  }
+}

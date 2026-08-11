@@ -17,6 +17,7 @@ public sealed class WorkflowProfileSharing
     public string SftpUsername { get; set; } = string.Empty;
     public string SftpRemoteDirectory { get; set; } = "/";
     public string SftpPrivateKeyPath { get; set; } = string.Empty;
+    public string SftpHostKeyFingerprint { get; set; } = string.Empty;
     public string SftpPublicBaseUrl { get; set; } = string.Empty;
     public string WebDavBaseUrl { get; set; } = string.Empty;
     public string WebDavRemoteDirectory { get; set; } = "/";

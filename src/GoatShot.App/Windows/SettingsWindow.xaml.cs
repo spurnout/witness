@@ -260,6 +260,7 @@ public partial class SettingsWindow : Window
         CaptureContextPaddingBox.Text = settings.CaptureContextPadding.ToString(CultureInfo.InvariantCulture);
         PrivateModeBox.IsChecked = settings.PrivateCaptureMode;
         RunAtStartupBox.IsChecked = _services.Startup.GetState().IsRegistered;
+        RefreshPersonalInstallStatus();
         ManagedPolicyStatusText.Text = ManagedPolicyService.LoadEffective(settings).Summary;
         OcrLanguageBox.Text = settings.OcrLanguageTag;
         LoadRecordingSettings(settings.Recording ??= new RecordingSettings());
@@ -271,6 +272,11 @@ public partial class SettingsWindow : Window
         GeminiEndpointBox.Text = settings.GeminiApiEndpoint;
         GeminiDefaultModelBox.Text = settings.GeminiDefaultModelId;
         GeminiSpeechModelBox.Text = settings.GeminiSpeechToTextModelId;
+        TranscriptionProviderBox.SelectedValue = settings.TranscriptionProvider;
+        if (TranscriptionProviderBox.SelectedIndex < 0) TranscriptionProviderBox.SelectedIndex = 0;
+        ExternalWhisperExecutableBox.Text = settings.ExternalWhisperExecutablePath;
+        ExternalWhisperModelBox.Text = settings.ExternalWhisperModelPath;
+        ExternalWhisperLanguageBox.Text = settings.ExternalWhisperLanguage;
         GeminiManifestBox.Text = settings.GeminiModelManifestPath;
         GeminiKeyStatusText.Text = _services.SecretStore.HasGeminiApiKey
             ? "A Gemini API key is saved for the current Windows user."
@@ -297,12 +303,12 @@ public partial class SettingsWindow : Window
         ImgurKeyStatusText.Text = _services.SecretStore.HasImgurClientId
             ? "An Imgur Client ID is saved with Windows DPAPI for the current user."
             : "No Imgur Client ID is saved.";
-        SftpExecutablePathBox.Text = settings.SftpExecutablePath;
         SftpHostBox.Text = settings.SftpHost;
         SftpPortBox.Text = settings.SftpPort.ToString();
         SftpUsernameBox.Text = settings.SftpUsername;
         SftpRemoteDirectoryBox.Text = settings.SftpRemoteDirectory;
         SftpPrivateKeyPathBox.Text = settings.SftpPrivateKeyPath;
+        SftpHostKeyFingerprintBox.Text = settings.SftpHostKeyFingerprint;
         SftpPublicBaseUrlBox.Text = settings.SftpPublicBaseUrl;
         WebDavBaseUrlBox.Text = settings.WebDavBaseUrl;
         WebDavRemoteDirectoryBox.Text = settings.WebDavRemoteDirectory;
@@ -693,19 +699,95 @@ public partial class SettingsWindow : Window
         ApplyCurrentSettingsFromControls();
         var settings = _services.Settings;
 
-        var startupResult = _services.Startup.SetEnabled(settings.RunAtStartup);
-        if (!startupResult.Succeeded)
+        bool startupSucceeded;
+        string startupMessage;
+        if (settings.RunAtStartup && !File.Exists(_services.PersonalInstall.InstalledExecutablePath))
+        {
+            var installResult = _services.PersonalInstall.InstallOrUpdate();
+            startupSucceeded = installResult.Succeeded;
+            startupMessage = installResult.Message;
+        }
+        else
+        {
+            var registrationResult = _services.Startup.SetEnabled(settings.RunAtStartup, _services.PersonalInstall.InstalledExecutablePath);
+            startupSucceeded = registrationResult.Succeeded;
+            startupMessage = registrationResult.Message;
+        }
+
+        if (!startupSucceeded)
         {
             System.Windows.MessageBox.Show(
-                startupResult.Message,
+                startupMessage,
                 "Startup registration",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            settings.RunAtStartup = _services.Startup.GetState().IsRegistered;
+            settings.RunAtStartup = _services.Startup.GetState(_services.PersonalInstall.InstalledExecutablePath).IsRegistered;
         }
 
         _services.SaveSettings();
         DialogResult = true;
+    }
+
+    private async void InstallOrRepair_Click(object sender, RoutedEventArgs e)
+    {
+        var install = _services.PersonalInstall.InstallOrUpdate();
+        var runtime = await _services.BundledTools.RepairAsync();
+        RefreshPersonalInstallStatus();
+        System.Windows.MessageBox.Show(
+            $"{install.Message}{Environment.NewLine}{runtime.Message}",
+            "GoatShot install and repair",
+            MessageBoxButton.OK,
+            install.Succeeded && runtime.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private void DisableStartup_Click(object sender, RoutedEventArgs e)
+    {
+        var result = _services.PersonalInstall.DisableStartup();
+        RunAtStartupBox.IsChecked = false;
+        RefreshPersonalInstallStatus();
+        System.Windows.MessageBox.Show(result.Message, "GoatShot startup", MessageBoxButton.OK,
+            result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private void Uninstall_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmation = System.Windows.MessageBox.Show(
+            "Remove the installed GoatShot program, startup registration, extracted runtime tools, and browser native-host registrations? Captures and settings will be preserved.",
+            "Uninstall GoatShot",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _services.BrowserNativeHosts.Uninstall();
+        var result = _services.PersonalInstall.BeginUninstall();
+        System.Windows.MessageBox.Show(result.Message, "Uninstall GoatShot", MessageBoxButton.OK,
+            result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        if (result.Succeeded)
+        {
+            System.Windows.Application.Current.Shutdown(0);
+        }
+    }
+
+    private void RefreshPersonalInstallStatus()
+    {
+        var install = _services.PersonalInstall.GetState();
+        var runtime = _services.BundledTools.ValidateExisting();
+        var segmentation = _services.PersonSegmentation.GetStatus();
+        var ffmpegAsset = runtime.Manifest.Assets.FirstOrDefault(asset => asset.Id == "ffmpeg");
+        var whisper = string.IsNullOrWhiteSpace(_services.Settings.ExternalWhisperExecutablePath)
+            ? "external Whisper not configured"
+            : File.Exists(Environment.ExpandEnvironmentVariables(_services.Settings.ExternalWhisperExecutablePath))
+                ? "external Whisper configured"
+                : "external Whisper path missing";
+        PersonalInstallStatusText.Text =
+            $"Current {install.CurrentVersion} ({install.BuildId}); installed {(string.IsNullOrWhiteSpace(install.InstalledVersion) ? "not installed" : install.InstalledVersion)} at {install.InstalledPath}. " +
+            $"Running {(install.RunningInstalledCopy ? "installed copy" : "download/development copy")}; update {(install.InstalledVersion.Length > 0 && _services.PersonalInstall.IsNewerThanInstalled() ? "available" : "not available")}. " +
+            $"Startup {(install.StartupRegistered && install.StartupCommandCurrent ? "enabled for tray-only launch" : "disabled or needs repair")}. " +
+            $"Bundled runtime: {runtime.Message} FFmpeg {(ffmpegAsset is null ? "development/PATH resolution" : ffmpegAsset.Version)}; segmentation: {segmentation.Message} " +
+            $"Transcription preference: {_services.Settings.TranscriptionProvider}; {whisper}; Gemini speech-to-text remains explicit per-action opt-in.";
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -1131,6 +1213,12 @@ public partial class SettingsWindow : Window
         settings.GeminiSpeechToTextModelId = string.IsNullOrWhiteSpace(GeminiSpeechModelBox.Text)
             ? "gemini-3.5-flash"
             : GeminiSpeechModelBox.Text.Trim();
+        settings.TranscriptionProvider = TranscriptionProviderBox.SelectedValue as string ?? "external-whisper";
+        settings.ExternalWhisperExecutablePath = ExternalWhisperExecutableBox.Text.Trim();
+        settings.ExternalWhisperModelPath = ExternalWhisperModelBox.Text.Trim();
+        settings.ExternalWhisperLanguage = string.IsNullOrWhiteSpace(ExternalWhisperLanguageBox.Text)
+            ? "en"
+            : ExternalWhisperLanguageBox.Text.Trim();
         settings.GeminiModelManifestPath = GeminiManifestBox.Text.Trim();
         _services.SaveSettings();
         RefreshProviderSetupSummary();
@@ -1228,6 +1316,12 @@ public partial class SettingsWindow : Window
         settings.GeminiSpeechToTextModelId = string.IsNullOrWhiteSpace(GeminiSpeechModelBox.Text)
             ? "gemini-3.5-flash"
             : GeminiSpeechModelBox.Text.Trim();
+        settings.TranscriptionProvider = TranscriptionProviderBox.SelectedValue as string ?? "external-whisper";
+        settings.ExternalWhisperExecutablePath = ExternalWhisperExecutableBox.Text.Trim();
+        settings.ExternalWhisperModelPath = ExternalWhisperModelBox.Text.Trim();
+        settings.ExternalWhisperLanguage = string.IsNullOrWhiteSpace(ExternalWhisperLanguageBox.Text)
+            ? "en"
+            : ExternalWhisperLanguageBox.Text.Trim();
         settings.GeminiModelManifestPath = GeminiManifestBox.Text.Trim();
         settings.LocalExportFolder = LocalExportFolderBox.Text.Trim();
         settings.CustomScriptCommand = CustomScriptBox.Text.Trim();
@@ -1254,7 +1348,6 @@ public partial class SettingsWindow : Window
         settings.ImgurApiEndpoint = string.IsNullOrWhiteSpace(ImgurEndpointBox.Text)
             ? "https://api.imgur.com/3/image"
             : ImgurEndpointBox.Text.Trim();
-        settings.SftpExecutablePath = SftpExecutablePathBox.Text.Trim();
         settings.SftpHost = SftpHostBox.Text.Trim();
         settings.SftpPort = int.TryParse(SftpPortBox.Text.Trim(), out var sftpPort) && sftpPort > 0
             ? sftpPort
@@ -1264,6 +1357,7 @@ public partial class SettingsWindow : Window
             ? "/"
             : SftpRemoteDirectoryBox.Text.Trim();
         settings.SftpPrivateKeyPath = SftpPrivateKeyPathBox.Text.Trim();
+        settings.SftpHostKeyFingerprint = SftpHostKeyFingerprintBox.Text.Trim();
         settings.SftpPublicBaseUrl = SftpPublicBaseUrlBox.Text.Trim();
         settings.WebDavBaseUrl = WebDavBaseUrlBox.Text.Trim();
         settings.WebDavRemoteDirectory = string.IsNullOrWhiteSpace(WebDavRemoteDirectoryBox.Text)

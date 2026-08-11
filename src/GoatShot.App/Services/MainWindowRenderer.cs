@@ -29,8 +29,8 @@ public static class MainWindowRenderer
             WindowStartupLocation = WindowStartupLocation.Manual,
             Left = -10000,
             Top = -10000,
-            Width = 1180,
-            Height = 760,
+            Width = 1440,
+            Height = 900,
             ShowInTaskbar = false
         };
 

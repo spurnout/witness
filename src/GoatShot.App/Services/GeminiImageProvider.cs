@@ -388,7 +388,7 @@ public sealed class GeminiImageProvider : IAiImageProvider
             return new AiAudioTranscriptionResult(
                 false,
                 null,
-                $"Audio is {info.Length} bytes, which exceeds GoatShot's current {MaxInlineAudioBytes} byte inline Gemini transcription limit. Use local Whisper/SRT or a future Files API path for longer recordings.",
+                $"Audio is {info.Length} bytes, which exceeds GoatShot's current {MaxInlineAudioBytes} byte inline Gemini transcription limit. Use supplied subtitles or an explicitly configured external Whisper installation for longer recordings.",
                 selectedModel);
         }
 

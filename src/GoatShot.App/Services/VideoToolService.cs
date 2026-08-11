@@ -15,12 +15,18 @@ public sealed class VideoToolService
     private readonly AppPaths _paths;
     private readonly WorkspaceStore _workspaceStore;
     private readonly HttpClient _httpClient;
+    private readonly PersonSegmentationInferenceService? _personSegmentation;
 
-    public VideoToolService(AppPaths paths, WorkspaceStore workspaceStore, HttpClient? httpClient = null)
+    public VideoToolService(
+        AppPaths paths,
+        WorkspaceStore workspaceStore,
+        HttpClient? httpClient = null,
+        PersonSegmentationInferenceService? personSegmentation = null)
     {
         _paths = paths;
         _workspaceStore = workspaceStore;
         _httpClient = httpClient ?? new HttpClient();
+        _personSegmentation = personSegmentation;
     }
 
     public async Task<VideoToolResult> ExportFrameAsync(
@@ -1262,6 +1268,16 @@ public sealed class VideoToolService
         }
 
         options ??= new PersonSegmentationMaskGenerationOptions();
+        if (!options.AcceptExternalRunner && string.IsNullOrWhiteSpace(options.RunnerPath))
+        {
+            return await GenerateBundledPersonSegmentationMaskAsync(
+                item,
+                options,
+                outputPath,
+                addToWorkspace,
+                cancellationToken);
+        }
+
         if (!options.AcceptExternalRunner)
         {
             return Failed("Person-segmentation mask generation runs an external local model runner and requires --accept-external-runner.");
@@ -1354,6 +1370,95 @@ public sealed class VideoToolService
         }
 
         return Succeeded(outputPath, saved, "Person-segmentation mask video exported");
+    }
+
+    private async Task<VideoToolResult> GenerateBundledPersonSegmentationMaskAsync(
+        CaptureItem item,
+        PersonSegmentationMaskGenerationOptions options,
+        string? outputPath,
+        bool addToWorkspace,
+        CancellationToken cancellationToken)
+    {
+        if (_personSegmentation is null || !_personSegmentation.GetStatus().Available)
+        {
+            return Failed("Bundled person segmentation is unavailable. Run Repair from Settings, or configure an explicit external runner override.");
+        }
+
+        var ffmpeg = RecordingService.FindFfmpeg();
+        if (string.IsNullOrWhiteSpace(ffmpeg))
+        {
+            return Failed("FFmpeg is unavailable. Run Repair from Settings or configure an explicit FFmpeg override.");
+        }
+
+        outputPath = ResolveOutputPath(
+            outputPath,
+            _paths.VideosRoot,
+            $"person-segmentation-mask-{Path.GetFileNameWithoutExtension(item.FileName)}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.mp4");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        var workRoot = Path.Combine(_paths.TempRoot, $"person-segmentation-{Guid.NewGuid():N}");
+        var framesRoot = Path.Combine(workRoot, "frames");
+        var masksRoot = Path.Combine(workRoot, "masks");
+        Directory.CreateDirectory(framesRoot);
+        Directory.CreateDirectory(masksRoot);
+        try
+        {
+            var maximumFrames = Math.Clamp(options.MaxFrames ?? 18_000, 1, 108_000);
+            var extraction = await RunFfmpegAsync(ffmpeg,
+                ["-y", "-i", item.FilePath, "-vsync", "0", "-frames:v", maximumFrames.ToString(CultureInfo.InvariantCulture), Path.Combine(framesRoot, "frame-%08d.png")],
+                cancellationToken);
+            if (!extraction.Succeeded)
+            {
+                return extraction;
+            }
+
+            var frames = Directory.GetFiles(framesRoot, "frame-*.png").OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+            if (frames.Count == 0)
+            {
+                return Failed("FFmpeg extracted no frames for person segmentation.");
+            }
+
+            foreach (var frame in frames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var maskPath = Path.Combine(masksRoot, Path.GetFileName(frame));
+                var mask = await _personSegmentation.GenerateMaskAsync(frame, maskPath, cancellationToken);
+                if (!mask.Succeeded)
+                {
+                    return Failed(mask.Message);
+                }
+            }
+
+            var frameRate = await GetVideoFrameRateAsync(ffmpeg, item.FilePath, cancellationToken) ?? 30d;
+            var encode = await RunFfmpegAsync(ffmpeg,
+                [
+                    "-y", "-framerate", frameRate.ToString("0.######", CultureInfo.InvariantCulture),
+                    "-i", Path.Combine(masksRoot, "frame-%08d.png"),
+                    "-c:v", "mpeg4", "-q:v", "2", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputPath
+                ],
+                cancellationToken);
+            if (!encode.Succeeded || !File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
+            {
+                return encode.Succeeded ? Failed("Bundled person segmentation did not produce a mask video.") : encode;
+            }
+
+            CaptureItem? saved = null;
+            if (addToWorkspace)
+            {
+                saved = await _workspaceStore.AddImageFileAsync(
+                    outputPath,
+                    CaptureKind.PersonSegmentationMaskVideo,
+                    $"Person-segmentation mask generated from {item.FileName} with the bundled ONNX model ({_personSegmentation.GetStatus().ExecutionProvider}).");
+            }
+
+            return Succeeded(outputPath, saved, $"Bundled person-segmentation mask video exported ({frames.Count} frames)");
+        }
+        finally
+        {
+            if (Directory.Exists(workRoot))
+            {
+                Directory.Delete(workRoot, recursive: true);
+            }
+        }
     }
 
     public async Task<VideoToolResult> GenerateHostedPersonSegmentationMaskAsync(
@@ -2769,6 +2874,39 @@ public sealed class VideoToolService
                 : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<double?> GetVideoFrameRateAsync(
+        string ffmpeg,
+        string inputPath,
+        CancellationToken cancellationToken)
+    {
+        var ffprobe = FindFfprobeForFfmpeg(ffmpeg);
+        if (string.IsNullOrWhiteSpace(ffprobe)) return null;
+        var start = new ProcessStartInfo
+        {
+            FileName = ffprobe,
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true,
+            ArgumentList = { "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate", "-of", "default=noprint_wrappers=1:nokey=1", inputPath }
+        };
+        try
+        {
+            var probe = await RunProbeProcessAsync(start, cancellationToken);
+            var parts = (probe?.StdOut ?? string.Empty).Trim().Split('/');
+            if (probe is not { ExitCode: 0 } || parts.Length == 0 ||
+                !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var numerator)) return null;
+            var denominator = parts.Length == 2 && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : 1d;
+            return numerator > 0 && denominator > 0 ? numerator / denominator : null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return null;
         }

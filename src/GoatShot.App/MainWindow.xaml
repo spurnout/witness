@@ -1,806 +1,1044 @@
 <Window x:Class="GoatShot.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GoatShot"
-        Width="1180"
-        Height="760"
-        MinWidth="980"
-        MinHeight="620"
-        Loaded="Window_Loaded"
-        Closing="Window_Closing"
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
         xmlns:local="clr-namespace:GoatShot.App"
-        controls:AppWindowChrome.IsEnabled="True">
+        Title="GoatShot"
+        Width="1440"
+        Height="900"
+        MinWidth="1080"
+        MinHeight="680"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        controls:AppWindowChrome.IsEnabled="True"
+        controls:AppWindowChrome.CaptionHeight="64">
     <Window.InputBindings>
         <KeyBinding Key="K" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <CommandBinding Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}" Executed="OpenCommandPalette_Executed" />
     </Window.CommandBindings>
-    <DockPanel>
-        <controls:AppTitleBar DockPanel.Dock="Top"
-                              Subtitle="Local-first Windows capture workspace" />
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240" />
-                <ColumnDefinition Width="360" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="300" />
-            </Grid.ColumnDefinitions>
+    <Window.Resources>
+        <SolidColorBrush x:Key="WorkspaceShellBrush" Color="#0D1215" />
+        <SolidColorBrush x:Key="WorkspaceHeaderBrush" Color="#12191C" />
+        <SolidColorBrush x:Key="WorkspaceSidebarBrush" Color="#10171A" />
+        <SolidColorBrush x:Key="WorkspaceSurfaceBrush" Color="#151E22" />
+        <SolidColorBrush x:Key="WorkspaceElevatedBrush" Color="#19252A" />
+        <SolidColorBrush x:Key="WorkspaceCanvasBrush" Color="#090E11" />
+        <SolidColorBrush x:Key="WorkspaceBorderBrush" Color="#2B3A40" />
+        <SolidColorBrush x:Key="WorkspaceAccentBrush" Color="#31D2C4" />
+        <SolidColorBrush x:Key="WorkspaceAccentDarkBrush" Color="#082A27" />
+        <SolidColorBrush x:Key="WorkspaceSecondaryTextBrush" Color="#A9B7BC" />
+        <SolidColorBrush x:Key="WorkspaceMutedTextBrush" Color="#899A9F" />
+        <SolidColorBrush x:Key="WorkspaceDangerBrush" Color="#E48686" />
 
-            <Border Grid.Column="0"
-                    Background="#091118"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="0,0,1,0"
-                    Padding="16">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBlock Text="Capture"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,10" />
-                        <Border Style="{StaticResource QuietCardBorder}"
-                                Padding="10"
-                                Margin="0,0,8,10">
-                            <StackPanel>
-                                <Button Click="ScreenAction_Click"
-                                        Style="{StaticResource IconActionButton}"
-                                        AutomationProperties.Name="Start screen capture"
-                                        ToolTip="Capture the selected screen target">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock Text="&#xE722;"
-                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                   FontSize="16"
-                                                   Margin="0,0,8,0" />
-                                        <TextBlock Text="Screen"
-                                                   FontSize="15"
-                                                   FontWeight="SemiBold" />
-                                    </DockPanel>
-                                </Button>
-                                <ComboBox x:Name="ScreenCaptureTypeBox"
-                                          AutomationProperties.Name="Screen capture target"
-                                          Style="{StaticResource GoatComboBox}"
-                                          SelectedIndex="0"
-                                          Margin="0,8,0,0"
-                                          ToolTip="Choose area, window, monitor, or scrolling capture before pressing Screen.">
-                                    <ComboBoxItem Content="Area / region" Tag="Region" />
-                                    <ComboBoxItem Content="Window" Tag="ActiveWindow" />
-                                    <ComboBoxItem Content="Scrolling window" Tag="ScrollingWindow" />
-                                    <ComboBoxItem Content="Horizontal scrolling" Tag="HorizontalScrolling" />
-                                    <ComboBoxItem Content="Fullscreen" Tag="Fullscreen" />
-                                    <ComboBoxItem Content="All monitors" Tag="AllMonitors" />
-                                    <ComboBoxItem Content="Active monitor" Tag="ActiveMonitor" />
-                                    <ComboBoxItem Content="Last region" Tag="LastRegion" />
-                                    <ComboBoxItem Content="Delayed area" Tag="DelayedRegion" />
-                                    <ComboBoxItem Content="Preset 1280 x 720" Tag="Preset1280" />
-                                    <ComboBoxItem Content="Preset 1920 x 1080" Tag="Preset1920" />
-                                </ComboBox>
-                            </StackPanel>
+        <Style x:Key="WorkspaceButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceSecondaryTextBrush}" />
+            <Setter Property="Background" Value="{StaticResource WorkspaceSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource WorkspaceBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,9" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#5B7278" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#1B292E" />
+                                <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#22343A" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Background" Value="#11191C" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#26343A" />
+                                <Setter Property="Foreground" Value="#718287" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-                        <Border x:Name="RecordingControlsAuditSection"
-                                AutomationProperties.Name="Recording controls"
-                                Style="{StaticResource QuietCardBorder}"
-                                Padding="10"
-                                Margin="0,0,8,10">
-                            <StackPanel>
-                                <Button Click="VideoAction_Click"
-                                        Style="{StaticResource IconActionButton}"
-                                        AutomationProperties.Name="Start or stop video recording"
-                                        ToolTip="Record the selected video target">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock Text="&#xE714;"
-                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                   FontSize="16"
-                                                   Margin="0,0,8,0" />
-                                        <TextBlock Text="Video"
-                                                   FontSize="15"
-                                                   FontWeight="SemiBold" />
-                                    </DockPanel>
-                                </Button>
-                                <ComboBox x:Name="VideoCaptureTypeBox"
-                                          AutomationProperties.Name="Video recording target"
-                                          Style="{StaticResource GoatComboBox}"
-                                          SelectedIndex="0"
-                                          Margin="0,8,0,8"
-                                          ToolTip="Choose smooth GIF or quick MP4 target before pressing Video.">
-                                    <ComboBoxItem Content="GIF monitor" Tag="GifMonitor" />
-                                    <ComboBoxItem Content="GIF area" Tag="GifRegion" />
-                                    <ComboBoxItem Content="GIF window" Tag="GifWindow" />
-                                    <ComboBoxItem Content="GIF all monitors" Tag="GifAllMonitors" />
-                                    <ComboBoxItem Content="MP4 monitor" Tag="Mp4Monitor" />
-                                    <ComboBoxItem Content="MP4 area" Tag="Mp4Region" />
-                                    <ComboBoxItem Content="MP4 window" Tag="Mp4Window" />
-                                    <ComboBoxItem Content="MP4 all monitors" Tag="Mp4AllMonitors" />
-                                </ComboBox>
-                                <Button Content="Pause / resume video"
-                                        Click="PauseRecording_Click"
-                                        Style="{StaticResource SecondaryButton}" />
-                            </StackPanel>
+        <Style x:Key="CaptureModeButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="MinWidth" Value="116" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+
+        <Style x:Key="PrimaryCaptureModeButton" TargetType="Button" BasedOn="{StaticResource CaptureModeButton}">
+            <Setter Property="Background" Value="{StaticResource WorkspaceAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceAccentDarkBrush}" />
+        </Style>
+
+        <Style x:Key="HeaderIconButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="ToolButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="PrimaryActionButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="Background" Value="{StaticResource WorkspaceAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceAccentDarkBrush}" />
+            <Setter Property="MinWidth" Value="126" />
+        </Style>
+
+        <Style x:Key="DangerTextButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceDangerBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="NavRadioButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceSecondaryTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" />
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#173A35" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1B4A43" />
+                                <Setter Property="Foreground" Value="{StaticResource WorkspaceAccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#172226" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-                        <Expander Header="Direct capture buttons"
-                                  IsExpanded="False"
-                                  Margin="0,0,8,10">
-                            <StackPanel Margin="0,8,0,0">
-                                <Button Content="All-in-one region" Click="CaptureRegion_Click" />
-                                <Button Content="Active window"
-                                        Click="CaptureWindow_Click"
-                                        ToolTip="Temporarily hides GoatShot, then captures the foreground app behind it." />
-                                <Button Content="Scrolling window" Click="CaptureScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
-                                <Button Content="Horizontal scrolling" Click="CaptureHorizontalScrollingWindow_Click" Style="{StaticResource SecondaryButton}" />
-                                <Button Content="Fullscreen" Click="CaptureFullscreen_Click" />
-                                <Button Content="All monitors" Click="CaptureAllMonitors_Click" Style="{StaticResource SecondaryButton}" />
-                                <Button Content="Active monitor" Click="CaptureMonitor_Click" />
-                                <Button Content="Preset 1280 x 720" Click="CapturePreset1280x720_Click" Style="{StaticResource SecondaryButton}" />
-                                <Button Content="Preset 1920 x 1080" Click="CapturePreset1920x1080_Click" Style="{StaticResource SecondaryButton}" />
-                                <Button Content="Last region" Click="CaptureLastRegion_Click" />
-                                <Button Content="Delayed region" Click="CaptureDelayed_Click" Style="{StaticResource SecondaryButton}" />
-                                <Separator Margin="0,8,0,12" Background="{StaticResource BorderBrush}" />
-                                <Button Content="Start / stop GIF" Click="Recording_Click" ToolTip="Record a local GIF using saved FPS settings. GIF timing is capped by the format." />
-                            <Button Content="Pause / resume recording" Click="PauseRecording_Click" Style="{StaticResource SecondaryButton}" />
-                            <Button Content="Quick MP4 5s" Click="RecordMp4_Click" Style="{StaticResource SecondaryButton}" />
-                            <Button Content="All monitors MP4 5s" Click="RecordAllMonitorsMp4_Click" Style="{StaticResource SecondaryButton}" />
-                            </StackPanel>
-                        </Expander>
+        <Style x:Key="UnavailableNavButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="#718287" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="IsEnabled" Value="False" />
+        </Style>
 
-                        <Expander Header="Recording &amp; camera"
-                                  IsExpanded="False"
-                                  Margin="0,0,8,10">
-                            <StackPanel Margin="0,8,0,0">
-                                <Border Background="#071016"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="8"
-                                        Margin="0,0,0,10">
-                                <StackPanel>
-                                    <StackPanel Margin="0,0,0,6">
-                                        <TextBlock Text="Camera preview"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource InkBrush}"
-                                                   Margin="0,0,0,6" />
-                                        <Button x:Name="WebcamPreviewButton"
-                                                Content="Start preview"
-                                                AutomationProperties.Name="Start or stop camera preview"
-                                                Click="ToggleWebcamPreview_Click"
-                                                Style="{StaticResource SecondaryButton}"
-                                                HorizontalAlignment="Stretch" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="WebcamPreviewStatusText"
-                                               Text="Preview stopped."
-                                               AutomationProperties.Name="Camera preview status"
-                                               AutomationProperties.LiveSetting="Polite"
-                                               TextWrapping="Wrap"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               FontSize="12"
-                                               Margin="0,0,0,6" />
-                                    <Border Height="52"
-                                            Background="#02070B"
-                                            BorderBrush="#1D3440"
-                                            BorderThickness="1"
-                                            CornerRadius="4">
-                                        <Image x:Name="WebcamPreviewImage"
-                                               AutomationProperties.Name="Camera preview frame"
-                                               Stretch="Uniform"
-                                               RenderOptions.BitmapScalingMode="HighQuality" />
-                                    </Border>
-                                </StackPanel>
-                                </Border>
-                                <StackPanel>
-                            <Border Background="#0D222B"
-                                    BorderBrush="{StaticResource BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="10"
-                                    Margin="0,2,8,10">
-                                <StackPanel>
-                                    <TextBlock Text="Current setup"
-                                               Foreground="{StaticResource InkBrush}"
-                                               FontWeight="SemiBold"
-                                               FontSize="12"
-                                               Margin="0,0,0,4" />
-                                    <TextBlock x:Name="RecordingSetupText"
-                                               AutomationProperties.Name="Recording setup summary"
-                                               TextWrapping="Wrap"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               FontSize="12"
-                                               LineHeight="17"
-                                               Text="State: idle." />
-                                </StackPanel>
-                            </Border>
-                            <TextBlock Text="Saved profile"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,4,8,4" />
-                            <Grid Margin="0,0,8,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="74" />
-                                </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="RecordingProfileBox"
-                                      Grid.Column="0"
-                                      AutomationProperties.Name="Saved recording profile"
-                                      Style="{StaticResource GoatComboBox}" />
-                                <Button Grid.Column="1"
-                                        Content="Apply"
-                                        Click="ApplyRecordingProfile_Click"
-                                        AutomationProperties.Name="Apply saved recording profile"
-                                        Style="{StaticResource SecondaryButton}"
-                                        Margin="6,0,0,0" />
-                            </Grid>
-                            <TextBlock Text="MP4 profile"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,4,8,4" />
-                            <ComboBox x:Name="RecordingQualityBox"
-                                      AutomationProperties.Name="MP4 quality profile"
-                                      Margin="0,0,8,8"
-                                      Style="{StaticResource GoatComboBox}"
-                                      SelectionChanged="RecordingControl_Changed">
-                                <ComboBoxItem Content="Small" />
-                                <ComboBoxItem Content="Balanced" />
-                                <ComboBoxItem Content="High quality" />
-                                <ComboBoxItem Content="Archive" />
-                            </ComboBox>
-                            <TextBlock Text="FPS"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,8,4" />
-                            <TextBox x:Name="RecordingFpsBox"
-                                     AutomationProperties.Name="Recording frames per second"
-                                     Margin="0,0,8,8"
-                                     LostFocus="RecordingControl_Changed"
-                                     ToolTip="Source recording FPS for MP4/WebM and GIF capture. GIF playback is capped by 10 ms timing steps." />
-                            <TextBlock Text="Target size"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,8,4" />
-                            <TextBox x:Name="RecordingSizeBox"
-                                     AutomationProperties.Name="Recording target size"
-                                     Margin="0,0,8,8"
-                                     LostFocus="RecordingControl_Changed"
-                                     ToolTip="Optional MP4 size such as 1280x720. Leave blank for source/max fallback size." />
-                            <TextBlock Text="Bitrate"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,8,4" />
-                            <TextBox x:Name="RecordingBitrateBox"
-                                     AutomationProperties.Name="Recording bitrate"
-                                     Margin="0,0,8,8"
-                                     LostFocus="RecordingControl_Changed"
-                                     ToolTip="Optional bitrate such as 6000k or 8M. Leave blank for profile CRF." />
-                            <TextBlock x:Name="RecordingValidationText"
-                                       AutomationProperties.Name="Recording input validation"
-                                       AutomationProperties.LiveSetting="Assertive"
-                                       Foreground="{StaticResource WarnBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Visibility="Collapsed"
-                                       Margin="0,0,8,8" />
-                            <CheckBox x:Name="RecordingMicBox" Content="Mic audio" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingSystemAudioBox" Content="System audio" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingWebcamBox" Content="Webcam overlay" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingCountdownBox" Content="Countdown" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingBorderBox" Content="Border" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingTimerBox" Content="Timer" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <CheckBox x:Name="RecordingKeystrokeBox" Content="Keys" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
-                            <Button Content="Start / stop step recorder" Click="StepRecorder_Click" Style="{StaticResource SecondaryButton}" />
-                            <TextBlock TextWrapping="Wrap"
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,8,14"
-                                       Text="Captures active-window screenshots on workflow clicks and exports Markdown/HTML guides." />
-                                </StackPanel>
-                            </StackPanel>
-                        </Expander>
+        <Style x:Key="InspectorCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource WorkspaceSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource WorkspaceBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
 
-                        <Separator Margin="0,10,8,16" Background="{StaticResource BorderBrush}" />
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceMutedTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
 
-                        <Expander Header="More tools" IsExpanded="False">
-                            <StackPanel Margin="0,8,0,0">
-                        <Button Content="Quick actions" Click="CaptureTask_Click" />
-                        <Button Content="Open editor" Click="OpenEditor_Click" />
-                        <Button Content="Import clipboard" Click="ImportClipboard_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Combine selected" Click="CombineSelected_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Pin to screen" Click="PinCapture_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Copy image" Click="CopyImage_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Copy file" Click="CopyFile_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Copy path" Click="CopyPath_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Copy markdown" Click="CopyMarkdown_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Show in Explorer" Click="ShowInExplorer_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Quick share" Click="QuickShare_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Share history" Click="ShareHistory_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Export bug report" Click="ExportBugReport_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Explain with AI" Click="AiExplain_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="AI history" Click="AiHistory_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Export video frame" Click="ExportVideoFrame_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Trim first 5s" Click="TrimVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Mute video" Click="MuteVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Volume 150%" Click="VolumeVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Speed 2x" Click="SpeedVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Crop center 75%" Click="CropVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Resize 720p" Click="ResizeVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Cut 2s middle" Click="CutVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Smooth GIF 60" Click="ConvertVideo_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Strip metadata" Click="StripMetadata_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="File details" Click="FileDetails_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Run OCR" Click="RunOcr_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Redact OCR secrets" Click="RedactOcrSecrets_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Scan text" Click="ScanText_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Decode QR/barcode" Click="DecodeBarcode_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Pick color" Click="ColorPicker_Click" Style="{StaticResource SecondaryButton}" />
-                        <Button Content="Pixel ruler" Click="PixelRuler_Click" Style="{StaticResource SecondaryButton}" />
-                            </StackPanel>
-                        </Expander>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
+        <Style x:Key="MetadataLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceMutedTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,12,8" />
+        </Style>
 
-            <Border Grid.Column="1"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="0,0,1,0"
-                    Padding="14">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="Workspace"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,8" />
-                        <TextBlock Text="Search captures"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   FontSize="12"
-                                   Margin="0,0,0,4" />
-                        <TextBox x:Name="SearchBox"
-                                 TextChanged="SearchBox_TextChanged"
-                                 Margin="0,0,0,12"
-                                 AutomationProperties.Name="Search captures"
-                                 ToolTip="Filter captures by file, type, notes, or OCR text." />
-                    </StackPanel>
+        <Style x:Key="MetadataValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceSecondaryTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
 
-                    <Border x:Name="EmptyState"
-                            Background="#0B151C"
-                            BorderBrush="{StaticResource BorderBrush}"
+        <Style x:Key="FilmstripItem" TargetType="ListBoxItem">
+            <Setter Property="AutomationProperties.Name" Value="{Binding AccessibilityName}" />
+            <Setter Property="AutomationProperties.HelpText" Value="Select to preview this capture. Hold Control to select several captures." />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="SelectionChrome"
+                                Width="146"
+                                Height="86"
+                                Background="{StaticResource WorkspaceSurfaceBrush}"
+                                BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="3">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+                                <Setter TargetName="SelectionChrome" Property="BorderThickness" Value="3" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="#5B7278" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
+                                <Setter TargetName="SelectionChrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Background="{StaticResource WorkspaceShellBrush}">
+        <Grid DockPanel.Dock="Top" Height="64">
+            <controls:AppTitleBar Height="64" Subtitle="" />
+            <Grid Margin="184,0,140,0"
+                  WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0"
+                            Width="500"
+                            Height="40"
+                            HorizontalAlignment="Center"
+                            Background="#0C1316"
+                            BorderBrush="{StaticResource WorkspaceBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="16"
-                            Visibility="Collapsed"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Stretch"
-                            Margin="18"
-                            AutomationProperties.Name="Empty workspace guidance">
-                        <StackPanel>
-                            <TextBlock Text="Three steps to your first capture"
+                            CornerRadius="20">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="34" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="&#xE721;"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                        FontSize="16"
-                                       FontWeight="SemiBold"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,8,0,0"><Run Text="1. Press " /><Run x:Name="EmptyStateHotkeyRun" FontWeight="SemiBold" Text="PrintScreen" /><Run Text=" &#8212; or click the button below &#8212; to grab a screen region." /></TextBlock>
-                            <TextBlock Text="2. Edit or redact in the editor before anything leaves this machine."
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,6,0,0" />
-                            <TextBlock Text="3. Share with Copy, Quick share, or a configured provider."
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,6,0,0" />
-                            <TextBlock Text="Captures stay local until you choose a share action."
-                                       Foreground="{StaticResource MutedInkBrush}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,10,0,12" />
-                            <StackPanel>
-                                <Button Content="Capture screen region"
-                                        Click="CaptureRegion_Click"
-                                        Style="{StaticResource PrimaryButton}"
-                                        HorizontalAlignment="Stretch"
-                                        AutomationProperties.Name="Capture screen region from empty workspace" />
-                                <Button Content="Import clipboard instead"
-                                        Click="ImportClipboard_Click"
-                                        Style="{StaticResource SecondaryButton}"
-                                        HorizontalAlignment="Stretch"
-                                        AutomationProperties.Name="Import clipboard image from empty workspace" />
-                            </StackPanel>
-                        </StackPanel>
+                                       Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False" />
+                            <Grid Grid.Column="1">
+                                <TextBox x:Name="SearchBox"
+                                         AutomationProperties.Name="Search captures"
+                                         TextChanged="SearchBox_TextChanged"
+                                         ToolTip="Search file names, capture types, notes, and OCR text"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="2,9"
+                                         FontSize="14"
+                                         VerticalContentAlignment="Center" />
+                                <TextBlock x:Name="SearchPlaceholderText"
+                                           Text="Search captures"
+                                           Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                           FontSize="14"
+                                           VerticalAlignment="Center"
+                                           Margin="3,0,0,0"
+                                           IsHitTestVisible="False" />
+                            </Grid>
+                            <Border Grid.Column="2"
+                                    Width="22"
+                                    Height="24"
+                                    Background="#18252A"
+                                    CornerRadius="5"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left">
+                                <TextBlock Text="/"
+                                           Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="12" />
+                            </Border>
+                        </Grid>
                     </Border>
 
-                    <ListBox x:Name="CaptureList"
-                             AutomationProperties.Name="Capture workspace list"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Foreground="{StaticResource InkBrush}"
-                             SelectionMode="Extended"
-                             SelectionChanged="CaptureList_SelectionChanged"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="8"
-                                        Margin="0,0,0,10"
-                                        Background="#0B151C">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="92" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border Grid.Column="0"
-                                                Width="82"
-                                                Height="58"
-                                                Background="#071016"
-                                                BorderBrush="#1D3440"
-                                                BorderThickness="1">
-                                            <Image Source="{Binding ThumbnailPath}"
-                                                   Stretch="Uniform" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                            <TextBlock Text="{Binding Title}"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding SizeLabel}"
-                                                       Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12" />
-                                            <TextBlock Text="{Binding FileName}"
-                                                       Foreground="{StaticResource MutedInkBrush}"
-                                                       FontSize="12"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </DockPanel>
-            </Border>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="Diagnostics_Click"
+                                Style="{StaticResource HeaderIconButton}"
+                                ToolTip="Diagnostics"
+                                AutomationProperties.Name="Open diagnostics">
+                            <TextBlock Text="?" FontSize="17" FontWeight="SemiBold" />
+                        </Button>
+                        <Button Click="Settings_Click"
+                                Style="{StaticResource HeaderIconButton}"
+                                ToolTip="Settings"
+                                AutomationProperties.Name="Open settings">
+                            <TextBlock Text="&#xE713;"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="16" />
+                        </Button>
+                        <Border Width="38"
+                                Height="38"
+                                CornerRadius="19"
+                                Background="#28454D"
+                                ToolTip="Personal local profile"
+                                AutomationProperties.Name="Personal local profile">
+                            <TextBlock Text="P"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </StackPanel>
+            </Grid>
+        </Grid>
 
-            <Border Grid.Column="2"
-                    Background="#081016"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="0,0,1,0"
-                    Padding="18">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="68" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="36" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="#0E1518"
+                    BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="24,10">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
-                        <TextBlock Text="Preview"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   DockPanel.Dock="Left" />
-                        <TextBlock x:Name="PreviewHint"
-                                   AutomationProperties.Name="Preview status"
-                                   Text="Select a capture"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   HorizontalAlignment="Right" />
-                    </DockPanel>
-                    <Border Grid.Row="1"
-                            Style="{StaticResource QuietCardBorder}"
-                            Padding="10"
-                            Margin="0,0,0,12">
-                        <UniformGrid Columns="2">
-                            <Button Click="OpenEditor_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Edit selected capture"
-                                    ToolTip="Open the selected capture in the editor">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Edit" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ScrollViewer Grid.Column="0"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Click="PrimaryRegionCapture_Click"
+                                    Style="{StaticResource PrimaryCaptureModeButton}"
+                                    AutomationProperties.Name="Capture a screen region">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE922;"
+                                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               Margin="0,0,8,0" />
+                                    <TextBlock Text="Region" />
                                 </StackPanel>
                             </Button>
-                            <Button Click="CopyImage_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Copy selected capture"
-                                    ToolTip="Copy the selected image to the clipboard">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Copy" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
+                            <Button Content="Window"
+                                    Click="CaptureWindow_Click"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Capture the active window" />
+                            <Button Content="Full screen"
+                                    Click="CaptureFullscreen_Click"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Capture the full screen" />
+                            <Button Click="VideoAction_Click"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Record an MP4 video">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Fill="#FF6B6B" Margin="0,0,8,0" />
+                                    <TextBlock Text="Video" />
                                 </StackPanel>
                             </Button>
-                            <Button Click="QuickShare_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Share selected capture"
-                                    ToolTip="Upload or share using the configured destination">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE72D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Share" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
-                                </StackPanel>
+                            <Button Content="GIF"
+                                    Click="Recording_Click"
+                                    Style="{StaticResource CaptureModeButton}"
+                                    AutomationProperties.Name="Start or stop GIF recording" />
+                            <ComboBox x:Name="DelayModeBox"
+                                      Width="126"
+                                      Height="46"
+                                      Style="{StaticResource GoatComboBox}"
+                                      SelectedIndex="0"
+                                      AutomationProperties.Name="Region capture delay"
+                                      ToolTip="Choose whether the Region button captures immediately or after three seconds">
+                                <ComboBoxItem Content="No delay" Tag="None" />
+                                <ComboBoxItem Content="3 seconds" Tag="ThreeSeconds" />
+                            </ComboBox>
+                            <Button Margin="12,0,0,0"
+                                    Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}"
+                                    Style="{StaticResource WorkspaceButton}"
+                                    AutomationProperties.Name="Open all capture and workspace commands"
+                                    ToolTip="All capture modes and workspace commands (Ctrl+K)">
+                                <TextBlock Text="&#xE712;"
+                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                           FontSize="15" />
                             </Button>
-                            <Button Click="RedactOcrSecrets_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Create privacy-redacted copy"
-                                    ToolTip="Detect text and create a redacted copy">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Privacy" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="ExportBugReport_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Create capture document"
-                                    ToolTip="Create a Markdown/HTML handoff document">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Document" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="CaptureTask_Click"
-                                    Style="{StaticResource PreviewActionButton}"
-                                    AutomationProperties.Name="Open capture action palette"
-                                    ToolTip="Open the full action palette for this capture">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE712;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" HorizontalAlignment="Center" />
-                                    <TextBlock Text="More" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Button>
-                        </UniformGrid>
-                    </Border>
-                    <Border Grid.Row="2"
-                            Background="#050B10"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="12">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Auto">
-                            <Image x:Name="PreviewImage"
-                                   AutomationProperties.Name="Selected capture preview"
-                                   Stretch="Uniform"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                        </ScrollViewer>
-                    </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <TextBlock Grid.Column="1"
+                               Text="PrtScn = instant region capture"
+                               Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                               FontSize="12"
+                               Margin="20,0,0,0"
+                               VerticalAlignment="Center" />
                 </Grid>
             </Border>
 
-            <Border Grid.Column="3"
-                    Background="{StaticResource PanelBrush}"
-                    Padding="16">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBlock Text="Privacy default"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,8" />
-                        <TextBlock Text="Captures stay local unless you copy, export, or configure a share action. AI is disabled until configured."
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,14" />
-
-                        <Expander Header="Health / Details" IsExpanded="False">
-                            <Border Style="{StaticResource QuietCardBorder}" Margin="0,8,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Capture truth"
-                                               FontSize="18"
-                                               FontWeight="Bold"
-                                               Margin="0,0,0,12" />
-                                    <TextBlock x:Name="DetailsText"
-                                               AutomationProperties.Name="Selected capture details"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,18" />
-
-                                    <TextBlock Text="Hotkeys"
-                                               FontSize="13"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Margin="0,0,0,8" />
-                                    <TextBlock x:Name="HotkeyText"
-                                               AutomationProperties.Name="Hotkey registration status"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,18" />
-
-                                    <TextBlock Text="Runtime status"
-                                               FontSize="13"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Margin="0,0,0,8" />
-                                    <TextBlock x:Name="DiagnosticsText"
-                                               AutomationProperties.Name="Runtime diagnostics summary"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,10" />
-                                    <Button Content="Copy diagnostic bundle"
-                                            Click="DiagnosticBundle_Click"
-                                            Style="{StaticResource SecondaryButton}"
-                                            Margin="0,0,0,18" />
-
-                                    <TextBlock Text="Upload queue"
-                                               FontSize="13"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Margin="0,0,0,8" />
-                                    <TextBlock x:Name="QueueStatusText"
-                                               AutomationProperties.Name="Upload queue status"
-                                               Foreground="{StaticResource MutedInkBrush}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,8" />
-                                    <ListBox x:Name="QueueList"
-                                             AutomationProperties.Name="Upload queue list"
-                                             Background="#081016"
-                                             BorderBrush="{StaticResource BorderBrush}"
-                                             Foreground="{StaticResource InkBrush}"
-                                             MaxHeight="180"
-                                             Margin="0,0,0,8">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderBrush="{StaticResource BorderBrush}"
-                                                        BorderThickness="0,0,0,1"
-                                                        Padding="4,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding FileName}"
-                                                                   FontWeight="SemiBold"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Foreground="{StaticResource MutedInkBrush}"
-                                                                   FontSize="12"
-                                                                   TextTrimming="CharacterEllipsis">
-                                                            <Run Text="{Binding StatusLabel, Mode=OneWay}" />
-                                                            <Run Text=" via " />
-                                                            <Run Text="{Binding Destination, Mode=OneWay}" />
-                                                        </TextBlock>
-                                                        <TextBlock Foreground="{StaticResource MutedInkBrush}"
-                                                                   FontSize="12"
-                                                                   TextTrimming="CharacterEllipsis">
-                                                            <Run Text="{Binding AttemptLabel, Mode=OneWay}" />
-                                                        </TextBlock>
-                                                        <TextBlock Text="{Binding NextAttemptLabel}"
-                                                                   Foreground="{StaticResource MutedInkBrush}"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap" />
-                                                        <TextBlock Text="{Binding LastMessage}"
-                                                                   Foreground="{StaticResource MutedInkBrush}"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                    <UniformGrid Columns="2">
-                                        <Button Content="Refresh queue"
-                                                Click="RefreshQueue_Click"
-                                                Style="{StaticResource SecondaryButton}" />
-                                        <Button Content="Process due"
-                                                Click="ProcessQueue_Click"
-                                                Style="{StaticResource SecondaryButton}" />
-                                        <Button Content="Cancel selected"
-                                                Click="CancelQueueItem_Click"
-                                                Style="{StaticResource SecondaryButton}" />
-                                        <Button Content="Retry selected"
-                                                Click="RetryQueueItem_Click"
-                                                Style="{StaticResource SecondaryButton}" />
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
-                        </Expander>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-        </Grid>
-
-        <Border Grid.Row="1"
-                Background="#0B151C"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="10,6">
-            <Grid>
+            <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="300" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Image Source="Assets/goatshot-logo.png"
-                           Width="18"
-                           Height="18"
-                           Margin="0,0,8,0"
-                           Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           AutomationProperties.Name="GoatShot logo" />
-                    <TextBlock x:Name="StatusText"
-                               AutomationProperties.Name="Application status"
-                               AutomationProperties.LiveSetting="Polite"
-                               Foreground="{StaticResource MutedInkBrush}"
-                               VerticalAlignment="Center"
-                               Text="Ready" />
-                </StackPanel>
+                <Border Grid.Column="0"
+                        Background="{StaticResource WorkspaceSidebarBrush}"
+                        BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                        BorderThickness="0,0,1,0"
+                        Padding="14,24,14,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="LIBRARY" Style="{StaticResource SectionLabel}" Margin="10,0,0,12" />
+                            <RadioButton x:Name="AllCapturesNavButton"
+                                         GroupName="LibraryFilter"
+                                         Tag="All"
+                                         IsChecked="True"
+                                         Checked="LibraryFilter_Checked"
+                                         Style="{StaticResource NavRadioButton}"
+                                         AutomationProperties.Name="Show all captures">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE80F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" />
+                                    <TextBlock Grid.Column="1" Text="All captures" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="AllCountText" Grid.Column="2" Text="0" />
+                                </Grid>
+                            </RadioButton>
+                            <RadioButton GroupName="LibraryFilter"
+                                         Tag="Screenshots"
+                                         Checked="LibraryFilter_Checked"
+                                         Style="{StaticResource NavRadioButton}"
+                                         AutomationProperties.Name="Show screenshots">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" />
+                                    <TextBlock Grid.Column="1" Text="Screenshots" />
+                                    <TextBlock x:Name="ScreenshotCountText" Grid.Column="2" Text="0" />
+                                </Grid>
+                            </RadioButton>
+                            <RadioButton GroupName="LibraryFilter"
+                                         Tag="Videos"
+                                         Checked="LibraryFilter_Checked"
+                                         Style="{StaticResource NavRadioButton}"
+                                         AutomationProperties.Name="Show videos and GIFs">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE714;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" />
+                                    <TextBlock Grid.Column="1" Text="Videos &amp; GIFs" />
+                                    <TextBlock x:Name="VideoCountText" Grid.Column="2" Text="0" />
+                                </Grid>
+                            </RadioButton>
+                            <Button Style="{StaticResource UnavailableNavButton}"
+                                    AutomationProperties.Name="Favorites unavailable"
+                                    AutomationProperties.HelpText="Favorites are not available in this release.">
+                                <DockPanel>
+                                    <TextBlock Text="&#xE734;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
+                                    <TextBlock Text="Favorites" />
+                                </DockPanel>
+                            </Button>
+                            <Button Style="{StaticResource UnavailableNavButton}"
+                                    AutomationProperties.Name="Trash unavailable"
+                                    AutomationProperties.HelpText="Trash is not available. Delete asks for confirmation and removes the local file.">
+                                <DockPanel>
+                                    <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
+                                    <TextBlock Text="Trash" />
+                                </DockPanel>
+                            </Button>
 
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Button Click="Settings_Click"
-                            Style="{StaticResource SecondaryButton}"
-                            Width="34"
-                            Height="30"
-                            Padding="0"
-                            Margin="0,0,6,0"
-                            ToolTip="Settings"
-                            AutomationProperties.Name="Open settings">
-                        <TextBlock Text="&#xE713;"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                   FontSize="14" />
-                    </Button>
-                    <Button Click="Diagnostics_Click"
-                            Style="{StaticResource SecondaryButton}"
-                            Width="34"
-                            Height="30"
-                            Padding="0"
-                            Margin="0"
-                            ToolTip="Diagnostics"
-                            AutomationProperties.Name="Open diagnostics">
-                        <TextBlock Text="&#xE9D9;"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                   FontSize="14" />
-                    </Button>
-                </StackPanel>
+                            <TextBlock Text="COLLECTIONS" Style="{StaticResource SectionLabel}" Margin="10,24,0,10" />
+                            <Button Style="{StaticResource UnavailableNavButton}"
+                                    AutomationProperties.Name="Collections unavailable"
+                                    AutomationProperties.HelpText="Collections are not available in this release.">
+                                <DockPanel>
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
+                                    <TextBlock Text="Coming later" />
+                                </DockPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <Border Grid.Row="2"
+                                BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                Padding="8,14,8,4">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE72E;"
+                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                           Foreground="{StaticResource WorkspaceAccentBrush}"
+                                           FontSize="16"
+                                           Margin="0,0,8,0" />
+                                <TextBlock Text="Captures stored locally"
+                                           Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Background="{StaticResource WorkspaceShellBrush}" Padding="24,20,24,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="54" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="64" />
+                            <RowDefinition Height="116" />
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                HorizontalAlignment="Left"
+                                Background="{StaticResource WorkspaceSurfaceBrush}"
+                                BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="8,5"
+                                Margin="0,0,0,12">
+                            <StackPanel x:Name="EditorToolbarActions" Orientation="Horizontal" IsEnabled="False">
+                                <TextBlock Text="Edit tools"
+                                           Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="4,0,10,0" />
+                                <Button Click="OpenEditor_Click"
+                                        Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor"
+                                        AutomationProperties.Name="Open the editor">
+                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17" />
+                                </Button>
+                                <Button Tag="Crop" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Crop (X)" AutomationProperties.Name="Open editor with crop tool">
+                                    <TextBlock Text="&#xE7A8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17" />
+                                </Button>
+                                <Button Tag="Arrow" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Arrow (A)" AutomationProperties.Name="Open editor with arrow tool">
+                                    <TextBlock Text="&#xE72A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="18" />
+                                </Button>
+                                <Button Tag="Text" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Text (T)" AutomationProperties.Name="Open editor with text tool">
+                                    <TextBlock Text="T" FontSize="17" FontWeight="Bold" />
+                                </Button>
+                                <Button Tag="Rectangle" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Rectangle (R)" AutomationProperties.Name="Open editor with rectangle tool">
+                                    <TextBlock Text="&#xE8A4;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17" />
+                                </Button>
+                                <Button Tag="Freehand" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Freehand (F)" AutomationProperties.Name="Open editor with freehand tool">
+                                    <TextBlock Text="&#xED63;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17" />
+                                </Button>
+                                <Button Tag="Blur" Click="OpenEditorTool_Click" Style="{StaticResource ToolButton}"
+                                        ToolTip="Open editor with Blur (B)" AutomationProperties.Name="Open editor with blur tool">
+                                    <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1"
+                                Background="{StaticResource WorkspaceCanvasBrush}"
+                                BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="14">
+                            <Grid>
+                                <Viewbox Stretch="Uniform" StretchDirection="Both">
+                                    <Image x:Name="PreviewImage"
+                                           AutomationProperties.Name="Selected capture preview"
+                                           Stretch="Uniform"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Viewbox>
+
+                                <Border x:Name="EmptyState"
+                                        Background="#0E171B"
+                                        BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="30"
+                                        Width="420"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.Name="Empty capture workspace">
+                                    <StackPanel>
+                                        <Border Width="56" Height="56" CornerRadius="14" Background="#173A35" HorizontalAlignment="Center">
+                                            <TextBlock Text="&#xE722;"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       FontSize="24"
+                                                       Foreground="{StaticResource WorkspaceAccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="Capture anything"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   TextAlignment="Center"
+                                                   Margin="0,14,0,6" />
+                                        <TextBlock Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                   FontSize="13"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"><Run Text="Press " /><Run x:Name="EmptyStateHotkeyRun" Text="PrintScreen" FontWeight="SemiBold" /><Run Text=" from anywhere. The image is copied automatically and added to Recent." /></TextBlock>
+                                        <Button Content="Capture a region"
+                                                Click="PrimaryRegionCapture_Click"
+                                                Style="{StaticResource PrimaryActionButton}"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,18,0,0"
+                                                AutomationProperties.Name="Capture a region from the empty workspace" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Background="#D919252A"
+                                        BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="7"
+                                        Padding="10,5"
+                                        Margin="0,0,4,4">
+                                    <TextBlock x:Name="PreviewHint"
+                                               Text="Fit"
+                                               Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                               FontSize="12"
+                                               MaxWidth="280"
+                                               TextTrimming="CharacterEllipsis"
+                                               AutomationProperties.Name="Preview status" />
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Grid x:Name="SelectionActionBar" Grid.Row="2" Margin="0,12,0,0" IsEnabled="False">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Click="CopyImage_Click" Style="{StaticResource PrimaryActionButton}"
+                                    AutomationProperties.Name="Copy selected capture" ToolTip="Copy the selected image">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Margin="0,0,8,0" />
+                                    <TextBlock Text="Copy" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" Content="Save copy" Click="SaveCopy_Click" Style="{StaticResource WorkspaceButton}"
+                                    Margin="12,0,0,0" AutomationProperties.Name="Save a copy of the selected capture" />
+                            <Button Grid.Column="2" Content="Share" Click="QuickShare_Click" Style="{StaticResource WorkspaceButton}"
+                                    Margin="12,0,0,0" AutomationProperties.Name="Share selected capture" />
+                            <Button Grid.Column="3" Content="Extract text" Click="RunOcr_Click" Style="{StaticResource WorkspaceButton}"
+                                    Margin="12,0,0,0" AutomationProperties.Name="Extract text from selected capture" />
+                            <Button Grid.Column="5" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}"
+                                    AutomationProperties.Name="Delete selected local capture" />
+                        </Grid>
+
+                        <Grid Grid.Row="3" Margin="0,8,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="24" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="RECENT" Style="{StaticResource SectionLabel}" VerticalAlignment="Top" />
+                            <ListBox x:Name="CaptureList"
+                                     Grid.Row="1"
+                                     AutomationProperties.Name="Recent captures"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource InkBrush}"
+                                     SelectionMode="Extended"
+                                     SelectionChanged="CaptureList_SelectionChanged"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                     ItemContainerStyle="{StaticResource FilmstripItem}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Image Source="{Binding ThumbnailPath}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <Border VerticalAlignment="Bottom" Background="#C9090E11" Padding="6,3">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           FontSize="10"
+                                                           Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Background="{StaticResource WorkspaceSidebarBrush}"
+                        BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                        BorderThickness="1,0,0,0"
+                        Padding="14,20,14,14">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Border Style="{StaticResource InspectorCard}">
+                                <StackPanel>
+                                    <TextBlock x:Name="SelectedFileNameText"
+                                               Text="No capture selected"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,0,0,14"
+                                               AutomationProperties.Name="Selected capture file name" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Captured" Style="{StaticResource MetadataLabel}" />
+                                            <TextBlock Text="Size" Style="{StaticResource MetadataLabel}" />
+                                            <TextBlock Text="Dimensions" Style="{StaticResource MetadataLabel}" Margin="0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock x:Name="SelectedCreatedText" Text="—" Style="{StaticResource MetadataValue}" />
+                                            <TextBlock x:Name="SelectedBytesText" Text="—" Style="{StaticResource MetadataValue}" />
+                                            <TextBlock x:Name="SelectedDimensionsText" Text="—" Style="{StaticResource MetadataValue}" Margin="0" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource InspectorCard}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE72E;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   Foreground="{StaticResource WorkspaceAccentBrush}"
+                                                   FontSize="19"
+                                                   Margin="0,0,10,0" />
+                                        <TextBlock Text="Private by default" FontSize="15" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                    <TextBlock Text="No network upload occurs until you choose a share or AI action."
+                                               Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Margin="0,10,0,14" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="AI features" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Background="#223137" CornerRadius="12" Padding="9,4">
+                                            <TextBlock x:Name="AiStateText"
+                                                       Text="Off"
+                                                       Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                       FontSize="11"
+                                                       AutomationProperties.Name="AI feature status" />
+                                        </Border>
+                                    </Grid>
+                                    <Button x:Name="PrivacyReviewButton"
+                                            Content="Review privacy tools"
+                                            Click="RedactOcrSecrets_Click"
+                                            Style="{StaticResource WorkspaceButton}"
+                                            HorizontalAlignment="Stretch"
+                                            Margin="0,14,0,0"
+                                            IsEnabled="False"
+                                            AutomationProperties.Name="Detect and redact sensitive text in the selected capture" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource InspectorCard}">
+                                <StackPanel>
+                                    <TextBlock Text="SHARE TARGETS" Style="{StaticResource SectionLabel}" Margin="0,0,0,14" />
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="9" Height="9" Fill="#45E18A" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="Clipboard" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" />
+                                        <TextBlock Grid.Column="2" Text="ready" Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="11" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="9" Height="9" Fill="#52666B" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="Imgur" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" />
+                                        <TextBlock x:Name="ImgurStatusText" Grid.Column="2" Text="not set up" Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="11" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="9" Height="9" Fill="#52666B" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="S3 bucket" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" />
+                                        <TextBlock x:Name="S3StatusText" Grid.Column="2" Text="not set up" Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="11" />
+                                    </Grid>
+                                    <Button Content="+ Add provider"
+                                            Click="Settings_Click"
+                                            Style="{StaticResource DangerTextButton}"
+                                            Foreground="{StaticResource WorkspaceAccentBrush}"
+                                            HorizontalAlignment="Left"
+                                            Margin="-12,8,0,-8"
+                                            AutomationProperties.Name="Open settings to add a share provider" />
+                                </StackPanel>
+                            </Border>
+
+                            <Expander Header="Health &amp; details" IsExpanded="False" Margin="0,0,0,12">
+                                <Border Style="{StaticResource InspectorCard}" Margin="0,8,0,0">
+                                    <StackPanel>
+                                        <TextBlock x:Name="DetailsText"
+                                                   AutomationProperties.Name="Selected capture details"
+                                                   Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,14" />
+                                        <TextBlock Text="Hotkeys" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <TextBlock x:Name="HotkeyText"
+                                                   AutomationProperties.Name="Hotkey registration status"
+                                                   Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,14" />
+                                        <TextBlock Text="Runtime" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <TextBlock x:Name="DiagnosticsText"
+                                                   AutomationProperties.Name="Runtime diagnostics summary"
+                                                   Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,10" />
+                                        <Button Content="Copy diagnostic bundle" Click="DiagnosticBundle_Click"
+                                                Style="{StaticResource WorkspaceButton}" Margin="0,0,0,14" />
+                                        <TextBlock Text="Upload queue" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <TextBlock x:Name="QueueStatusText"
+                                                   AutomationProperties.Name="Upload queue status"
+                                                   Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,8" />
+                                        <ListBox x:Name="QueueList"
+                                                 AutomationProperties.Name="Upload queue list"
+                                                 Background="#0D1518"
+                                                 BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                                                 Foreground="{StaticResource InkBrush}"
+                                                 MaxHeight="150"
+                                                 Margin="0,0,0,8">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="5">
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="10">
+                                                            <Run Text="{Binding StatusLabel}" /><Run Text=" via " /><Run Text="{Binding Destination}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <UniformGrid Columns="2">
+                                            <Button Content="Refresh" Click="RefreshQueue_Click" Style="{StaticResource WorkspaceButton}" Margin="0,0,6,6" />
+                                            <Button Content="Process due" Click="ProcessQueue_Click" Style="{StaticResource WorkspaceButton}" Margin="0,0,0,6" />
+                                            <Button Content="Cancel" Click="CancelQueueItem_Click" Style="{StaticResource WorkspaceButton}" Margin="0,0,6,0" />
+                                            <Button Content="Retry" Click="RetryQueueItem_Click" Style="{StaticResource WorkspaceButton}" />
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+                            </Expander>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
             </Grid>
-        </Border>
 
-        <Border x:Name="CommandPaletteOverlay"
-                Grid.Row="0"
-                Grid.RowSpan="2"
-                Background="#D802070B"
-                Visibility="Collapsed"
-                Panel.ZIndex="100"
-                MouseDown="CommandPaletteOverlay_MouseDown"
-                AutomationProperties.Name="Command palette">
-            <Border Width="560"
-                    MaxHeight="470"
-                    VerticalAlignment="Top"
-                    HorizontalAlignment="Center"
-                    Margin="0,80,0,0"
-                    Background="#0B151C"
-                    BorderBrush="{StaticResource AccentBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Padding="14">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top"
-                               Text="Run a command"
-                               FontWeight="Bold"
-                               FontSize="14"
-                               Margin="0,0,0,8" />
-                    <TextBox x:Name="CommandPaletteSearch"
-                             DockPanel.Dock="Top"
-                             AutomationProperties.Name="Command palette search"
-                             TextChanged="CommandPaletteSearch_TextChanged"
-                             PreviewKeyDown="CommandPaletteSearch_PreviewKeyDown"
-                             Margin="0,0,0,10"
-                             ToolTip="Type to filter. Enter runs the selected command, Esc closes." />
-                    <TextBlock DockPanel.Dock="Bottom"
-                               Text="&#x2191; &#x2193; to move  &#183;  Enter to run  &#183;  Esc to close"
-                               Foreground="{StaticResource MutedInkBrush}"
+            <Border Grid.Row="2"
+                    Background="#10171A"
+                    BorderBrush="{StaticResource WorkspaceBorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="14,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Grid.Column="0" Width="9" Height="9" Fill="#45E18A" VerticalAlignment="Center" Margin="0,0,9,0" />
+                    <TextBlock x:Name="StatusText"
+                               Grid.Column="1"
+                               Text="Ready"
+                               Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               AutomationProperties.Name="Application status"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock x:Name="FooterSummaryText"
+                               Grid.Column="2"
+                               Text="Local-only mode · AI off · 0 captures"
+                               Foreground="{StaticResource WorkspaceMutedTextBrush}"
                                FontSize="11"
-                               Margin="0,8,0,0" />
-                    <ListBox x:Name="CommandPaletteList"
-                             AutomationProperties.Name="Command palette results"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Foreground="{StaticResource InkBrush}"
-                             MaxHeight="330"
-                             DisplayMemberPath="Display"
-                             MouseDoubleClick="CommandPaletteList_MouseDoubleClick" />
-                </DockPanel>
+                               VerticalAlignment="Center"
+                               AutomationProperties.Name="Workspace summary" />
+                </Grid>
             </Border>
-        </Border>
-    </Grid>
+
+            <!-- These configuration controls retain the existing recording/capture contracts.
+                 Their operator-facing home is Settings; the redesigned workspace uses direct
+                 mode buttons and Ctrl+K for the longer command catalog. -->
+            <Grid Visibility="Collapsed" IsHitTestVisible="False">
+                <ComboBox x:Name="ScreenCaptureTypeBox" SelectedIndex="0">
+                    <ComboBoxItem Content="Area / region" Tag="Region" />
+                    <ComboBoxItem Content="Window" Tag="ActiveWindow" />
+                    <ComboBoxItem Content="Scrolling window" Tag="ScrollingWindow" />
+                    <ComboBoxItem Content="Horizontal scrolling" Tag="HorizontalScrolling" />
+                    <ComboBoxItem Content="Fullscreen" Tag="Fullscreen" />
+                    <ComboBoxItem Content="All monitors" Tag="AllMonitors" />
+                    <ComboBoxItem Content="Active monitor" Tag="ActiveMonitor" />
+                    <ComboBoxItem Content="Last region" Tag="LastRegion" />
+                    <ComboBoxItem Content="Delayed area" Tag="DelayedRegion" />
+                    <ComboBoxItem Content="Preset 1280 x 720" Tag="Preset1280" />
+                    <ComboBoxItem Content="Preset 1920 x 1080" Tag="Preset1920" />
+                </ComboBox>
+                <ComboBox x:Name="VideoCaptureTypeBox" SelectedIndex="4">
+                    <ComboBoxItem Content="GIF monitor" Tag="GifMonitor" />
+                    <ComboBoxItem Content="GIF area" Tag="GifRegion" />
+                    <ComboBoxItem Content="GIF window" Tag="GifWindow" />
+                    <ComboBoxItem Content="GIF all monitors" Tag="GifAllMonitors" />
+                    <ComboBoxItem Content="MP4 monitor" Tag="Mp4Monitor" />
+                    <ComboBoxItem Content="MP4 area" Tag="Mp4Region" />
+                    <ComboBoxItem Content="MP4 window" Tag="Mp4Window" />
+                    <ComboBoxItem Content="MP4 all monitors" Tag="Mp4AllMonitors" />
+                </ComboBox>
+                <Border x:Name="RecordingControlsAuditSection">
+                    <StackPanel>
+                        <Button x:Name="WebcamPreviewButton" Content="Start preview" Click="ToggleWebcamPreview_Click" />
+                        <TextBlock x:Name="WebcamPreviewStatusText" Text="Preview stopped." />
+                        <Image x:Name="WebcamPreviewImage" />
+                        <TextBlock x:Name="RecordingSetupText" />
+                        <ComboBox x:Name="RecordingProfileBox" />
+                        <Button Content="Apply recording profile" Click="ApplyRecordingProfile_Click" />
+                        <ComboBox x:Name="RecordingQualityBox" SelectionChanged="RecordingControl_Changed">
+                            <ComboBoxItem Content="Low" />
+                            <ComboBoxItem Content="Balanced" />
+                            <ComboBoxItem Content="High" />
+                            <ComboBoxItem Content="Lossless" />
+                        </ComboBox>
+                        <TextBox x:Name="RecordingFpsBox" />
+                        <TextBox x:Name="RecordingSizeBox" />
+                        <TextBox x:Name="RecordingBitrateBox" />
+                        <TextBlock x:Name="RecordingValidationText" />
+                        <CheckBox x:Name="RecordingMicBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingSystemAudioBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingWebcamBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingCountdownBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingBorderBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingTimerBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                        <CheckBox x:Name="RecordingKeystrokeBox" Checked="RecordingControl_Changed" Unchecked="RecordingControl_Changed" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border x:Name="CommandPaletteOverlay"
+                    Grid.Row="0"
+                    Grid.RowSpan="3"
+                    Background="#D802070B"
+                    Visibility="Collapsed"
+                    Panel.ZIndex="100"
+                    MouseDown="CommandPaletteOverlay_MouseDown"
+                    AutomationProperties.Name="Command palette">
+                <Border Width="560"
+                        MaxHeight="470"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Center"
+                        Margin="0,76,0,0"
+                        Background="{StaticResource WorkspaceSurfaceBrush}"
+                        BorderBrush="{StaticResource WorkspaceAccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="16">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Run a command" FontWeight="Bold" FontSize="15" Margin="0,0,0,10" />
+                        <TextBox x:Name="CommandPaletteSearch"
+                                 DockPanel.Dock="Top"
+                                 AutomationProperties.Name="Command palette search"
+                                 TextChanged="CommandPaletteSearch_TextChanged"
+                                 PreviewKeyDown="CommandPaletteSearch_PreviewKeyDown"
+                                 Margin="0,0,0,10"
+                                 ToolTip="Type to filter. Enter runs the selected command, Escape closes." />
+                        <TextBlock DockPanel.Dock="Bottom"
+                                   Text="&#x2191; &#x2193; to move  ·  Enter to run  ·  Esc to close"
+                                   Foreground="{StaticResource WorkspaceMutedTextBrush}"
+                                   FontSize="11"
+                                   Margin="0,8,0,0" />
+                        <ListBox x:Name="CommandPaletteList"
+                                 AutomationProperties.Name="Command palette results"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="{StaticResource InkBrush}"
+                                 MaxHeight="330"
+                                 DisplayMemberPath="Display"
+                                 MouseDoubleClick="CommandPaletteList_MouseDoubleClick" />
+                    </DockPanel>
+                </Border>
+            </Border>
+        </Grid>
     </DockPanel>
 </Window>

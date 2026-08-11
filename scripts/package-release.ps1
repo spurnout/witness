@@ -1,150 +1,157 @@
 param(
     [string] $Configuration = "Release",
     [string] $Runtime = "win-x64",
-    [string] $Version = "0.1.0",
+    [string] $Version = "0.2.0",
+    [string] $BuildId = "",
     [switch] $SkipInstaller,
     [switch] $SkipSingleExe
 )
 
 $ErrorActionPreference = "Stop"
 
-function Assert-LastExitCode([string] $step) {
-    # $ErrorActionPreference = "Stop" does not cover native exit codes; without this
-    # a failed publish still produces a "successful" (but incomplete) package.
-    if ($LASTEXITCODE -ne 0) {
-        throw "$step failed with exit code $LASTEXITCODE."
+function Assert-LastExitCode([string] $Step) {
+    # Successful PowerShell child scripts do not set LASTEXITCODE. Only native
+    # processes provide a numeric code; script failures already terminate under
+    # ErrorActionPreference=Stop.
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "$Step failed with exit code $LASTEXITCODE."
     }
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$appProject = Join-Path $repoRoot "src\GoatShot.App\GoatShot.App.csproj"
-$cliProject = Join-Path $repoRoot "src\GoatShot.Cli\GoatShot.Cli.csproj"
-$publishRoot = Join-Path $repoRoot "artifacts\publish"
-$distRoot = Join-Path $repoRoot "artifacts\dist"
-$publishDir = Join-Path $publishRoot "GoatShot-$Runtime"
-$zipPath = Join-Path $distRoot "GoatShot-$Version-$Runtime-portable.zip"
-$singleExePublishDir = Join-Path $publishRoot "GoatShot-$Runtime-single-exe"
-$singleExeDistDir = Join-Path $distRoot "GoatShot-$Version-$Runtime-single-exe"
-$installerScript = Join-Path $repoRoot "packaging\GoatShot.iss"
-
-if (-not (Test-Path $appProject)) {
-    throw "App project not found: $appProject"
+function Get-Sha256Hex([string] $PathValue) {
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [IO.File]::OpenRead($PathValue)
+        try { return ([BitConverter]::ToString($sha256.ComputeHash($stream)) -replace '-', '').ToLowerInvariant() }
+        finally { $stream.Dispose() }
+    }
+    finally { $sha256.Dispose() }
 }
 
-if (-not (Test-Path $cliProject)) {
-    throw "CLI project not found: $cliProject"
+function Remove-ValidatedDirectory([string] $PathValue, [string] $ExpectedParent) {
+    if (-not (Test-Path -LiteralPath $PathValue)) { return }
+    $resolved = [System.IO.Path]::GetFullPath($PathValue)
+    $parent = [System.IO.Path]::GetFullPath($ExpectedParent).TrimEnd('\') + '\'
+    if (-not $resolved.StartsWith($parent, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clear packaging directory outside $parent`: $resolved"
+    }
+    Remove-Item -LiteralPath $resolved -Recurse -Force
+}
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$appProject = Join-Path $repoRoot "src\GoatShot.App\GoatShot.App.csproj"
+$publishRoot = Join-Path $repoRoot "artifacts\publish"
+$publishDir = Join-Path $publishRoot "GoatShot-$Runtime-single-exe"
+$distRoot = Join-Path $repoRoot "artifacts\dist"
+$embeddedRoot = Join-Path $repoRoot "artifacts\embedded-assets"
+$artifactName = "GoatShot-$Version-$Runtime.exe"
+$artifactPath = Join-Path $distRoot $artifactName
+
+if ($Runtime -ne "win-x64") { throw "Personal V1 supports only win-x64." }
+if ($SkipSingleExe) { throw "Personal V1 is distributed only as a single executable." }
+if ([string]::IsNullOrWhiteSpace($BuildId)) {
+    $BuildId = (git -C $repoRoot rev-parse --short=12 HEAD).Trim()
+    Assert-LastExitCode "Build identity resolution"
 }
 
 New-Item -ItemType Directory -Force -Path $publishRoot, $distRoot | Out-Null
-if (Test-Path $publishDir) {
-    Remove-Item -LiteralPath $publishDir -Recurse -Force
-}
+Remove-ValidatedDirectory $publishDir $publishRoot
+
+& (Join-Path $PSScriptRoot "prepare-embedded-assets.ps1") -OutputRoot $embeddedRoot -Version $Version -BuildId $BuildId
+Assert-LastExitCode "Embedded asset preparation"
 
 dotnet publish $appProject `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
     -o $publishDir `
-    /p:PublishSingleFile=false `
+    /p:PublishSingleFile=true `
+    /p:EnableCompressionInSingleFile=false `
+    /p:IncludeNativeLibrariesForSelfExtract=true `
     /p:PublishReadyToRun=true `
     /p:PublishTrimmed=false `
-    /p:Version=$Version
-Assert-LastExitCode "App publish"
+    /p:DebugType=embedded `
+    /p:Version=$Version `
+    /p:SourceRevisionId=$BuildId `
+    /p:GoatShotDistribution=true `
+    /p:GoatShotBuildId=$BuildId `
+    /p:EmbeddedAssetsRoot=$embeddedRoot
+Assert-LastExitCode "Personal single-exe publish"
 
-dotnet publish $cliProject `
-    -c $Configuration `
-    -r $Runtime `
-    --self-contained true `
-    -o $publishDir `
-    /p:PublishSingleFile=false `
-    /p:PublishReadyToRun=true `
-    /p:PublishTrimmed=false `
-    /p:Version=$Version
-Assert-LastExitCode "CLI publish"
-
-Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $publishDir "README.md") -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot "spec.md") -Destination (Join-Path $publishDir "spec.md") -Force
-$browserExtensionSource = Join-Path $repoRoot "browser-extension"
-if (Test-Path $browserExtensionSource) {
-    Copy-Item -LiteralPath $browserExtensionSource -Destination (Join-Path $publishDir "browser-extension") -Recurse -Force
+$publishedExe = Join-Path $publishDir "GoatShot.exe"
+if (-not (Test-Path -LiteralPath $publishedExe -PathType Leaf)) {
+    throw "Single-exe publish did not create $publishedExe"
 }
 
-if (Test-Path $zipPath) {
-    Remove-Item -LiteralPath $zipPath -Force
+Get-ChildItem -LiteralPath $distRoot -Filter "*.exe" -File |
+    Remove-Item -Force
+Get-ChildItem -LiteralPath $distRoot -Filter "GoatShot-*-portable.zip" -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+Copy-Item -LiteralPath $publishedExe -Destination $artifactPath -Force
+
+# A PE executable may carry a ZIP payload after its image. ZipArchive reads the
+# final central directory and treats the PE bytes as a self-extracting prefix.
+# This keeps the runtime to one file without relying on .NET single-file
+# manifest-resource streams for large native assets.
+$assetArchive = Join-Path $embeddedRoot "embedded-assets.zip"
+if (-not (Test-Path -LiteralPath $assetArchive -PathType Leaf)) {
+    throw "Prepared embedded asset archive is missing: $assetArchive"
 }
-
-Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
-
-$singleExeDir = $null
-if (-not $SkipSingleExe) {
-    if (Test-Path $singleExePublishDir) {
-        Remove-Item -LiteralPath $singleExePublishDir -Recurse -Force
+$targetStream = [IO.File]::Open($artifactPath, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::None)
+try {
+    $assetStream = [IO.File]::OpenRead($assetArchive)
+    try {
+        $assetLength = $assetStream.Length
+        $assetStream.CopyTo($targetStream)
+        $lengthBytes = [BitConverter]::GetBytes([Int64]$assetLength)
+        $targetStream.Write($lengthBytes, 0, $lengthBytes.Length)
+        $magicBytes = [Text.Encoding]::ASCII.GetBytes("GOATSHOTASSET1!!")
+        $targetStream.Write($magicBytes, 0, $magicBytes.Length)
     }
-
-    if (Test-Path $singleExeDistDir) {
-        Remove-Item -LiteralPath $singleExeDistDir -Recurse -Force
-    }
-
-    # IncludeNativeLibrariesForSelfExtract is required: without it the WPF app
-    # crashes at startup with DllNotFoundException in SetWindowLongPtrWndProc.
-    dotnet publish $appProject `
-        -c $Configuration `
-        -r $Runtime `
-        --self-contained true `
-        -o $singleExePublishDir `
-        /p:PublishSingleFile=true `
-        /p:EnableCompressionInSingleFile=true `
-        /p:IncludeNativeLibrariesForSelfExtract=true `
-        /p:PublishReadyToRun=true `
-        /p:PublishTrimmed=false `
-        /p:Version=$Version
-    Assert-LastExitCode "Single-exe publish"
-
-    New-Item -ItemType Directory -Force -Path $singleExeDistDir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $singleExePublishDir "GoatShot.exe") -Destination (Join-Path $singleExeDistDir "GoatShot.exe") -Force
-    Copy-Item -LiteralPath (Join-Path $singleExePublishDir "GoatShot.pdb") -Destination (Join-Path $singleExeDistDir "GoatShot.pdb") -Force
-    $singleExeDir = $singleExeDistDir
+    finally { $assetStream.Dispose() }
 }
+finally { $targetStream.Dispose() }
 
-$isccCandidates = @()
-if ($env:INNO_SETUP_ISCC) {
-    $isccCandidates += $env:INNO_SETUP_ISCC
-}
+$hash = Get-Sha256Hex $artifactPath
+$hashPath = "$artifactPath.sha256"
+Set-Content -LiteralPath $hashPath -Value "$hash  $artifactName" -Encoding ASCII
 
-$isccFromPath = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
-if ($isccFromPath) {
-    $isccCandidates += $isccFromPath.Source
-}
+$manifestPath = Join-Path $embeddedRoot "embedded-assets.manifest.json"
+$manifestHash = Get-Sha256Hex $manifestPath
+$metadataPath = Join-Path $distRoot "GoatShot-$Version-$Runtime.build.json"
+[pscustomobject]@{
+    schemaVersion = "goatshot.personal-build.v1"
+    product = "GoatShot"
+    version = $Version
+    runtime = $Runtime
+    buildId = $BuildId
+    buildTimestampUtc = (Get-Date).ToUniversalTime().ToString("o")
+    executable = $artifactName
+    executableSha256 = $hash
+    embeddedAssetManifestSha256 = $manifestHash
+    signed = $false
+    distribution = "unsigned per-user self-installing executable"
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataPath -Encoding UTF8
 
-$isccCandidates += @(
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
-)
+$noticesPath = Join-Path $distRoot "GoatShot-$Version-THIRD-PARTY-NOTICES.txt"
+$embeddedNotices = Join-Path $embeddedRoot "staging\bundle\THIRD_PARTY_NOTICES.md"
+if (-not (Test-Path -LiteralPath $embeddedNotices)) { throw "Embedded third-party notices are missing." }
+$noticeLines = Get-Content -LiteralPath $embeddedNotices
+Set-Content -LiteralPath $noticesPath -Value $noticeLines -Encoding UTF8
 
-$iscc = $isccCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-$installerPath = $null
-
-if (-not $SkipInstaller -and $iscc) {
-    & $iscc `
-        "/DAppVersion=$Version" `
-        "/DPublishDir=$publishDir" `
-        "/DOutputDir=$distRoot" `
-        $installerScript
-    Assert-LastExitCode "Inno Setup compile"
-
-    $installerPath = Join-Path $distRoot "GoatShot-Setup-$Version-win-x64.exe"
-    if (-not (Test-Path $installerPath)) {
-        throw "Inno Setup reported success but the installer was not created: $installerPath"
-    }
-}
-elseif (-not $SkipInstaller) {
-    Write-Warning "Inno Setup compiler was not found. Portable zip was created; install Inno Setup 6 or set INNO_SETUP_ISCC to build the .exe installer."
-}
+$sbomPath = Join-Path $distRoot "GoatShot-$Version-$Runtime.spdx.json"
+& (Join-Path $PSScriptRoot "create-spdx-sbom.ps1") -Version $Version -Runtime $Runtime -OutputPath $sbomPath -EmbeddedManifestPath $manifestPath | Out-Null
+Assert-LastExitCode "SPDX SBOM generation"
 
 [pscustomobject]@{
+    Executable = $artifactPath
+    Sha256 = $hash
+    ChecksumFile = $hashPath
+    BuildMetadata = $metadataPath
+    Notices = $noticesPath
+    Sbom = $sbomPath
     PublishDir = $publishDir
-    PortableZip = $zipPath
-    SingleExeDir = $singleExeDir
-    Installer = $installerPath
-    InnoSetupCompiler = $iscc
+    EmbeddedAssets = $embeddedRoot
+    Installer = $null
+    PortableZip = $null
 }

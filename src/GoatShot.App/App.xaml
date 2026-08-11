@@ -124,7 +124,7 @@
                                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="#6F8393" />
+                                <Setter Property="Foreground" Value="#7890A1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -242,7 +242,7 @@
             <Setter Property="Margin" Value="0,4,0,8" />
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="#6F8393" />
+                    <Setter Property="Foreground" Value="#7890A1" />
                 </Trigger>
             </Style.Triggers>
         </Style>

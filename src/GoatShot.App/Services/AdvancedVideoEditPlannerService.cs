@@ -200,7 +200,7 @@ public sealed class AdvancedVideoEditPlannerService
             Capability = "webcam-background-processing",
             Available = true,
             PreviewRequired = true,
-            Message = "FFmpeg keyed-background processing, deterministic foreground-mask generation, reviewed external mask/matte compositing, explicit local external-runner person mask generation, governed hosted service handoff, stage-only model validation/staging, and supplied mask-quality evaluation are available. GoatShot still does not bundle, trust, enable, register, run inference from, host, provide or prove first-party hosted accounts for, or broadly quality-certify a segmentation model."
+            Message = "FFmpeg keyed-background processing, deterministic foreground masks, bundled ONNX person-segmentation with DirectML/CPU fallback, reviewed mask compositing, explicit external/hosted overrides, and supplied mask-quality evaluation are available. Model output still requires operator review and is not broadly quality-certified."
         };
     }
 
@@ -754,6 +754,7 @@ public sealed class PersonSegmentationMaskGenerationOptions
     public string? ArgumentsTemplate { get; set; }
     public string? ModelPath { get; set; }
     public int? TimeoutSeconds { get; set; }
+    public int? MaxFrames { get; set; }
     public bool AcceptExternalRunner { get; set; }
 }
 

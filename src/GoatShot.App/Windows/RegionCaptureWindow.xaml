@@ -8,6 +8,8 @@
         Topmost="True"
         ShowInTaskbar="False"
         Cursor="Cross"
+        AutomationProperties.Name="Select a capture region"
+        AutomationProperties.HelpText="Drag with the mouse, choose a window or monitor, or use arrow keys to move the keyboard selection. Hold Shift and use arrows to resize. Press Enter to capture or Escape to cancel."
         KeyDown="Window_KeyDown">
     <Grid x:Name="Root"
           AutomationProperties.Name="Region capture overlay"
@@ -90,7 +92,7 @@
                        FontSize="13"
                        MaxWidth="560"
                        TextWrapping="Wrap"
-                       Text="Drag a region, or pick a window/monitor from the chooser (top-right). The pixel lens magnifies around the cursor. Shift disables snap. Esc cancels." />
+                       Text="Drag a region, pick a window/monitor, or use arrows to move the keyboard selection. Shift+arrows resize. Enter captures; Esc cancels. Shift while dragging disables snap." />
         </Border>
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"

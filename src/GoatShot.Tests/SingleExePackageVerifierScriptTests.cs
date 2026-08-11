@@ -69,16 +69,44 @@ public sealed class SingleExePackageVerifierScriptTests
         }
     }
 
+    [TestMethod]
+    public void VerifySingleExePackage_FailsWhenNoticesContainUnexpandedExpressions()
+    {
+        var repoRoot = FindRepoRoot();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "goatshot-single-exe-verify-test-" + Guid.NewGuid().ToString("N"));
+        var distDir = Path.Combine(tempRoot, "dist");
+        var publishDir = Path.Combine(tempRoot, "publish");
+        var outputRoot = Path.Combine(tempRoot, "out");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            CreateSingleExeLayout(distDir, publishDir, includeLooseNativeLibrary: false);
+            CreateReleaseCompanions(distDir, "locked $($lock.ffmpeg.build) configuration");
+
+            var result = RunPowerShell(repoRoot, distDir, publishDir, outputRoot, skipMetadataChecks: false);
+
+            Assert.AreEqual(1, result.ExitCode, result.Output);
+            using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputRoot, "single-exe-package-verification.json")));
+            Assert.IsTrue(
+                json.RootElement.GetProperty("issues")
+                    .EnumerateArray()
+                    .Any(issue => issue.GetString()!.Contains("unexpanded PowerShell expression", StringComparison.OrdinalIgnoreCase)));
+        }
+        finally
+        {
+            DeleteIfExists(tempRoot);
+        }
+    }
+
     private static void CreateSingleExeLayout(string distDir, string publishDir, bool includeLooseNativeLibrary)
     {
         Directory.CreateDirectory(distDir);
         Directory.CreateDirectory(publishDir);
 
         var exeBytes = new byte[4096];
-        File.WriteAllBytes(Path.Combine(distDir, "GoatShot.exe"), exeBytes);
+        File.WriteAllBytes(Path.Combine(distDir, "GoatShot-0.2.0-win-x64.exe"), exeBytes);
         File.WriteAllBytes(Path.Combine(publishDir, "GoatShot.exe"), exeBytes);
-        File.WriteAllText(Path.Combine(distDir, "GoatShot.pdb"), "x");
-        File.WriteAllText(Path.Combine(publishDir, "GoatShot.pdb"), "x");
 
         if (includeLooseNativeLibrary)
         {
@@ -90,7 +118,8 @@ public sealed class SingleExePackageVerifierScriptTests
         string repoRoot,
         string distDir,
         string publishDir,
-        string outputRoot)
+        string outputRoot,
+        bool skipMetadataChecks = true)
     {
         var processInfo = new ProcessStartInfo
         {
@@ -113,6 +142,11 @@ public sealed class SingleExePackageVerifierScriptTests
         processInfo.ArgumentList.Add(outputRoot);
         processInfo.ArgumentList.Add("-MinimumExeBytes");
         processInfo.ArgumentList.Add("1024");
+        if (skipMetadataChecks)
+        {
+            processInfo.ArgumentList.Add("-SkipMetadataChecks");
+        }
+        processInfo.ArgumentList.Add("-SkipRuntimeSmoke");
         processInfo.ArgumentList.Add("-Json");
 
         using var process = Process.Start(processInfo) ?? throw new InvalidOperationException("PowerShell did not start.");
@@ -120,6 +154,25 @@ public sealed class SingleExePackageVerifierScriptTests
         var stderr = process.StandardError.ReadToEnd();
         process.WaitForExit();
         return (process.ExitCode, stdout + Environment.NewLine + stderr);
+    }
+
+    private static void CreateReleaseCompanions(string distDir, string notices)
+    {
+        var exeName = "GoatShot-0.2.0-win-x64.exe";
+        var exePath = Path.Combine(distDir, exeName);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(exePath))).ToLowerInvariant();
+        File.WriteAllText(exePath + ".sha256", $"{hash}  {exeName}");
+        File.WriteAllText(
+            Path.Combine(distDir, "GoatShot-0.2.0-win-x64.build.json"),
+            JsonSerializer.Serialize(new
+            {
+                version = "0.2.0",
+                executableSha256 = hash,
+                buildId = "test-build",
+                embeddedAssetManifestSha256 = "test-manifest"
+            }));
+        File.WriteAllText(Path.Combine(distDir, "GoatShot-0.2.0-THIRD-PARTY-NOTICES.txt"), notices);
+        File.WriteAllText(Path.Combine(distDir, "GoatShot-0.2.0-win-x64.spdx.json"), "{}");
     }
 
     private static string FindRepoRoot()

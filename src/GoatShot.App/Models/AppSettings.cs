@@ -2,7 +2,7 @@ namespace GoatShot.App.Models;
 
 public sealed class AppSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 14;
+    public int SettingsSchemaVersion { get; set; } = 15;
     public string LibraryRoot { get; set; } = string.Empty;
     public bool AutoCopyImageAfterCapture { get; set; } = true;
     public bool IncludeCursor { get; set; } = true;
@@ -16,6 +16,10 @@ public sealed class AppSettings
     public string GeminiApiEndpoint { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
     public string GeminiDefaultModelId { get; set; } = "gemini-3.1-flash-image";
     public string GeminiSpeechToTextModelId { get; set; } = "gemini-3.5-flash";
+    public string TranscriptionProvider { get; set; } = "external-whisper";
+    public string ExternalWhisperExecutablePath { get; set; } = string.Empty;
+    public string ExternalWhisperModelPath { get; set; } = string.Empty;
+    public string ExternalWhisperLanguage { get; set; } = "en";
     public string DefaultShareDestination { get; set; } = "Clipboard image";
     public string FileNameTemplate { get; set; } = "{date}-{time}-{app}-{capture_type}-{counter}";
     public string LocalExportFolder { get; set; } = string.Empty;
@@ -39,6 +43,7 @@ public sealed class AppSettings
     public string SftpUsername { get; set; } = string.Empty;
     public string SftpRemoteDirectory { get; set; } = "/";
     public string SftpPrivateKeyPath { get; set; } = string.Empty;
+    public string SftpHostKeyFingerprint { get; set; } = string.Empty;
     public string SftpPublicBaseUrl { get; set; } = string.Empty;
     public string WebDavBaseUrl { get; set; } = string.Empty;
     public string WebDavRemoteDirectory { get; set; } = "/";

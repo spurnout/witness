@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CaptureItem> _captures = new();
     private readonly ObservableCollection<UploadQueueItem> _uploadQueueItems = new();
     private List<CaptureItem> _allCaptures = new();
+    private string _libraryFilter = "All";
     private bool _allowClose;
     private bool _recordingControlsReady;
     private bool _settingsPrewarmQueued;
@@ -27,13 +28,15 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _webcamPreviewCts;
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
+    private readonly bool _startHidden;
     private const string SensitiveScanNotePrefix = "Sensitive scan:";
     private const string AiAnalysisNotePrefix = "AI analysis:";
 
-    public MainWindow(AppServices services, bool auditMode = false)
+    public MainWindow(AppServices services, bool auditMode = false, bool startHidden = false)
     {
         _services = services;
         _auditMode = auditMode;
+        _startHidden = startHidden;
         InitializeComponent();
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         CaptureList.ItemsSource = _captures;
@@ -149,6 +152,13 @@ public partial class MainWindow : Window
 
         _services.AttachTray(this);
         QueueSettingsPrewarm();
+
+        if (_startHidden)
+        {
+            ShowInTaskbar = false;
+            Hide();
+            SetStatus("GoatShot started in the tray.");
+        }
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -211,10 +221,18 @@ public partial class MainWindow : Window
 
     private void ApplyFilter()
     {
+        var selectedId = (CaptureList?.SelectedItem as CaptureItem)?.Id;
         var query = SearchBox?.Text?.Trim() ?? string.Empty;
-        var filtered = string.IsNullOrWhiteSpace(query)
+        IEnumerable<CaptureItem> filtered = string.IsNullOrWhiteSpace(query)
             ? _allCaptures
             : FilterCaptures(query);
+
+        filtered = _libraryFilter switch
+        {
+            "Screenshots" => filtered.Where(item => !IsVideoCapture(item)),
+            "Videos" => filtered.Where(IsVideoCapture),
+            _ => filtered
+        };
 
         _captures.Clear();
         foreach (var capture in filtered)
@@ -223,6 +241,85 @@ public partial class MainWindow : Window
         }
 
         EmptyState.Visibility = _captures.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RefreshWorkspaceSummary();
+
+        if (CaptureList is not null && _captures.Count > 0)
+        {
+            CaptureList.SelectedItem = _captures.FirstOrDefault(item => item.Id == selectedId) ?? _captures[0];
+        }
+    }
+
+    private static bool IsVideoCapture(CaptureItem item)
+    {
+        return item.Kind is CaptureKind.RecordingGif
+            or CaptureKind.RecordingMp4
+            or CaptureKind.VideoFrame
+            or CaptureKind.TrimmedVideo
+            or CaptureKind.MutedVideo
+            or CaptureKind.VolumeAdjustedVideo
+            or CaptureKind.DenoisedVideo
+            or CaptureKind.SpeedAdjustedVideo
+            or CaptureKind.CroppedVideo
+            or CaptureKind.ResizedVideo
+            or CaptureKind.CutVideo
+            or CaptureKind.MergedVideo
+            or CaptureKind.CompositeVideo
+            or CaptureKind.ForegroundMaskVideo
+            or CaptureKind.PersonSegmentationMaskVideo
+            or CaptureKind.BackgroundProcessedVideo
+            or CaptureKind.IntroOutroVideo
+            or CaptureKind.SubtitledVideo
+            or CaptureKind.ConvertedVideo
+            or CaptureKind.AndroidRecording;
+    }
+
+    private void RefreshWorkspaceSummary()
+    {
+        if (AllCountText is null || ScreenshotCountText is null || VideoCountText is null || FooterSummaryText is null)
+        {
+            return;
+        }
+
+        var videoCount = _allCaptures.Count(IsVideoCapture);
+        var screenshotCount = _allCaptures.Count - videoCount;
+        AllCountText.Text = _allCaptures.Count.ToString(CultureInfo.InvariantCulture);
+        ScreenshotCountText.Text = screenshotCount.ToString(CultureInfo.InvariantCulture);
+        VideoCountText.Text = videoCount.ToString(CultureInfo.InvariantCulture);
+
+        var totalBytes = _allCaptures.Sum(item => Math.Max(0, item.Bytes));
+        var totalLabel = totalBytes < 1024 * 1024
+            ? $"{totalBytes / 1024d:0.#} KB"
+            : $"{totalBytes / 1024d / 1024d:0.#} MB";
+        var aiLabel = _services.Settings.AiEnabled ? "on" : "off";
+        FooterSummaryText.Text = $"Local-only mode · AI {aiLabel} · {_allCaptures.Count} captures ({totalLabel})";
+
+        if (AiStateText is not null)
+        {
+            AiStateText.Text = _services.Settings.AiEnabled ? "On · consent required" : "Off";
+        }
+
+        if (ImgurStatusText is not null && S3StatusText is not null)
+        {
+            var providers = _services.ProviderDiagnostics.GetDiagnostics();
+            ImgurStatusText.Text = ProviderStatusLabel(providers.FirstOrDefault(record => record.ProviderName == "Imgur"));
+            S3StatusText.Text = ProviderStatusLabel(providers.FirstOrDefault(record => record.ProviderName == "S3-compatible"));
+        }
+    }
+
+    private static string ProviderStatusLabel(ProviderDiagnosticRecord? record)
+    {
+        if (record is null)
+        {
+            return "unavailable";
+        }
+
+        return record.Status switch
+        {
+            "Ready" => "ready",
+            "Blocked by policy" => "policy blocked",
+            "Roadmap" => "unavailable",
+            _ => "not set up"
+        };
     }
 
     private IReadOnlyList<CaptureItem> FilterCaptures(string query)
@@ -332,6 +429,16 @@ public partial class MainWindow : Window
     }
 
     private void CaptureRegion_Click(object sender, RoutedEventArgs e) => CaptureRegionCommand();
+    private void PrimaryRegionCapture_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedComboTag(DelayModeBox, "None") == "ThreeSeconds")
+        {
+            CaptureDelayed_Click(sender, e);
+            return;
+        }
+
+        CaptureRegionCommand();
+    }
     private void ScreenAction_Click(object sender, RoutedEventArgs e) => RunSelectedScreenCapture();
     private void CaptureWindow_Click(object sender, RoutedEventArgs e) => CaptureWindowCommand();
     private async void CaptureScrollingWindow_Click(object sender, RoutedEventArgs e) => await CaptureScrollingWindowAsync();
@@ -1043,9 +1150,13 @@ public partial class MainWindow : Window
         OpenEditorForItem(item);
     }
 
-    private void OpenEditorForItem(CaptureItem item)
+    private void OpenEditorForItem(CaptureItem item, AnnotationMode? initialTool = null)
     {
         var editor = new EditorWindow(item, _services);
+        if (initialTool is { } tool)
+        {
+            editor.SelectTool(tool);
+        }
         editor.CaptureSaved += async (_, saved) =>
         {
             _allCaptures.Insert(0, saved);
@@ -1056,6 +1167,20 @@ public partial class MainWindow : Window
         };
         editor.Owner = this;
         editor.Show();
+    }
+
+    private void OpenEditorTool_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedCapture();
+        if (item is null)
+        {
+            return;
+        }
+
+        if (sender is System.Windows.Controls.Button { Tag: string tag } && Enum.TryParse<AnnotationMode>(tag, out var tool))
+        {
+            OpenEditorForItem(item, tool);
+        }
     }
 
     private void CaptureTask_Click(object sender, RoutedEventArgs e)
@@ -1119,6 +1244,51 @@ public partial class MainWindow : Window
     private async void CopyImage_Click(object sender, RoutedEventArgs e)
     {
         await ShareSelectedAsync(ShareDestination.ClipboardImage);
+    }
+
+    private void SaveCopy_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedCapture();
+        if (item is null)
+        {
+            return;
+        }
+
+        var extension = Path.GetExtension(item.FilePath);
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = Path.GetFileNameWithoutExtension(item.FileName),
+            DefaultExt = extension,
+            AddExtension = true,
+            Filter = string.IsNullOrWhiteSpace(extension)
+                ? "All files (*.*)|*.*"
+                : $"{extension.TrimStart('.').ToUpperInvariant()} file (*{extension})|*{extension}|All files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            SetStatus("Save copy canceled.");
+            return;
+        }
+
+        try
+        {
+            File.Copy(item.FilePath, dialog.FileName, overwrite: true);
+            SetStatus($"Saved a copy to {dialog.FileName}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Could not save a copy: {ex.Message}");
+        }
+    }
+
+    private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedCapture();
+        if (item is not null)
+        {
+            await DeleteLocalCaptureWithConfirmationAsync(item);
+        }
     }
 
     private async void CopyFile_Click(object sender, RoutedEventArgs e)
@@ -1392,6 +1562,7 @@ public partial class MainWindow : Window
             E("Resize to 720p", "Video", () => ResizeVideo_Click(this, empty)),
             E("Cut 2s from middle", "Video", () => CutVideo_Click(this, empty)),
             E("Convert to smooth GIF 60", "Video", () => ConvertVideo_Click(this, empty)),
+            E("Generate person mask", "Video", () => GeneratePersonMask_Click(this, empty)),
             E("Strip metadata", "Privacy", () => StripMetadata_Click(this, empty)),
             E("File details", "Workspace", () => FileDetails_Click(this, empty)),
             E("Run OCR", "Analyze", () => RunOcr_Click(this, empty)),
@@ -1777,6 +1948,22 @@ public partial class MainWindow : Window
         HandleVideoToolResult(result);
     }
 
+    private async void GeneratePersonMask_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedCapture();
+        if (item is null)
+        {
+            return;
+        }
+
+        SetStatus("Generating a local person mask with the bundled ONNX model. This can take several minutes...");
+        var result = await _services.VideoTools.GeneratePersonSegmentationMaskAsync(
+            item,
+            new PersonSegmentationMaskGenerationOptions(),
+            addToWorkspace: true);
+        HandleVideoToolResult(result);
+    }
+
     private void HandleVideoToolResult(VideoToolResult result)
     {
         if (!result.Succeeded)
@@ -2132,7 +2319,31 @@ public partial class MainWindow : Window
         SetStatus(updated is null ? $"Queue item not found: {item.Id}" : $"{updated.FileName}: {updated.LastMessage}");
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (SearchPlaceholderText is not null)
+        {
+            SearchPlaceholderText.Visibility = string.IsNullOrWhiteSpace(SearchBox.Text)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        if (IsInitialized)
+        {
+            ApplyFilter();
+        }
+    }
+
+    private void LibraryFilter_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!IsInitialized || sender is not System.Windows.Controls.RadioButton { Tag: string filter })
+        {
+            return;
+        }
+
+        _libraryFilter = filter;
+        ApplyFilter();
+    }
 
     private async Task RefreshUploadQueueAsync()
     {
@@ -2151,9 +2362,15 @@ public partial class MainWindow : Window
         var item = SelectedCapture();
         if (item is null)
         {
+            SetSelectionActionsEnabled(false);
             PreviewImage.Source = null;
             DetailsText.Text = "No capture selected.";
             PreviewHint.Text = "Select a capture";
+            SelectedFileNameText.Text = "No capture selected";
+            SelectedCreatedText.Text = "—";
+            SelectedBytesText.Text = "—";
+            SelectedDimensionsText.Text = "—";
+            EmptyState.Visibility = Visibility.Visible;
             return;
         }
 
@@ -2162,8 +2379,14 @@ public partial class MainWindow : Window
 
     private void UpdateCaptureDetails(CaptureItem item)
     {
+        SetSelectionActionsEnabled(true);
         PreviewImage.Source = LoadPreviewImage(item);
         PreviewHint.Text = item.FileName;
+        EmptyState.Visibility = Visibility.Collapsed;
+        SelectedFileNameText.Text = item.FileName;
+        SelectedCreatedText.Text = item.CreatedAt.LocalDateTime.ToString("g", CultureInfo.CurrentCulture);
+        SelectedBytesText.Text = item.BytesLabel;
+        SelectedDimensionsText.Text = item.SizeLabel;
         DetailsText.Text =
             $"Kind: {item.Kind}{Environment.NewLine}" +
             $"Created: {item.CreatedAt.LocalDateTime:g}{Environment.NewLine}" +
@@ -2180,6 +2403,24 @@ public partial class MainWindow : Window
             $"OCR words: {item.OcrWords.Count}{Environment.NewLine}" +
             $"OCR recognized: {(item.OcrRecognizedAt?.LocalDateTime.ToString("g") ?? "n/a")}{Environment.NewLine}{Environment.NewLine}" +
             $"{item.Notes}";
+    }
+
+    private void SetSelectionActionsEnabled(bool enabled)
+    {
+        if (EditorToolbarActions is not null)
+        {
+            EditorToolbarActions.IsEnabled = enabled;
+        }
+
+        if (SelectionActionBar is not null)
+        {
+            SelectionActionBar.IsEnabled = enabled;
+        }
+
+        if (PrivacyReviewButton is not null)
+        {
+            PrivacyReviewButton.IsEnabled = enabled;
+        }
     }
 
     private CaptureItem? SelectedCapture()
@@ -2373,9 +2614,17 @@ public partial class MainWindow : Window
             existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
             existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
         ApplyFilter();
-        PreviewImage.Source = null;
-        PreviewHint.Text = "Select a capture";
-        DetailsText.Text = string.Empty;
+        if (_captures.Count == 0)
+        {
+            PreviewImage.Source = null;
+            PreviewHint.Text = "Select a capture";
+            DetailsText.Text = string.Empty;
+            SelectedFileNameText.Text = "No capture selected";
+            SelectedCreatedText.Text = "—";
+            SelectedBytesText.Text = "—";
+            SelectedDimensionsText.Text = "—";
+            EmptyState.Visibility = Visibility.Visible;
+        }
         SetStatus($"Deleted local capture: {item.FileName}");
     }
 
@@ -2446,6 +2695,7 @@ public partial class MainWindow : Window
             _services.WatchFolders.Restart();
             _services.UploadQueueWorker.Restart();
             RefreshDiagnostics();
+            RefreshWorkspaceSummary();
             QueueSettingsPrewarm();
             SetStatus("Settings updated.");
         }

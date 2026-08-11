@@ -1176,45 +1176,6 @@ public sealed class ShareService
             .Replace("%7E", "~", StringComparison.OrdinalIgnoreCase);
     }
 
-    internal static string? FindSftpExecutable(string? configuredPath = null)
-    {
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            var expanded = Environment.ExpandEnvironmentVariables(configuredPath.Trim());
-            return File.Exists(expanded) ? expanded : null;
-        }
-
-        var environmentPath = Environment.GetEnvironmentVariable("GOATSHOT_SFTP_PATH");
-        if (!string.IsNullOrWhiteSpace(environmentPath))
-        {
-            var expanded = Environment.ExpandEnvironmentVariables(environmentPath.Trim());
-            return File.Exists(expanded) ? expanded : null;
-        }
-
-        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            try
-            {
-                var candidate = Path.Combine(directory.Trim(), "sftp.exe");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-            catch
-            {
-                // Ignore malformed PATH entries.
-            }
-        }
-
-        var systemCandidate = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.System),
-            "OpenSSH",
-            "sftp.exe");
-        return File.Exists(systemCandidate) ? systemCandidate : null;
-    }
-
     private static string BuildRemoteFileName(CaptureItem item)
     {
         var fileName = string.Join("_", item.FileName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));

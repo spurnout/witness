@@ -8,7 +8,7 @@ public sealed class StartupRegistrationService
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "GoatShot";
 
-    public StartupRegistrationState GetState()
+    public StartupRegistrationState GetState(string? executablePath = null)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -30,7 +30,7 @@ public sealed class StartupRegistrationService
                 };
             }
 
-            var expected = BuildStartupCommand();
+            var expected = BuildStartupCommand(executablePath);
             var isCurrent = command.Equals(expected, StringComparison.OrdinalIgnoreCase);
             return new StartupRegistrationState
             {
@@ -51,7 +51,7 @@ public sealed class StartupRegistrationService
         }
     }
 
-    public StartupRegistrationResult SetEnabled(bool enabled)
+    public StartupRegistrationResult SetEnabled(bool enabled, string? executablePath = null)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -78,7 +78,7 @@ public sealed class StartupRegistrationService
 
             if (enabled)
             {
-                key.SetValue(ValueName, BuildStartupCommand(), RegistryValueKind.String);
+                key.SetValue(ValueName, BuildStartupCommand(executablePath), RegistryValueKind.String);
                 return new StartupRegistrationResult
                 {
                     Succeeded = true,
@@ -103,9 +103,14 @@ public sealed class StartupRegistrationService
         }
     }
 
-    private static string BuildStartupCommand()
+    internal static string BuildStartupCommand(string? executablePath = null)
     {
-        var executable = Environment.ProcessPath;
+        var executable = executablePath;
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            executable = Environment.ProcessPath;
+        }
+
         if (string.IsNullOrWhiteSpace(executable))
         {
             executable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
@@ -116,6 +121,6 @@ public sealed class StartupRegistrationService
             throw new InvalidOperationException("The current app executable path could not be resolved.");
         }
 
-        return $"\"{executable}\"";
+        return $"\"{Path.GetFullPath(executable)}\" --background";
     }
 }

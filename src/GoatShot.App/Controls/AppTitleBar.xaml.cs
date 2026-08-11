@@ -18,6 +18,13 @@ public partial class AppTitleBar
             typeof(AppTitleBar),
             new PropertyMetadata(string.Empty));
 
+    public static readonly DependencyProperty HeaderContentProperty =
+        DependencyProperty.Register(
+            nameof(HeaderContent),
+            typeof(object),
+            typeof(AppTitleBar),
+            new PropertyMetadata(null));
+
     private static readonly DependencyPropertyDescriptor? ResizeModeDescriptor =
         DependencyPropertyDescriptor.FromProperty(Window.ResizeModeProperty, typeof(Window));
 
@@ -34,6 +41,12 @@ public partial class AppTitleBar
     {
         get => (string)GetValue(SubtitleProperty);
         set => SetValue(SubtitleProperty, value);
+    }
+
+    public object? HeaderContent
+    {
+        get => GetValue(HeaderContentProperty);
+        set => SetValue(HeaderContentProperty, value);
     }
 
     private void AppTitleBar_Loaded(object sender, RoutedEventArgs e)

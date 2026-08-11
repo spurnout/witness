@@ -130,6 +130,35 @@
                            Margin="0,0,0,10" />
                 <CheckBox x:Name="PrivateModeBox" Content="Private capture mode: save temporary files but do not index workspace history" />
                 <CheckBox x:Name="RunAtStartupBox" Content="Run GoatShot when I sign in to Windows" />
+                <Border Background="#101B23"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,10,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Personal installation" FontWeight="SemiBold" />
+                        <TextBlock x:Name="PersonalInstallStatusText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,10"
+                                   AutomationProperties.Name="Personal installation and runtime status"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <WrapPanel>
+                            <Button Content="Install or repair"
+                                    Click="InstallOrRepair_Click"
+                                    AutomationProperties.Name="Install or repair GoatShot for this user" />
+                            <Button Content="Disable startup"
+                                    Click="DisableStartup_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    AutomationProperties.Name="Disable GoatShot startup" />
+                            <Button Content="Uninstall"
+                                    Click="Uninstall_Click"
+                                    Style="{StaticResource DangerButton}"
+                                    AutomationProperties.Name="Uninstall GoatShot but preserve captures and settings" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
                 <TextBlock Text="Effective managed policy" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
                 <TextBlock x:Name="ManagedPolicyStatusText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -602,14 +631,23 @@
                 <TextBox x:Name="SftpUsernameBox" Margin="0,6,0,10" />
                 <TextBlock Text="SFTP remote directory" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="SftpRemoteDirectoryBox" Margin="0,6,0,6" />
-                <TextBlock Text="The remote directory should already exist unless the server allows creating it. Unknown host keys must be trusted through OpenSSH before non-interactive upload."
+                <TextBlock Text="The embedded SSH.NET client creates missing directories when allowed by the server. A pinned SHA-256 host key is mandatory."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
                 <TextBlock Text="SFTP private key path" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="SftpPrivateKeyPathBox" Margin="0,6,0,6" />
-                <TextBlock Text="Optional. Leave blank to use OpenSSH defaults, ssh-agent, or server-side account policy."
+                <TextBlock Text="Required. GoatShot reads this key only for the configured SFTP connection."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="SFTP host key SHA-256 fingerprint" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="SftpHostKeyFingerprintBox"
+                         Margin="0,6,0,6"
+                         AutomationProperties.Name="SFTP host key SHA-256 fingerprint" />
+                <TextBlock Text="Required. Paste the server's verified SHA256 fingerprint; unknown or changed keys are rejected."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -621,9 +659,7 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
-                <TextBlock Text="SFTP executable path" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="SftpExecutablePathBox" Margin="0,6,0,6" />
-                <TextBlock Text="Advanced. Leave blank to use OpenSSH sftp.exe from PATH or C:\Windows\System32\OpenSSH."
+                <TextBlock Text="SFTP runs in-process through the bundled SSH.NET library; no sftp.exe installation is required."
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1524,6 +1560,36 @@
                 <TextBox x:Name="GeminiDefaultModelBox" Margin="0,6,0,14" />
                 <TextBlock Text="Default Gemini speech-to-text model" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="GeminiSpeechModelBox" Margin="0,6,0,14" />
+                <TextBlock Text="Preferred speech-to-text provider" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="TranscriptionProviderBox"
+                          SelectedValuePath="Tag"
+                          Margin="0,6,0,6"
+                          AutomationProperties.Name="Preferred speech-to-text provider">
+                    <ComboBoxItem Content="Supplied subtitles or external Whisper" Tag="external-whisper" />
+                    <ComboBoxItem Content="Gemini, with consent for each action" Tag="gemini" />
+                </ComboBox>
+                <TextBlock Text="The preference never triggers a cloud fallback. Gemini is called only when you explicitly choose it for a transcription action."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="External Whisper executable" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="ExternalWhisperExecutableBox"
+                         Margin="0,6,0,6"
+                         AutomationProperties.Name="External Whisper executable path" />
+                <TextBlock Text="Optional. GoatShot never downloads or bundles Whisper. Leave blank to use supplied subtitles or explicitly approved Gemini speech-to-text."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+                <TextBlock Text="External Whisper model" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="ExternalWhisperModelBox"
+                         Margin="0,6,0,10"
+                         AutomationProperties.Name="External Whisper model path" />
+                <TextBlock Text="External Whisper language" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="ExternalWhisperLanguageBox"
+                         Margin="0,6,0,14"
+                         AutomationProperties.Name="External Whisper language" />
                 <TextBlock Text="Gemini API key" Foreground="{StaticResource MutedInkBrush}" />
                 <PasswordBox x:Name="GeminiApiKeyBox"
                              Background="#0B151C"

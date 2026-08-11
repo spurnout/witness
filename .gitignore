@@ -8,6 +8,7 @@ artifacts/*
 # IDE/local state
 .vs/
 .vscode/
+.od-skills/
 *.user
 *.suo
 

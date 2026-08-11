@@ -109,14 +109,8 @@ public sealed class ProviderDiagnosticsService
                     }
                 }
 
-                if (ShareService.FindSftpExecutable(_settings.SftpExecutablePath) is null)
-                {
-                    record.MissingSettings.Add("OpenSSH sftp.exe");
-                }
-                else
-                {
-                    record.ConfiguredSettings.Add("OpenSSH sftp.exe available");
-                }
+                RequireSetting(record, "SFTP host key SHA-256 fingerprint", _settings.SftpHostKeyFingerprint);
+                record.ConfiguredSettings.Add("Embedded SSH.NET client available");
                 break;
             case "Imgur":
                 NoteSetting(record, "Imgur API endpoint", _settings.ImgurApiEndpoint, "default Imgur API endpoint");

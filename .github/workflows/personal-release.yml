@@ -1,0 +1,79 @@
+name: personal-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version without v prefix
+        required: true
+        default: 0.2.0
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $value = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          "value=$value" >> $env:GITHUB_OUTPUT
+      - name: Restore, build, and test clean revision
+        shell: pwsh
+        run: |
+          dotnet restore GoatShot.slnx
+          dotnet build GoatShot.slnx -c Release --no-restore
+          dotnet test GoatShot.slnx -c Release --no-build --logger "console;verbosity=minimal"
+          dotnet list GoatShot.slnx package --vulnerable --include-transitive
+      - name: Package locked Personal V1 assets
+        shell: powershell
+        run: .\scripts\package-release.ps1 -Version '${{ steps.version.outputs.value }}' -BuildId '${{ github.sha }}'
+      - name: Verify single executable
+        shell: powershell
+        run: .\scripts\verify-single-exe-package.ps1 -Version '${{ steps.version.outputs.value }}'
+      - name: Create public release proof bundle
+        shell: powershell
+        run: |
+          .\scripts\create-release-proof-bundle.ps1 `
+            -Version '${{ steps.version.outputs.value }}' `
+            -OutputRoot '.\artifacts\tag-release-proof' `
+            -SkipCommands `
+            -SkipTrancheNotes `
+            -AdditionalArtifactPath @(
+              '.\artifacts\single-exe-package-verification\single-exe-package-verification.json',
+              '.\artifacts\single-exe-package-verification\single-exe-package-verification.md',
+              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.exe.sha256",
+              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.build.json",
+              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-win-x64.spdx.json",
+              ".\artifacts\dist\GoatShot-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt",
+              '.\artifacts\v1-readiness-summary.md'
+            )
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: GoatShot-${{ steps.version.outputs.value }}-win-x64
+          path: |
+            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.exe
+            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.exe.sha256
+            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.build.json
+            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-win-x64.spdx.json
+            artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt
+            artifacts/single-exe-package-verification/**
+            artifacts/tag-release-proof/GoatShot-release-proof-*.zip
+      - name: Publish GitHub prerelease for tag builds
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' artifacts/dist/GoatShot-${{ steps.version.outputs.value }}-* artifacts/tag-release-proof/GoatShot-release-proof-*.zip --prerelease --title 'GoatShot ${{ github.ref_name }}' --notes 'Unsigned Windows x64 personal preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live Android-device proof remain open.'

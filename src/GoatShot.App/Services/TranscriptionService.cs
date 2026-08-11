@@ -11,11 +11,13 @@ public sealed partial class TranscriptionService
 {
     private readonly AppPaths _paths;
     private readonly GeminiImageProvider? _gemini;
+    private readonly AppSettings? _settings;
 
-    public TranscriptionService(AppPaths paths, GeminiImageProvider? gemini = null)
+    public TranscriptionService(AppPaths paths, GeminiImageProvider? gemini = null, AppSettings? settings = null)
     {
         _paths = paths;
         _gemini = gemini;
+        _settings = settings;
     }
 
     public async Task<TranscriptionResult> TranscribeAsync(
@@ -33,6 +35,12 @@ public sealed partial class TranscriptionService
         TranscriptionRequest request,
         CancellationToken cancellationToken = default)
     {
+        request = request with
+        {
+            WhisperExecutablePath = FirstNonEmpty(request.WhisperExecutablePath, _settings?.ExternalWhisperExecutablePath),
+            WhisperModelPath = FirstNonEmpty(request.WhisperModelPath, _settings?.ExternalWhisperModelPath),
+            Language = FirstNonEmpty(request.Language, _settings?.ExternalWhisperLanguage)
+        };
         var videoPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(request.VideoPath));
         if (!File.Exists(videoPath))
         {
@@ -71,8 +79,8 @@ public sealed partial class TranscriptionService
             ? $" Provider STT: {providerResult?.Message ?? "not attempted"}"
             : " Provider STT was not requested; pass --ai --provider gemini to send extracted audio to configured Gemini for short recordings.";
         return Failed(
-            "Automatic speech-to-text could not run. Provide --srt, embed an SRT/subtitle stream in the video, or install/configure a local Whisper CLI with GOATSHOT_WHISPER_EXE. " +
-            $"Embedded subtitle extraction: {embedded.Message} Local Whisper: {whisper.Message}{providerMessage}");
+            "Automatic speech-to-text could not run. Provide --srt, embed an SRT/subtitle stream, or explicitly configure an external Whisper executable/model. GoatShot never downloads or bundles Whisper. " +
+            $"Embedded subtitle extraction: {embedded.Message} External Whisper: {whisper.Message}{providerMessage}");
     }
 
     public async Task<TranscriptionResult> ImportSrtAsync(
@@ -348,13 +356,13 @@ public sealed partial class TranscriptionService
         var engine = ResolveLocalSpeechEngine(request);
         if (engine is null)
         {
-            return Failed("No local Whisper executable was found.");
+            return Failed("No configured external Whisper executable was found.");
         }
 
         var ffmpeg = RecordingService.FindFfmpeg();
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
-            return Failed("FFmpeg was not found, so audio extraction for local Whisper could not run.");
+            return Failed("FFmpeg was not found, so audio extraction for external Whisper could not run.");
         }
 
         var tempRoot = Path.Combine(_paths.TempRoot, $"transcribe-whisper-{Guid.NewGuid():N}");
@@ -382,7 +390,7 @@ public sealed partial class TranscriptionService
             if (!audio.Succeeded || !File.Exists(wavPath) || new FileInfo(wavPath).Length == 0)
             {
                 return Failed(audio.Succeeded
-                    ? "FFmpeg did not create an audio WAV for local Whisper."
+                    ? "FFmpeg did not create an audio WAV for external Whisper."
                     : audio.Message);
             }
 

@@ -7,6 +7,7 @@ public sealed class AppServices : IDisposable
     private AppServices(
         AppSettings settings,
         AppPaths paths,
+        BundledToolResolver bundledTools,
         SettingsStore settingsStore,
         WorkspaceStore workspaceStore,
         WorkspaceMetadataIndex workspaceIndex,
@@ -31,11 +32,13 @@ public sealed class AppServices : IDisposable
         LocalPluginService localPlugins,
         RemotePluginPackageService remotePlugins,
         PersonSegmentationModelPackageService personSegmentationModels,
+        PersonSegmentationInferenceService personSegmentation,
         BrowserExtensionNativeBridgeService browserExtensionBridge,
         BrowserNativeHostRegistrationService browserNativeHosts,
         OAuthFlowService oauthFlow,
         OAuthBrowserFlowService oauthBrowserFlow,
         StartupRegistrationService startup,
+        PersonalInstallService personalInstall,
         GeminiImageProvider gemini,
         AiActionHistoryService aiHistory,
         IAudioCaptureService audioCapture,
@@ -54,6 +57,7 @@ public sealed class AppServices : IDisposable
     {
         Settings = settings;
         Paths = paths;
+        BundledTools = bundledTools;
         SettingsStore = settingsStore;
         WorkspaceStore = workspaceStore;
         WorkspaceIndex = workspaceIndex;
@@ -78,11 +82,13 @@ public sealed class AppServices : IDisposable
         LocalPlugins = localPlugins;
         RemotePlugins = remotePlugins;
         PersonSegmentationModels = personSegmentationModels;
+        PersonSegmentation = personSegmentation;
         BrowserExtensionBridge = browserExtensionBridge;
         BrowserNativeHosts = browserNativeHosts;
         OAuthFlow = oauthFlow;
         OAuthBrowserFlow = oauthBrowserFlow;
         Startup = startup;
+        PersonalInstall = personalInstall;
         Gemini = gemini;
         AiHistory = aiHistory;
         AudioCapture = audioCapture;
@@ -102,6 +108,7 @@ public sealed class AppServices : IDisposable
 
     public AppSettings Settings { get; }
     public AppPaths Paths { get; }
+    public BundledToolResolver BundledTools { get; }
     public SettingsStore SettingsStore { get; }
     public WorkspaceStore WorkspaceStore { get; }
     public WorkspaceMetadataIndex WorkspaceIndex { get; }
@@ -126,11 +133,13 @@ public sealed class AppServices : IDisposable
     public LocalPluginService LocalPlugins { get; }
     public RemotePluginPackageService RemotePlugins { get; }
     public PersonSegmentationModelPackageService PersonSegmentationModels { get; }
+    public PersonSegmentationInferenceService PersonSegmentation { get; }
     public BrowserExtensionNativeBridgeService BrowserExtensionBridge { get; }
     public BrowserNativeHostRegistrationService BrowserNativeHosts { get; }
     public OAuthFlowService OAuthFlow { get; }
     public OAuthBrowserFlowService OAuthBrowserFlow { get; }
     public StartupRegistrationService Startup { get; }
+    public PersonalInstallService PersonalInstall { get; }
     public GeminiImageProvider Gemini { get; }
     public AiActionHistoryService AiHistory { get; }
     public IAudioCaptureService AudioCapture { get; }
@@ -150,11 +159,18 @@ public sealed class AppServices : IDisposable
 
     public static AppServices Create()
     {
+        StartupTrace.Write("AppServices settings load");
         var settingsStore = new SettingsStore();
         var settings = settingsStore.Load();
         var paths = AppPaths.Create(settings);
         settingsStore.UsePath(paths.SettingsPath);
         settingsStore.Save(settings);
+        StartupTrace.Write("AppServices bundled resolver");
+        var bundledTools = new BundledToolResolver(Path.Combine(paths.LocalRoot, "runtime"));
+        bundledTools.EnsureReadyAsync().GetAwaiter().GetResult();
+        StartupTrace.Write("AppServices bundled runtime ready");
+        SetBundledToolEnvironment("GOATSHOT_FFMPEG_PATH", bundledTools.Resolve("ffmpeg"));
+        SetBundledToolEnvironment("GOATSHOT_FFPROBE_PATH", bundledTools.Resolve("ffprobe"));
 
         var workspaceIndex = new WorkspaceMetadataIndex(paths);
         var workspaceStore = new WorkspaceStore(paths, settings);
@@ -176,12 +192,14 @@ public sealed class AppServices : IDisposable
         var localPlugins = new LocalPluginService(paths, settings);
         var remotePlugins = new RemotePluginPackageService(paths, localPlugins, settings: settings);
         var personSegmentationModels = new PersonSegmentationModelPackageService(paths);
+        var personSegmentation = new PersonSegmentationInferenceService(bundledTools);
         var browserExtensionBridge = new BrowserExtensionNativeBridgeService(paths, workspaceStore);
         var browserNativeHosts = new BrowserNativeHostRegistrationService(paths);
         var sharing = new ShareService(paths, settings, secretStore);
         var uploadQueue = new UploadQueueService(paths, settings.UploadQueue);
         var uploadQueueWorker = new UploadQueueWorkerService(settings.UploadQueue, uploadQueue, sharing);
         var startup = new StartupRegistrationService();
+        var personalInstall = new PersonalInstallService(startup);
         var audioCapture = new WindowsAudioCaptureService();
         var cameraOverlay = new WindowsCameraOverlayService();
         var diagnostics = new DiagnosticsService(
@@ -211,18 +229,20 @@ public sealed class AppServices : IDisposable
         var gemini = new GeminiImageProvider(settings, paths, secretStore);
         var aiHistory = new AiActionHistoryService(paths);
         var recording = new RecordingService(paths, settings, screenshots, workspaceStore, audioCapture, cameraOverlay);
-        var videoTools = new VideoToolService(paths, workspaceStore);
+        var videoTools = new VideoToolService(paths, workspaceStore, personSegmentation: personSegmentation);
         var imageLayouts = new ImageLayoutService(paths, workspaceStore);
-        var transcription = new TranscriptionService(paths, gemini);
+        var transcription = new TranscriptionService(paths, gemini, settings);
         var videoIntelligence = new VideoIntelligenceService(paths, transcription, gemini);
         var diagnosticBundles = new DiagnosticBundleService(paths, settings, workspaceStore, diagnostics, providerDiagnostics);
         var documentationPackets = new DocumentationPacketService(paths, aiHistory, bugReports);
         var stepRecorder = new StepRecorderService(paths, screenshots, workspaceStore, ocr);
         var hotkeys = new HotkeyService();
 
+        StartupTrace.Write("AppServices graph ready");
         return new AppServices(
             settings,
             paths,
+            bundledTools,
             settingsStore,
             workspaceStore,
             workspaceIndex,
@@ -247,11 +267,13 @@ public sealed class AppServices : IDisposable
             localPlugins,
             remotePlugins,
             personSegmentationModels,
+            personSegmentation,
             browserExtensionBridge,
             browserNativeHosts,
             oauthFlow,
             oauthBrowserFlow,
             startup,
+            personalInstall,
             gemini,
             aiHistory,
             audioCapture,
@@ -267,6 +289,14 @@ public sealed class AppServices : IDisposable
             documentationPackets,
             stepRecorder,
             hotkeys);
+    }
+
+    private static void SetBundledToolEnvironment(string variable, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(variable)))
+        {
+            Environment.SetEnvironmentVariable(variable, value);
+        }
     }
 
     public void AttachTray(MainWindow window)
@@ -285,6 +315,7 @@ public sealed class AppServices : IDisposable
         UploadQueueWorker.Dispose();
         StepRecorder.Dispose();
         Recording.Dispose();
+        PersonSegmentation.Dispose();
         WatchFolders.Dispose();
         Hotkeys.Dispose();
     }

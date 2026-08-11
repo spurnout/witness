@@ -4,7 +4,7 @@ namespace GoatShot.App.Services;
 
 public static class SettingsMigrationService
 {
-    public const int CurrentSchemaVersion = 14;
+    public const int CurrentSchemaVersion = 15;
 
     public static SettingsMigrationResult Migrate(AppSettings settings)
     {

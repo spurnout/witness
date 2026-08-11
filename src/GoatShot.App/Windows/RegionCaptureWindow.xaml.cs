@@ -44,6 +44,17 @@ public partial class RegionCaptureWindow : Window
 
         FrozenScreen.Source = frozenScreen;
         LoadChooserTargets();
+        Loaded += (_, _) =>
+        {
+            Root.Focus();
+            var width = Math.Min(640d, Math.Max(1d, ActualWidth * 0.5d));
+            var height = Math.Min(480d, Math.Max(1d, ActualHeight * 0.5d));
+            SetPreviewSelection(
+                Math.Max(0d, (ActualWidth - width) / 2d),
+                Math.Max(0d, (ActualHeight - height) / 2d),
+                width,
+                height);
+        };
     }
 
     public CaptureBounds? SelectedBounds { get; private set; }
@@ -108,7 +119,55 @@ public partial class RegionCaptureWindow : Window
         if (e.Key == Key.Escape)
         {
             DialogResult = false;
+            e.Handled = true;
+            return;
         }
+
+        if (e.Key == Key.Enter && _lastSelection is not null)
+        {
+            SelectedBounds = _lastSelection.FinalBounds;
+            DialogResult = true;
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+        {
+            MoveOrResizeKeyboardSelection(e.Key, Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
+            e.Handled = true;
+        }
+    }
+
+    private void MoveOrResizeKeyboardSelection(Key key, bool resize)
+    {
+        var current = _lastSelection?.FinalBounds ?? new CaptureBounds
+        {
+            X = _virtualBounds.X,
+            Y = _virtualBounds.Y,
+            Width = Math.Min(640, _virtualBounds.Width),
+            Height = Math.Min(480, _virtualBounds.Height)
+        };
+        const int step = 10;
+        var dx = key == Key.Left ? -step : key == Key.Right ? step : 0;
+        var dy = key == Key.Up ? -step : key == Key.Down ? step : 0;
+        var left = current.X - _virtualBounds.X;
+        var top = current.Y - _virtualBounds.Y;
+        var right = left + current.Width;
+        var bottom = top + current.Height;
+        if (resize)
+        {
+            right = Math.Clamp(right + dx, left + 3, _virtualBounds.Width);
+            bottom = Math.Clamp(bottom + dy, top + 3, _virtualBounds.Height);
+        }
+        else
+        {
+            left = Math.Clamp(left + dx, 0, Math.Max(0, _virtualBounds.Width - current.Width));
+            top = Math.Clamp(top + dy, 0, Math.Max(0, _virtualBounds.Height - current.Height));
+            right = left + current.Width;
+            bottom = top + current.Height;
+        }
+
+        SetPreviewSelection(left, top, right - left, bottom - top);
     }
 
     private void UpdateSelection(WpfPoint start, WpfPoint end)

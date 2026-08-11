@@ -750,28 +750,26 @@ public sealed class ShareProviderAdapterTests
     }
 
     [TestMethod]
-    public async Task SftpProvider_UploadsThroughRunnerWithBatchAndPublicUrl()
+    public async Task SftpProvider_UploadsThroughClientWithPinnedHostKeyAndPublicUrl()
     {
         await WithTempPathsAsync(async paths =>
         {
             Directory.CreateDirectory(paths.TempRoot);
-            var executablePath = Path.Combine(paths.TempRoot, "sftp.exe");
             var privateKeyPath = Path.Combine(paths.TempRoot, "id_ed25519");
-            File.WriteAllText(executablePath, "fake sftp");
             File.WriteAllText(privateKeyPath, "fake key");
 
-            var runner = new RecordingSftpProcessRunner(new SftpProcessResult(true, 0, "upload ok", string.Empty));
+            var client = new RecordingSftpClientAdapter(new SftpUploadResult(true, "upload ok"));
             var settings = new AppSettings
             {
-                SftpExecutablePath = executablePath,
                 SftpHost = "files.example.test",
                 SftpPort = 2222,
                 SftpUsername = "deploy",
                 SftpRemoteDirectory = "/captures/2026/",
                 SftpPrivateKeyPath = privateKeyPath,
+                SftpHostKeyFingerprint = "SHA256:ABCDEF",
                 SftpPublicBaseUrl = "https://cdn.example.test/public"
             };
-            var provider = new SftpShareProvider(paths, settings, runner);
+            var provider = new SftpShareProvider(paths, settings, client);
             var item = CreateCaptureItem(paths, "sftp adapter.png", 42);
 
             var health = await provider.ValidateCredentialsAsync(CancellationToken.None);
@@ -779,31 +777,14 @@ public sealed class ShareProviderAdapterTests
 
             Assert.IsTrue(health.IsHealthy, health.Message);
             Assert.IsTrue(result.Succeeded, result.Message);
-            Assert.IsNotNull(runner.LastRequest);
-            Assert.AreEqual(executablePath, runner.LastRequest.ExecutablePath);
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    "-b",
-                    runner.LastRequest.BatchPath,
-                    "-P",
-                    "2222",
-                    "-o",
-                    "BatchMode=yes",
-                    "-o",
-                    "ConnectTimeout=15",
-                    "-i",
-                    privateKeyPath,
-                    "deploy@files.example.test"
-                },
-                runner.LastRequest.Arguments.ToArray());
-            Assert.AreEqual("deploy@files.example.test", runner.LastRequest.Target);
-            StringAssert.Contains(runner.LastRequest.RemotePath, "/captures/2026/");
-            StringAssert.Contains(runner.LastRequest.RemotePath, "sftp adapter.png");
-            StringAssert.Contains(runner.LastBatchText, "-mkdir \"/captures/2026\"");
-            StringAssert.Contains(runner.LastBatchText, "put \"");
-            StringAssert.Contains(runner.LastBatchText, "/captures/2026/");
-            StringAssert.Contains(runner.LastBatchText, "sftp adapter.png");
+            Assert.IsNotNull(client.LastRequest);
+            Assert.AreEqual("files.example.test", client.LastRequest.Host);
+            Assert.AreEqual(2222, client.LastRequest.Port);
+            Assert.AreEqual("deploy", client.LastRequest.Username);
+            Assert.AreEqual(privateKeyPath, client.LastRequest.PrivateKeyPath);
+            Assert.AreEqual("ABCDEF", client.LastRequest.HostKeySha256);
+            StringAssert.Contains(client.LastRequest.RemotePath, "/captures/2026/");
+            StringAssert.Contains(client.LastRequest.RemotePath, "sftp adapter.png");
             StringAssert.StartsWith(result.ShareUrl, "https://cdn.example.test/public/");
             StringAssert.Contains(Uri.UnescapeDataString(result.ShareUrl!), "sftp adapter.png");
             StringAssert.Contains(result.Message, "completed and copied URL");
@@ -811,47 +792,49 @@ public sealed class ShareProviderAdapterTests
     }
 
     [TestMethod]
-    public async Task SftpProvider_ProcessFailureIncludesExitCodeAndOutput()
+    public async Task SftpProvider_ClientFailureIncludesRedactedOutput()
     {
         await WithTempPathsAsync(async paths =>
         {
             Directory.CreateDirectory(paths.TempRoot);
-            var executablePath = Path.Combine(paths.TempRoot, "sftp.exe");
-            File.WriteAllText(executablePath, "fake sftp");
+            var privateKeyPath = Path.Combine(paths.TempRoot, "id_ed25519");
+            File.WriteAllText(privateKeyPath, "fake key");
 
-            var runner = new RecordingSftpProcessRunner(new SftpProcessResult(true, 255, string.Empty, "Host key verification failed."));
+            var client = new RecordingSftpClientAdapter(new SftpUploadResult(false, "Host key verification failed."));
             var settings = new AppSettings
             {
-                SftpExecutablePath = executablePath,
                 SftpHost = "files.example.test",
-                SftpUsername = "deploy"
+                SftpUsername = "deploy",
+                SftpPrivateKeyPath = privateKeyPath,
+                SftpHostKeyFingerprint = "ABCDEF"
             };
-            var provider = new SftpShareProvider(paths, settings, runner);
+            var provider = new SftpShareProvider(paths, settings, client);
             var item = CreateCaptureItem(paths, "sftp-failed.png", 12);
 
             var result = await provider.UploadAsync(ToRequest(item), CancellationToken.None);
 
             Assert.IsFalse(result.Succeeded);
             Assert.IsNull(result.ShareUrl);
-            Assert.IsNotNull(runner.LastRequest);
-            StringAssert.Contains(result.Message, "exit code 255");
+            Assert.IsNotNull(client.LastRequest);
             StringAssert.Contains(result.Message, "Host key verification failed");
         });
     }
 
     [TestMethod]
-    public async Task SftpProvider_MissingExecutableFailsBeforeRunner()
+    public async Task SftpProvider_MissingHostKeyPinFailsBeforeClient()
     {
         await WithTempPathsAsync(async paths =>
         {
-            var runner = new RecordingSftpProcessRunner(new SftpProcessResult(true, 0, string.Empty, string.Empty));
+            var privateKeyPath = Path.Combine(paths.TempRoot, "id_ed25519");
+            File.WriteAllText(privateKeyPath, "fake key");
+            var client = new RecordingSftpClientAdapter(new SftpUploadResult(true, string.Empty));
             var settings = new AppSettings
             {
-                SftpExecutablePath = Path.Combine(paths.TempRoot, "missing-sftp.exe"),
                 SftpHost = "files.example.test",
-                SftpUsername = "deploy"
+                SftpUsername = "deploy",
+                SftpPrivateKeyPath = privateKeyPath
             };
-            var provider = new SftpShareProvider(paths, settings, runner);
+            var provider = new SftpShareProvider(paths, settings, client);
             var item = CreateCaptureItem(paths, "sftp-missing-exe.png", 12);
 
             var health = await provider.ValidateCredentialsAsync(CancellationToken.None);
@@ -859,8 +842,8 @@ public sealed class ShareProviderAdapterTests
 
             Assert.IsFalse(health.IsHealthy);
             Assert.IsFalse(result.Succeeded);
-            StringAssert.Contains(result.Message, "OpenSSH sftp.exe");
-            Assert.IsNull(runner.LastRequest);
+            StringAssert.Contains(result.Message, "host key SHA-256 fingerprint");
+            Assert.IsNull(client.LastRequest);
         });
     }
 
@@ -871,13 +854,13 @@ public sealed class ShareProviderAdapterTests
         {
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
-            var runner = new RecordingSftpProcessRunner(new SftpProcessResult(true, 0, string.Empty, string.Empty));
-            var provider = new SftpShareProvider(paths, new AppSettings(), runner);
+            var client = new RecordingSftpClientAdapter(new SftpUploadResult(true, string.Empty));
+            var provider = new SftpShareProvider(paths, new AppSettings(), client);
             var item = CreateCaptureItem(paths, "sftp-canceled.png", 12);
 
             await Assert.ThrowsExactlyAsync<OperationCanceledException>(
                 () => provider.UploadAsync(ToRequest(item), cancellation.Token));
-            Assert.IsNull(runner.LastRequest);
+            Assert.IsNull(client.LastRequest);
         });
     }
 
@@ -2158,25 +2141,21 @@ public sealed class ShareProviderAdapterTests
         }
     }
 
-    private sealed class RecordingSftpProcessRunner : ISftpProcessRunner
+    private sealed class RecordingSftpClientAdapter : ISftpClientAdapter
     {
-        private readonly SftpProcessResult _result;
+        private readonly SftpUploadResult _result;
 
-        public RecordingSftpProcessRunner(SftpProcessResult result)
+        public RecordingSftpClientAdapter(SftpUploadResult result)
         {
             _result = result;
         }
 
-        public SftpProcessRequest? LastRequest { get; private set; }
-        public string LastBatchText { get; private set; } = string.Empty;
+        public SftpUploadRequest? LastRequest { get; private set; }
 
-        public Task<SftpProcessResult> RunAsync(SftpProcessRequest request, CancellationToken cancellationToken)
+        public Task<SftpUploadResult> UploadAsync(SftpUploadRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LastRequest = request;
-            LastBatchText = File.Exists(request.BatchPath)
-                ? File.ReadAllText(request.BatchPath)
-                : string.Empty;
             return Task.FromResult(_result);
         }
     }

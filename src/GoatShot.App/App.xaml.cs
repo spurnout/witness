@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using System.Text.Json;
+using System.Diagnostics;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 using GoatShot.App.Windows;
@@ -10,16 +11,21 @@ namespace GoatShot.App;
 public partial class App : System.Windows.Application
 {
     public AppServices Services { get; private set; } = null!;
+    private SingleInstanceCoordinator? _singleInstance;
+    private PersonalInstallService? _personalInstall;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        StartupTrace.Write($"OnStartup args={string.Join('|', e.Args)}");
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
-        Services = AppServices.Create();
-        var startupOptions = AppStartupOptions.Parse(
+        var startupArguments = BrowserNativeHostLaunchDetector.Resolve(
             e.Args,
+            Console.IsInputRedirected);
+        var startupOptions = AppStartupOptions.Parse(
+            startupArguments,
             Environment.GetEnvironmentVariable("GOATSHOT_OPEN_SETTINGS"),
             Environment.GetEnvironmentVariable("GOATSHOT_SETTINGS_SECTION"),
             Environment.GetEnvironmentVariable("GOATSHOT_RENDER_MAIN"),
@@ -50,6 +56,35 @@ public partial class App : System.Windows.Application
             Environment.GetEnvironmentVariable("GOATSHOT_RECORD_PROOF_SCENE_DURATION"),
             Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_WPF_SURFACE"),
             Environment.GetEnvironmentVariable("GOATSHOT_AUDIT_WPF_OUTPUT"));
+        StartupTrace.Write($"Parsed mode={startupOptions.Mode} verb={startupOptions.RuntimeVerb}");
+
+        if (startupOptions.RuntimeVerb.Equals("--complete-uninstall", StringComparison.OrdinalIgnoreCase))
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                var exitCode = await PersonalInstallService.CompleteUninstallAsync(startupOptions.RuntimeArguments);
+                Shutdown(exitCode);
+            });
+            return;
+        }
+
+        StartupTrace.Write("Creating services");
+        Services = AppServices.Create();
+        StartupTrace.Write("Services created");
+        _personalInstall = Services.PersonalInstall;
+
+        if (startupOptions.Mode == AppStartupMode.RuntimeVerb)
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                StartupTrace.Write("Runtime verb dispatched");
+                var exitCode = await new AppRuntimeVerbExecutor(Services, _personalInstall)
+                    .ExecuteAsync(startupOptions);
+                StartupTrace.Write($"Runtime verb completed exit={exitCode}");
+                Shutdown(exitCode);
+            });
+            return;
+        }
         if (startupOptions.RenderMain)
         {
             Dispatcher.BeginInvoke(async () =>
@@ -316,15 +351,130 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var mainWindow = new MainWindow(Services);
+        if (startupOptions.Mode == AppStartupMode.Interactive &&
+            _personalInstall.IsDistributionBuild &&
+            !_personalInstall.IsRunningInstalledCopy)
+        {
+            if (_personalInstall.IsNewerThanInstalled())
+            {
+                if (OfferPersonalInstall(_personalInstall))
+                {
+                    return;
+                }
+            }
+            else if (File.Exists(_personalInstall.InstalledExecutablePath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _personalInstall.InstalledExecutablePath,
+                    UseShellExecute = true
+                });
+                Shutdown(0);
+                return;
+            }
+        }
+
+        _singleInstance = new SingleInstanceCoordinator();
+        if (!_singleInstance.IsPrimary)
+        {
+            _singleInstance.SendAsync(SingleInstanceMessage.Activate).GetAwaiter().GetResult();
+            Shutdown(0);
+            return;
+        }
+
+        var mainWindow = new MainWindow(
+            Services,
+            startHidden: startupOptions.Mode == AppStartupMode.Background);
         MainWindow = mainWindow;
+        _singleInstance.StartServer(message => Dispatcher.InvokeAsync(() =>
+        {
+            if (message == SingleInstanceMessage.Activate)
+            {
+                mainWindow.ShowWorkspaceCommand();
+            }
+            else
+            {
+                mainWindow.ExitCommand();
+            }
+        }).Task);
         mainWindow.Show();
+        _personalInstall.MarkStartupSuccessful();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        Services.Dispose();
+        _singleInstance?.Dispose();
+        if (Services is not null)
+        {
+            Services.Dispose();
+        }
         base.OnExit(e);
+    }
+
+    private bool OfferPersonalInstall(PersonalInstallService install)
+    {
+        SingleInstanceCoordinator? coordinator = new();
+        try
+        {
+            var state = install.GetState();
+            var isUpdate = !string.IsNullOrWhiteSpace(state.InstalledVersion);
+
+            // A first-run prompt temporarily owns the user-scoped instance lock. Do not
+            // let a second distribution launch create another prompt or compete to copy.
+            if (!isUpdate && !coordinator.IsPrimary)
+            {
+                coordinator.SendAsync(SingleInstanceMessage.Activate).GetAwaiter().GetResult();
+                Shutdown(0);
+                return true;
+            }
+
+            if (coordinator.IsPrimary)
+            {
+                coordinator.StartServer(_ => Task.CompletedTask);
+            }
+
+            var response = System.Windows.MessageBox.Show(
+                isUpdate
+                    ? $"Update the installed GoatShot {state.InstalledVersion} copy to {state.CurrentVersion}?"
+                    : "Install GoatShot for this Windows user and start it in the tray when you sign in?",
+                isUpdate ? "Update GoatShot" : "Install GoatShot",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (response != MessageBoxResult.Yes)
+            {
+                return false;
+            }
+
+            if (!coordinator.IsPrimary)
+            {
+                coordinator.SendAsync(SingleInstanceMessage.PrepareForUpdate).GetAwaiter().GetResult();
+                Thread.Sleep(750);
+            }
+
+            var result = install.InstallOrUpdate();
+            if (!result.Succeeded)
+            {
+                System.Windows.MessageBox.Show(result.Message, "GoatShot install", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            // Release the temporary first-run instance lock before starting the installed
+            // copy. Otherwise the new process treats the installer as the primary app and exits.
+            coordinator.Dispose();
+            coordinator = null;
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = result.InstalledPath,
+                UseShellExecute = true
+            });
+            Shutdown(0);
+            return true;
+        }
+        finally
+        {
+            coordinator?.Dispose();
+        }
     }
 
     private async Task RecordProofSceneAsync(AppStartupOptions startupOptions)

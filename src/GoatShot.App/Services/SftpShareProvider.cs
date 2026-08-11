@@ -1,26 +1,24 @@
-using System.Diagnostics;
-using System.Globalization;
-using System.Text;
 using GoatShot.App.Models;
+using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace GoatShot.App.Services;
 
 public sealed class SftpShareProvider : IShareProvider
 {
-    private readonly AppPaths _paths;
     private readonly AppSettings _settings;
-    private readonly ISftpProcessRunner _processRunner;
+    private readonly ISftpClientAdapter _client;
 
     public SftpShareProvider(AppPaths paths, AppSettings settings)
-        : this(paths, settings, new OpenSshSftpProcessRunner())
+        : this(paths, settings, new SshNetSftpClientAdapter())
     {
     }
 
-    public SftpShareProvider(AppPaths paths, AppSettings settings, ISftpProcessRunner processRunner)
+    public SftpShareProvider(AppPaths paths, AppSettings settings, ISftpClientAdapter client)
     {
-        _paths = paths;
+        _ = paths;
         _settings = settings;
-        _processRunner = processRunner;
+        _client = client;
     }
 
     public ShareDestination? Destination => ShareDestination.Sftp;
@@ -35,35 +33,19 @@ public sealed class SftpShareProvider : IShareProvider
     public Task<ProviderHealth> ValidateCredentialsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(_settings.SftpHost) ||
-            string.IsNullOrWhiteSpace(_settings.SftpUsername))
-        {
-            return Task.FromResult(new ProviderHealth(false, "SFTP host and username are not configured."));
-        }
-
-        if (FindSftpExecutable(_settings.SftpExecutablePath) is null)
-        {
-            return Task.FromResult(new ProviderHealth(false, "OpenSSH sftp.exe was not found on PATH, GOATSHOT_SFTP_PATH, or the configured SFTP executable path."));
-        }
-
-        var privateKeyPath = ExpandOptionalPath(_settings.SftpPrivateKeyPath);
-        if (!string.IsNullOrWhiteSpace(privateKeyPath) && !File.Exists(privateKeyPath))
-        {
-            return Task.FromResult(new ProviderHealth(false, $"SFTP private key was configured but not found: {privateKeyPath}"));
-        }
-
-        return Task.FromResult(new ProviderHealth(true, "SFTP is configured for local OpenSSH upload attempts."));
+        var issue = ValidateConfiguration();
+        return Task.FromResult(string.IsNullOrWhiteSpace(issue)
+            ? new ProviderHealth(true, "SFTP is configured for in-process SSH.NET upload with a pinned host key.")
+            : new ProviderHealth(false, issue));
     }
 
     public async Task<ShareUploadResult> UploadAsync(ShareUploadRequest request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(_settings.SftpHost) ||
-            string.IsNullOrWhiteSpace(_settings.SftpUsername))
+        var issue = ValidateConfiguration();
+        if (!string.IsNullOrWhiteSpace(issue))
         {
-            return new ShareUploadResult(false, null, "SFTP upload needs host and username settings.");
+            return new ShareUploadResult(false, null, issue);
         }
 
         if (string.IsNullOrWhiteSpace(request.FilePath) || !File.Exists(request.FilePath))
@@ -71,142 +53,59 @@ public sealed class SftpShareProvider : IShareProvider
             return new ShareUploadResult(false, null, $"Source file does not exist: {request.FilePath}");
         }
 
-        var sftp = FindSftpExecutable(_settings.SftpExecutablePath);
-        if (string.IsNullOrWhiteSpace(sftp))
-        {
-            return new ShareUploadResult(false, null, "SFTP upload needs OpenSSH sftp.exe on PATH, GOATSHOT_SFTP_PATH, or the configured SFTP executable path.");
-        }
-
-        var privateKeyPath = ExpandOptionalPath(_settings.SftpPrivateKeyPath);
-        if (!string.IsNullOrWhiteSpace(privateKeyPath) && !File.Exists(privateKeyPath))
-        {
-            return new ShareUploadResult(false, null, $"SFTP private key was configured but not found: {privateKeyPath}");
-        }
-
-        Directory.CreateDirectory(_paths.TempRoot);
-        var batchPath = Path.Combine(_paths.TempRoot, $"sftp-upload-{MetadataValue(request, "id", Guid.NewGuid().ToString("N"))}.txt");
-        var port = _settings.SftpPort <= 0 ? 22 : _settings.SftpPort;
         var remoteDirectory = NormalizeRemoteDirectory(_settings.SftpRemoteDirectory);
         var remoteFileName = BuildRemoteFileName(request);
         var remotePath = CombineRemotePath(remoteDirectory, remoteFileName);
-        var target = $"{_settings.SftpUsername.Trim()}@{_settings.SftpHost.Trim()}";
-        var batchLines = BuildBatchLines(request.FilePath, remoteDirectory, remotePath);
+        var result = await _client.UploadAsync(new SftpUploadRequest(
+            _settings.SftpHost.Trim(),
+            _settings.SftpPort <= 0 ? 22 : _settings.SftpPort,
+            _settings.SftpUsername.Trim(),
+            ExpandOptionalPath(_settings.SftpPrivateKeyPath)!,
+            NormalizeFingerprint(_settings.SftpHostKeyFingerprint),
+            request.FilePath,
+            remoteDirectory,
+            remotePath), cancellationToken);
 
-        await File.WriteAllLinesAsync(batchPath, batchLines, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
-
-        try
+        var shareUrl = result.Succeeded ? BuildPublicUrl(remoteFileName) : null;
+        if (!string.IsNullOrWhiteSpace(shareUrl))
         {
-            var arguments = BuildArguments(batchPath, port, privateKeyPath, target);
-            var result = await _processRunner.RunAsync(
-                new SftpProcessRequest(sftp, arguments, batchPath, target, remotePath),
-                cancellationToken);
-
-            if (!result.Started)
-            {
-                return new ShareUploadResult(false, null, "SFTP upload could not start sftp.exe.");
-            }
-
-            var shareUrl = result.ExitCode == 0 ? BuildPublicUrl(remoteFileName) : null;
-            if (!string.IsNullOrWhiteSpace(shareUrl))
-            {
-                ClipboardInterop.SetText(shareUrl);
-            }
-
-            return new ShareUploadResult(
-                result.ExitCode == 0,
-                shareUrl,
-                result.ExitCode == 0
-                    ? string.IsNullOrWhiteSpace(shareUrl)
-                        ? $"SFTP upload completed: {target}:{remotePath}"
-                        : $"SFTP upload completed and copied URL: {shareUrl}"
-                    : $"SFTP upload failed with exit code {result.ExitCode}: {ShortProcessOutput(result.StandardError, result.StandardOutput)}");
+            ClipboardInterop.SetText(shareUrl);
         }
-        finally
-        {
-            TryDelete(batchPath);
-        }
+
+        return new ShareUploadResult(
+            result.Succeeded,
+            shareUrl,
+            result.Succeeded
+                ? string.IsNullOrWhiteSpace(shareUrl)
+                    ? $"SFTP upload completed: {_settings.SftpUsername}@{_settings.SftpHost}:{remotePath}"
+                    : $"SFTP upload completed and copied URL: {shareUrl}"
+                : $"SFTP upload failed: {SensitiveTextDetector.Redact(result.Message)}");
     }
 
-    internal static string? FindSftpExecutable(string? configuredPath = null)
+    private string ValidateConfiguration()
     {
-        if (!string.IsNullOrWhiteSpace(configuredPath))
+        if (string.IsNullOrWhiteSpace(_settings.SftpHost) || string.IsNullOrWhiteSpace(_settings.SftpUsername))
         {
-            var expanded = Environment.ExpandEnvironmentVariables(configuredPath.Trim());
-            return File.Exists(expanded) ? expanded : null;
+            return "SFTP host and username are not configured.";
         }
 
-        var environmentPath = Environment.GetEnvironmentVariable("GOATSHOT_SFTP_PATH");
-        if (!string.IsNullOrWhiteSpace(environmentPath))
+        var privateKeyPath = ExpandOptionalPath(_settings.SftpPrivateKeyPath);
+        if (string.IsNullOrWhiteSpace(privateKeyPath))
         {
-            var expanded = Environment.ExpandEnvironmentVariables(environmentPath.Trim());
-            return File.Exists(expanded) ? expanded : null;
+            return "SFTP private key path is required for the in-process client.";
         }
 
-        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        if (!File.Exists(privateKeyPath))
         {
-            try
-            {
-                var candidate = Path.Combine(directory.Trim(), "sftp.exe");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-            catch
-            {
-                // Ignore malformed PATH entries.
-            }
+            return $"SFTP private key was configured but not found: {privateKeyPath}";
         }
 
-        var systemCandidate = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.System),
-            "OpenSSH",
-            "sftp.exe");
-        return File.Exists(systemCandidate) ? systemCandidate : null;
-    }
-
-    private static string[] BuildBatchLines(string filePath, string remoteDirectory, string remotePath)
-    {
-        var localPath = filePath.Replace('\\', '/');
-        return remoteDirectory == "/"
-            ? new[]
-            {
-                $"put {QuoteSftpPath(localPath)} {QuoteSftpPath(remotePath)}"
-            }
-            : new[]
-            {
-                $"-mkdir {QuoteSftpPath(remoteDirectory)}",
-                $"put {QuoteSftpPath(localPath)} {QuoteSftpPath(remotePath)}"
-            };
-    }
-
-    private static IReadOnlyList<string> BuildArguments(
-        string batchPath,
-        int port,
-        string? privateKeyPath,
-        string target)
-    {
-        var arguments = new List<string>
+        if (string.IsNullOrWhiteSpace(_settings.SftpHostKeyFingerprint))
         {
-            "-b",
-            batchPath,
-            "-P",
-            port.ToString(CultureInfo.InvariantCulture),
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=15"
-        };
-
-        if (!string.IsNullOrWhiteSpace(privateKeyPath))
-        {
-            arguments.Add("-i");
-            arguments.Add(privateKeyPath);
+            return "SFTP host key SHA-256 fingerprint is required; GoatShot will not trust an unknown server key.";
         }
 
-        arguments.Add(target);
-        return arguments;
+        return string.Empty;
     }
 
     private static string BuildRemoteFileName(ShareUploadRequest request)
@@ -216,31 +115,16 @@ public sealed class SftpShareProvider : IShareProvider
         return $"{MetadataValue(request, "id", Guid.NewGuid().ToString("N"))}-{safeFileName}";
     }
 
-    private static string NormalizeRemoteDirectory(string? value)
+    internal static string NormalizeRemoteDirectory(string? value)
     {
-        var directory = string.IsNullOrWhiteSpace(value)
-            ? "/"
-            : value.Replace('\\', '/').Trim();
-
-        if (directory.Length == 0 || directory == ".")
-        {
-            return ".";
-        }
-
-        if (directory == "/")
-        {
-            return "/";
-        }
-
-        return directory.TrimEnd('/');
+        var directory = string.IsNullOrWhiteSpace(value) ? "/" : value.Replace('\\', '/').Trim();
+        return directory.Length == 0 || directory == "." ? "." : directory == "/" ? "/" : directory.TrimEnd('/');
     }
 
-    private static string CombineRemotePath(string directory, string fileName)
-    {
-        return directory is "" or "." or "/"
+    internal static string CombineRemotePath(string directory, string fileName) =>
+        directory is "" or "." or "/"
             ? directory == "/" ? $"/{fileName}" : fileName
             : $"{directory.TrimEnd('/')}/{fileName}";
-    }
 
     private string? BuildPublicUrl(string remoteFileName)
     {
@@ -265,106 +149,102 @@ public sealed class SftpShareProvider : IShareProvider
         return builder.Uri.ToString();
     }
 
-    private static string EncodeKey(string key)
+    private static string EncodeKey(string key) =>
+        string.Join("/", key.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString));
+
+    private static string MetadataValue(ShareUploadRequest request, string key, string fallback) =>
+        request.Metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
+
+    private static string? ExpandOptionalPath(string? path) =>
+        string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim()));
+
+    internal static string NormalizeFingerprint(string value) =>
+        value.Trim().Replace("SHA256:", string.Empty, StringComparison.OrdinalIgnoreCase).Replace(":", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
+}
+
+public sealed record SftpUploadRequest(
+    string Host,
+    int Port,
+    string Username,
+    string PrivateKeyPath,
+    string HostKeySha256,
+    string LocalPath,
+    string RemoteDirectory,
+    string RemotePath);
+
+public sealed record SftpUploadResult(bool Succeeded, string Message);
+
+public interface ISftpClientAdapter
+{
+    Task<SftpUploadResult> UploadAsync(SftpUploadRequest request, CancellationToken cancellationToken);
+}
+
+public sealed class SshNetSftpClientAdapter : ISftpClientAdapter
+{
+    public async Task<SftpUploadResult> UploadAsync(SftpUploadRequest request, CancellationToken cancellationToken)
     {
-        return string.Join("/", key.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(EncodePathSegment));
+        return await Task.Run(() => Upload(request, cancellationToken), cancellationToken);
     }
 
-    private static string EncodePathSegment(string segment)
-    {
-        return Uri.EscapeDataString(segment)
-            .Replace("%2D", "-", StringComparison.OrdinalIgnoreCase)
-            .Replace("%2E", ".", StringComparison.OrdinalIgnoreCase)
-            .Replace("%5F", "_", StringComparison.OrdinalIgnoreCase)
-            .Replace("%7E", "~", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string QuoteSftpPath(string path)
-    {
-        return $"\"{path.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
-    }
-
-    private static string MetadataValue(ShareUploadRequest request, string key, string fallback)
-    {
-        return request.Metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
-            ? value
-            : fallback;
-    }
-
-    private static string? ExpandOptionalPath(string? path)
-    {
-        return string.IsNullOrWhiteSpace(path)
-            ? null
-            : Environment.ExpandEnvironmentVariables(path.Trim());
-    }
-
-    private static string ShortProcessOutput(string stderr, string stdout)
-    {
-        var text = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
-        text = text.ReplaceLineEndings(" ").Trim();
-        return text.Length <= 360 ? text : text[..360] + "...";
-    }
-
-    private static void TryDelete(string path)
+    private static SftpUploadResult Upload(SftpUploadRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            File.Delete(path);
+            using var key = new PrivateKeyFile(request.PrivateKeyPath);
+            var connection = new ConnectionInfo(
+                request.Host,
+                request.Port,
+                request.Username,
+                new PrivateKeyAuthenticationMethod(request.Username, key))
+            {
+                Timeout = TimeSpan.FromSeconds(15)
+            };
+            using var client = new SftpClient(connection);
+            var hostKeyAccepted = false;
+            client.HostKeyReceived += (_, args) =>
+            {
+                var received = SftpShareProvider.NormalizeFingerprint(args.FingerPrintSHA256);
+                hostKeyAccepted = received.Equals(request.HostKeySha256, StringComparison.OrdinalIgnoreCase);
+                args.CanTrust = hostKeyAccepted;
+            };
+            cancellationToken.Register(client.Dispose);
+            client.Connect();
+            if (!hostKeyAccepted)
+            {
+                return new SftpUploadResult(false, "Host key verification failed.");
+            }
+
+            EnsureRemoteDirectory(client, request.RemoteDirectory);
+            using var input = File.OpenRead(request.LocalPath);
+            client.UploadFile(input, request.RemotePath, canOverride: true);
+            client.Disconnect();
+            return new SftpUploadResult(true, "Upload completed.");
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // Temp batch cleanup is best-effort.
+            throw;
+        }
+        catch (Exception exception) when (exception is SshException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return new SftpUploadResult(false, exception.Message);
         }
     }
-}
 
-public sealed record SftpProcessRequest(
-    string ExecutablePath,
-    IReadOnlyList<string> Arguments,
-    string BatchPath,
-    string Target,
-    string RemotePath);
-
-public sealed record SftpProcessResult(
-    bool Started,
-    int ExitCode,
-    string StandardOutput,
-    string StandardError);
-
-public interface ISftpProcessRunner
-{
-    Task<SftpProcessResult> RunAsync(SftpProcessRequest request, CancellationToken cancellationToken);
-}
-
-public sealed class OpenSshSftpProcessRunner : ISftpProcessRunner
-{
-    public async Task<SftpProcessResult> RunAsync(SftpProcessRequest request, CancellationToken cancellationToken)
+    private static void EnsureRemoteDirectory(SftpClient client, string directory)
     {
-        var start = new ProcessStartInfo
+        if (directory is "" or "." or "/")
         {
-            FileName = request.ExecutablePath,
-            UseShellExecute = false,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            CreateNoWindow = true
-        };
-
-        foreach (var argument in request.Arguments)
-        {
-            start.ArgumentList.Add(argument);
+            return;
         }
 
-        using var process = Process.Start(start);
-        if (process is null)
+        var current = directory.StartsWith('/') ? "/" : string.Empty;
+        foreach (var segment in directory.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
-            return new SftpProcessResult(false, -1, string.Empty, string.Empty);
+            current = current == "/" ? $"/{segment}" : string.IsNullOrEmpty(current) ? segment : $"{current}/{segment}";
+            if (!client.Exists(current))
+            {
+                client.CreateDirectory(current);
+            }
         }
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-        return new SftpProcessResult(true, process.ExitCode, stdout, stderr);
     }
 }

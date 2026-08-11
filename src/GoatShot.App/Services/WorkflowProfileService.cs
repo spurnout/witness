@@ -174,6 +174,7 @@ public sealed class WorkflowProfileService
                 SftpUsername = _settings.SftpUsername,
                 SftpRemoteDirectory = _settings.SftpRemoteDirectory,
                 SftpPrivateKeyPath = _settings.SftpPrivateKeyPath,
+                SftpHostKeyFingerprint = _settings.SftpHostKeyFingerprint,
                 SftpPublicBaseUrl = _settings.SftpPublicBaseUrl,
                 WebDavBaseUrl = _settings.WebDavBaseUrl,
                 WebDavRemoteDirectory = _settings.WebDavRemoteDirectory,
@@ -299,6 +300,7 @@ public sealed class WorkflowProfileService
             ? "/"
             : profile.Sharing.SftpRemoteDirectory;
         _settings.SftpPrivateKeyPath = profile.Sharing.SftpPrivateKeyPath;
+        _settings.SftpHostKeyFingerprint = profile.Sharing.SftpHostKeyFingerprint;
         _settings.SftpPublicBaseUrl = profile.Sharing.SftpPublicBaseUrl;
         _settings.WebDavBaseUrl = profile.Sharing.WebDavBaseUrl;
         _settings.WebDavRemoteDirectory = string.IsNullOrWhiteSpace(profile.Sharing.WebDavRemoteDirectory)
