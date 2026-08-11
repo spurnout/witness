@@ -221,6 +221,15 @@ public sealed class AndroidAdbCaptureService
         var remoteDirectory = string.IsNullOrWhiteSpace(request.RemoteDirectory)
             ? "/sdcard/Movies/Receipts"
             : request.RemoteDirectory.Trim().TrimEnd('/');
+        if (!IsSafeAndroidMediaDirectory(remoteDirectory))
+        {
+            return FailedVideo(
+                diagnostics,
+                durationSeconds,
+                string.Empty,
+                "Android remote directory must be an absolute /sdcard or /storage/emulated/0 path using only letters, numbers, dots, underscores, hyphens, and slashes, without traversal.");
+        }
+
         var remotePath = $"{remoteDirectory}/receipts-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.mp4";
 
         AdbProcessResult mkdir;
@@ -977,6 +986,20 @@ public sealed class AndroidAdbCaptureService
 
         args.AddRange(command);
         return args;
+    }
+
+    private static bool IsSafeAndroidMediaDirectory(string value)
+    {
+        if ((!value.StartsWith("/sdcard/", StringComparison.Ordinal) &&
+             !value.StartsWith("/storage/emulated/0/", StringComparison.Ordinal)) ||
+            value.Contains("//", StringComparison.Ordinal) ||
+            value.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '/' or '.' or '_' or '-')))
+        {
+            return false;
+        }
+
+        return value.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .All(segment => segment is not "." and not "..");
     }
 
     private static List<string> ValidateLivePreviewBounds(

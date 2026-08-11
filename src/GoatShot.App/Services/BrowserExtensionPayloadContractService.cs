@@ -157,11 +157,6 @@ public static class BrowserExtensionPayloadContractService
             return redactedUrl;
         }
 
-        if (string.IsNullOrWhiteSpace(uri.Query))
-        {
-            return url;
-        }
-
         var query = uri.Query.TrimStart('?');
         var redactedQuery = string.Join(
             "&",
@@ -169,10 +164,9 @@ public static class BrowserExtensionPayloadContractService
                 .Select(RedactQueryPart));
 
         var baseUrl = uri.GetLeftPart(UriPartial.Path);
-        var fragment = string.IsNullOrWhiteSpace(uri.Fragment) ? string.Empty : uri.Fragment;
         return string.IsNullOrWhiteSpace(redactedQuery)
-            ? $"{baseUrl}{fragment}"
-            : $"{baseUrl}?{redactedQuery}{fragment}";
+            ? baseUrl
+            : $"{baseUrl}?{redactedQuery}";
     }
 
     private static void ValidateStitchManifest(

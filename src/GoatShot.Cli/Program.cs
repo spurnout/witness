@@ -5157,7 +5157,7 @@ internal static class Program
              !args[0].Equals("host", StringComparison.OrdinalIgnoreCase) &&
              !args[0].Equals("preview", StringComparison.OrdinalIgnoreCase)))
         {
-            Console.Error.WriteLine("companion-portal requires: export --output <folder> [--manual-validation folder-or-summary.json] [--proof-root artifacts] [--share-history-limit 200] [--media file --accept-media-copy] [--json], media-review --output <folder> --media <file> --accept-media-copy [--json], or serve --output <folder> [--host 127.0.0.1|0.0.0.0] [--port 0] [--self-hosted --accept-remote-clients --auth-token-env NAME] [--media file --accept-media-copy] [--check] [--json].");
+            Console.Error.WriteLine("companion-portal requires: export --output <folder> [--manual-validation folder-or-summary.json] [--proof-root artifacts] [--share-history-limit 200] [--media file --accept-media-copy] [--json], media-review --output <folder> --media <file> --accept-media-copy [--json], or serve --output <folder> [--host 127.0.0.1] [--port 0] [--auth-token-env NAME] [--media file --accept-media-copy] [--check] [--json]. The built-in server is loopback-only; use an external HTTPS host for remote access.");
             return 2;
         }
 
@@ -11722,7 +11722,7 @@ internal static class Program
               goatshot companion-portal export --output artifacts\companion-portal-readonly [--manual-validation artifacts\manual-validation\yyyy-mm-dd] [--proof-root artifacts] [--share-history-limit 200] [--json]
               goatshot companion-portal media-review --output artifacts\companion-portal-media-review --media shot.png --accept-media-copy [--json]
               goatshot companion-portal serve --output artifacts\companion-portal-preview [--host 127.0.0.1] [--port 0] [--media shot.png --accept-media-copy] [--check] [--json]
-              goatshot companion-portal serve --output artifacts\companion-portal-self-hosted --host 0.0.0.0 --self-hosted --accept-remote-clients --auth-token-env RECEIPTS_PORTAL_TOKEN [--check] [--json]
+              The built-in companion portal server is loopback-only. Remote access requires a separately configured HTTPS host.
               goatshot print-import setup [--folder .\PrintDrop] [--enable] [--include-subdirectories] [--setup-note setup.md] [--json]
               goatshot print-import contract [--folder .\PrintDrop] [--ensure-folder] [--json]
               goatshot print-import diagnostics [--folder .\PrintDrop] [--ensure-folder] [--json]

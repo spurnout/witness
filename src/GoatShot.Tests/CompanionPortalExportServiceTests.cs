@@ -313,7 +313,7 @@ public sealed class CompanionPortalExportServiceTests
     }
 
     [TestMethod]
-    public async Task HostAsync_ServesExplicitSelfHostedPreviewWithSharedTokenAuth()
+    public async Task HostAsync_RejectsRemotePreviewEvenWithSharedTokenUntilTlsExists()
     {
         await WithTempPathsAsync(async paths =>
         {
@@ -332,45 +332,14 @@ public sealed class CompanionPortalExportServiceTests
                 AccessToken = token
             });
 
-            Assert.IsTrue(session.Result.Succeeded, session.Result.Message);
-            Assert.IsFalse(session.Result.LoopbackOnly);
-            Assert.IsTrue(session.Result.RemoteClientsAllowed);
+            Assert.IsFalse(session.Result.Succeeded);
+            Assert.IsTrue(session.Result.LoopbackOnly);
+            Assert.IsFalse(session.Result.RemoteClientsAllowed);
             Assert.IsFalse(session.Result.MutatingRoutesEnabled);
             Assert.IsTrue(session.Result.AuthRequired);
             Assert.AreEqual("shared-token", session.Result.AccessControlMode);
-            Assert.IsFalse(session.Result.WouldContactPortal);
-            Assert.IsFalse(session.Result.WouldSync);
-            Assert.IsFalse(session.Result.WouldUpload);
-            Assert.IsFalse(session.Result.WouldReadSecrets);
-            Assert.IsFalse(session.Result.WouldMutatePolicy);
-            Assert.IsNotNull(session.Export);
-            Assert.AreEqual("self-hosted-read-only-companion-portal-preview-v0", session.Export!.Report.Mode);
-            Assert.IsFalse(session.Export.Report.Boundary.LoopbackOnly);
-            Assert.IsTrue(session.Export.Report.Boundary.RemoteClientsAllowed);
-            Assert.IsTrue(session.Export.Report.Boundary.AuthRequired);
-            Assert.AreEqual("shared-token", session.Export.Report.Boundary.AccessControlMode);
-
-            using var http = new HttpClient();
-            var unauthorized = await http.GetAsync(session.Result.Url);
-            Assert.AreEqual(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
-
-            using var authed = new HttpClient();
-            authed.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Bearer " + token);
-            var index = await authed.GetStringAsync(session.Result.Url);
-            var report = await authed.GetStringAsync(new Uri(new Uri(session.Result.Url), CompanionPortalExportService.ReportJsonFileName));
-            var health = await authed.GetStringAsync(new Uri(new Uri(session.Result.Url), "health.json"));
-
-            StringAssert.Contains(index, "Receipts companion portal self-hosted preview");
-            StringAssert.Contains(report, "\"mode\": \"self-hosted-read-only-companion-portal-preview-v0\"");
-            StringAssert.Contains(report, "\"remoteClientsAllowed\": true");
-            Assert.IsFalse(report.Contains(token, StringComparison.OrdinalIgnoreCase));
-            StringAssert.Contains(health, "\"authRequired\": true");
-            StringAssert.Contains(health, "\"accessControlMode\": \"shared-token\"");
-
-            using var post = new HttpRequestMessage(HttpMethod.Post, session.Result.Url);
-            post.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
-            var postResponse = await authed.SendAsync(post);
-            Assert.AreEqual(HttpStatusCode.MethodNotAllowed, postResponse.StatusCode);
+            StringAssert.Contains(session.Result.Message, "loopback-only");
+            StringAssert.Contains(session.Result.Message, "HTTPS");
         });
     }
 
@@ -396,7 +365,7 @@ public sealed class CompanionPortalExportServiceTests
             Assert.IsFalse(session.Result.Succeeded);
             Assert.IsFalse(session.Result.RemoteClientsAllowed);
             Assert.IsFalse(session.Result.MutatingRoutesEnabled);
-            StringAssert.Contains(session.Result.Message, "auth-token");
+            StringAssert.Contains(session.Result.Message, "loopback-only");
             Assert.IsFalse(Directory.Exists(outputRoot));
         });
     }

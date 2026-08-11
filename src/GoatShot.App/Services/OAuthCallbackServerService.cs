@@ -15,7 +15,7 @@ public sealed class OAuthCallbackServerService
 
         preferredPort = preferredPort is > 0 and <= 65_535 ? preferredPort : 0;
         var listener = new TcpListener(IPAddress.Loopback, preferredPort);
-        listener.Start(1);
+        listener.Start(8);
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         return new OAuthCallbackSession(
             listener,
@@ -29,6 +29,7 @@ public sealed class OAuthCallbackServerService
 public sealed class OAuthCallbackSession : IAsyncDisposable
 {
     private const int MaxHeaderBytes = 16 * 1024;
+    private static readonly TimeSpan ClientReadTimeout = TimeSpan.FromSeconds(5);
 
     private readonly TcpListener _listener;
     private readonly string _expectedState;
@@ -71,12 +72,27 @@ public sealed class OAuthCallbackSession : IAsyncDisposable
 
         try
         {
-            using var client = await _listener.AcceptTcpClientAsync(linked.Token);
-            await using var stream = client.GetStream();
-            var request = await ReadHttpRequestAsync(stream, linked.Token);
-            var result = ParseRequest(request);
-            await WriteResponseAsync(stream, result, linked.Token);
-            return result;
+            while (true)
+            {
+                using var client = await _listener.AcceptTcpClientAsync(linked.Token);
+                await using var stream = client.GetStream();
+                using var clientTimeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token);
+                clientTimeout.CancelAfter(ClientReadTimeout);
+                try
+                {
+                    var request = await ReadHttpRequestAsync(stream, clientTimeout.Token);
+                    var result = ParseRequest(request);
+                    await WriteResponseAsync(stream, result, clientTimeout.Token);
+                    if (result.Succeeded || string.Equals(result.State, _expectedState, StringComparison.Ordinal))
+                    {
+                        return result;
+                    }
+                }
+                catch (OperationCanceledException) when (!linked.IsCancellationRequested)
+                {
+                    // Ignore a slow or incomplete client and keep waiting for the provider callback.
+                }
+            }
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {

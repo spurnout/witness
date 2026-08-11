@@ -766,6 +766,7 @@ public sealed partial class TranscriptionService
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
+        Process? process = null;
         try
         {
             var start = new ProcessStartInfo
@@ -781,26 +782,38 @@ public sealed partial class TranscriptionService
                 start.ArgumentList.Add(argument);
             }
 
-            using var process = Process.Start(start);
+            process = Process.Start(start);
             if (process is null)
             {
                 return new ProcessResult(false, $"Could not start {executablePath}.");
             }
 
-            var stderr = await process.StandardError.ReadToEndAsync(timeoutCts.Token);
-            var stdout = await process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            await process.WaitForExitAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            await Task.WhenAll(stderrTask, stdoutTask, process.WaitForExitAsync(timeoutCts.Token));
+            var stderr = await stderrTask;
+            var stdout = await stdoutTask;
             return process.ExitCode == 0
                 ? new ProcessResult(true, "Process completed.")
                 : new ProcessResult(false, $"{Path.GetFileName(executablePath)} failed with exit code {process.ExitCode}: {RecordingService.ShortFfmpegMessage(stderr, stdout)}");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            TryKill(process);
             return new ProcessResult(false, $"{Path.GetFileName(executablePath)} timed out after {timeout.TotalSeconds:0} seconds.");
+        }
+        catch (OperationCanceledException)
+        {
+            TryKill(process);
+            throw;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new ProcessResult(false, $"{ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            process?.Dispose();
         }
     }
 
@@ -842,6 +855,7 @@ public sealed partial class TranscriptionService
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
+        Process? process = null;
         try
         {
             var start = new ProcessStartInfo
@@ -857,26 +871,53 @@ public sealed partial class TranscriptionService
                 start.ArgumentList.Add(argument);
             }
 
-            using var process = Process.Start(start);
+            process = Process.Start(start);
             if (process is null)
             {
                 return new ProcessCaptureResult(false, string.Empty, $"Could not start {executablePath}.");
             }
 
-            var stderr = await process.StandardError.ReadToEndAsync(timeoutCts.Token);
-            var stdout = await process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            await process.WaitForExitAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            await Task.WhenAll(stderrTask, stdoutTask, process.WaitForExitAsync(timeoutCts.Token));
+            var stderr = await stderrTask;
+            var stdout = await stdoutTask;
             return process.ExitCode == 0
                 ? new ProcessCaptureResult(true, stdout, "Process completed.")
                 : new ProcessCaptureResult(false, stdout, $"{Path.GetFileName(executablePath)} failed with exit code {process.ExitCode}: {RecordingService.ShortFfmpegMessage(stderr, stdout)}");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            TryKill(process);
             return new ProcessCaptureResult(false, string.Empty, $"{Path.GetFileName(executablePath)} timed out after {timeout.TotalSeconds:0} seconds.");
+        }
+        catch (OperationCanceledException)
+        {
+            TryKill(process);
+            throw;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new ProcessCaptureResult(false, string.Empty, $"{ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
+    private static void TryKill(Process? process)
+    {
+        try
+        {
+            if (process is { HasExited: false })
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+            // Best effort cleanup must not hide the original timeout or cancellation.
         }
     }
 

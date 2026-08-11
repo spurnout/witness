@@ -7,6 +7,22 @@ namespace GoatShot.Tests;
 public sealed class SettingsStoreTests
 {
     [TestMethod]
+    public void Save_ProtectsWebhookCredentialsAndRoundTripsThem()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "goatshot-settings-tests", Guid.NewGuid().ToString("N"), "settings.json");
+        var store = new SettingsStore();
+        store.UsePath(path);
+        const string webhook = "https://hooks.example.test/services/super-secret-token";
+
+        store.Save(new AppSettings { SlackWebhookUrl = webhook });
+
+        var persisted = File.ReadAllText(path);
+        Assert.IsFalse(persisted.Contains("super-secret-token", StringComparison.Ordinal));
+        StringAssert.Contains(persisted, "dpapi:v1:");
+        Assert.AreEqual(webhook, store.Load().SlackWebhookUrl);
+    }
+
+    [TestMethod]
     public void SaveAndLoad_RoundTripsSettingsFromCustomPath()
     {
         var path = Path.Combine(Path.GetTempPath(), "goatshot-settings-tests", Guid.NewGuid().ToString("N"), "settings.json");

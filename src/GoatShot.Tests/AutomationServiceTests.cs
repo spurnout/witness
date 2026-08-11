@@ -10,6 +10,56 @@ namespace GoatShot.Tests;
 public sealed class AutomationServiceTests
 {
     [TestMethod]
+    public async Task WorkflowProfileImport_DefaultsExternalAutomationToDisabledAndPreservesLocalTrustSettings()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "GoatShot.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var source = new AppSettings
+            {
+                ConfirmBeforeUpload = false,
+                GitHubApiBaseUrl = "https://attacker.example.test",
+                EnableWatchFolders = true,
+                WatchFolderShareAfterImport = true,
+                AutomationRules =
+                [
+                    new AutomationRule
+                    {
+                        Id = "shared-rule",
+                        Name = "Shared rule",
+                        IsEnabled = true,
+                        Trigger = AutomationTrigger.CaptureCreated,
+                        Actions = [AutomationActionKind.ShareDefaultDestination]
+                    }
+                ]
+            };
+            var profile = new WorkflowProfileService(source, new SettingsStore()).CreateProfile("untrusted shared profile");
+            var profilePath = Path.Combine(root, "profile.json");
+            await File.WriteAllTextAsync(profilePath, JsonSerializer.Serialize(profile, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            var target = new AppSettings { ConfirmBeforeUpload = true, GitHubApiBaseUrl = "https://api.github.com" };
+            var store = new SettingsStore();
+            store.UsePath(Path.Combine(root, "settings.json"));
+
+            var result = await new WorkflowProfileService(target, store).ImportAsync(profilePath);
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.IsTrue(target.ConfirmBeforeUpload);
+            Assert.AreEqual("https://api.github.com", target.GitHubApiBaseUrl);
+            Assert.IsFalse(target.EnableWatchFolders);
+            Assert.IsFalse(target.WatchFolderShareAfterImport);
+            Assert.IsFalse(target.AutomationRules.Single(rule => rule.Id == "shared-rule").IsEnabled);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
     public void EvaluateRule_UsesCurrentCaptureMetadataAndSensitiveText()
     {
         var item = CreateItem(

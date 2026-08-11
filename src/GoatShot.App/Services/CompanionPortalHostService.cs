@@ -10,6 +10,11 @@ namespace GoatShot.App.Services;
 public sealed class CompanionPortalHostService
 {
     private const int MinimumAccessTokenLength = 16;
+    private const int MaxConcurrentClients = 16;
+    private const int MaxRequestLineCharacters = 8 * 1024;
+    private const int MaxHeaderCharacters = 32 * 1024;
+    private const int MaxHeaderCount = 100;
+    private static readonly TimeSpan RequestHeaderTimeout = TimeSpan.FromSeconds(5);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -145,13 +150,25 @@ public sealed class CompanionPortalHostService
         string? accessToken,
         CancellationToken cancellationToken)
     {
+        var clientGate = new SemaphoreSlim(MaxConcurrentClients, MaxConcurrentClients);
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
                 var client = await listener.AcceptTcpClientAsync(cancellationToken);
+                await clientGate.WaitAsync(cancellationToken);
                 _ = Task.Run(
-                    () => HandleClientAsync(client, outputRoot, report, result, accessToken, cancellationToken),
+                    async () =>
+                    {
+                        try
+                        {
+                            await HandleClientAsync(client, outputRoot, report, result, accessToken, cancellationToken);
+                        }
+                        finally
+                        {
+                            clientGate.Release();
+                        }
+                    },
                     CancellationToken.None);
             }
             catch (OperationCanceledException)
@@ -178,6 +195,9 @@ public sealed class CompanionPortalHostService
         CancellationToken cancellationToken)
     {
         using var _ = client;
+        using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        requestTimeout.CancelAfter(RequestHeaderTimeout);
+        cancellationToken = requestTimeout.Token;
         await using var stream = client.GetStream();
         using var reader = new StreamReader(stream, Encoding.ASCII, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         var requestLine = await reader.ReadLineAsync(cancellationToken);
@@ -186,7 +206,14 @@ public sealed class CompanionPortalHostService
             return;
         }
 
+        if (requestLine.Length > MaxRequestLineCharacters)
+        {
+            await WriteResponseAsync(stream, 431, "Request Header Fields Too Large", "text/plain; charset=utf-8", "Request line is too large.", false, cancellationToken);
+            return;
+        }
+
         var headers = await ReadHeadersAsync(reader, cancellationToken);
+        requestTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
 
         var parts = requestLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
@@ -272,12 +299,12 @@ public sealed class CompanionPortalHostService
 
         if (staticFile?.Binary == true)
         {
-            await WriteBytesResponseAsync(
+            await WriteFileResponseAsync(
                 stream,
                 200,
                 "OK",
                 contentType,
-                await File.ReadAllBytesAsync(filePath, cancellationToken),
+                filePath,
                 headOnly,
                 cancellationToken);
             return;
@@ -329,12 +356,19 @@ public sealed class CompanionPortalHostService
         CancellationToken cancellationToken)
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var totalCharacters = 0;
         while (true)
         {
             var line = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrEmpty(line))
             {
                 return headers;
+            }
+
+            totalCharacters += line.Length + 2;
+            if (totalCharacters > MaxHeaderCharacters || headers.Count >= MaxHeaderCount)
+            {
+                throw new InvalidDataException("Request headers exceed the portal safety limit.");
             }
 
             var separator = line.IndexOf(':');
@@ -421,20 +455,21 @@ public sealed class CompanionPortalHostService
         }
     }
 
-    private static async Task WriteBytesResponseAsync(
+    private static async Task WriteFileResponseAsync(
         Stream stream,
         int statusCode,
         string reason,
         string contentType,
-        byte[] body,
+        string filePath,
         bool headOnly,
         CancellationToken cancellationToken,
         string extraHeaders = "")
     {
+        var fileInfo = new FileInfo(filePath);
         var headers = Encoding.ASCII.GetBytes(
             $"HTTP/1.1 {statusCode} {reason}\r\n" +
             $"Content-Type: {contentType}\r\n" +
-            $"Content-Length: {body.Length}\r\n" +
+            $"Content-Length: {fileInfo.Length}\r\n" +
             "Cache-Control: no-store\r\n" +
             "X-Receipts-Portal-Boundary: read-only\r\n" +
             "X-GoatShot-Portal-Boundary: read-only\r\n" +
@@ -443,7 +478,8 @@ public sealed class CompanionPortalHostService
         await stream.WriteAsync(headers, cancellationToken);
         if (!headOnly)
         {
-            await stream.WriteAsync(body, cancellationToken);
+            await using var file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            await file.CopyToAsync(stream, cancellationToken);
         }
     }
 
@@ -497,31 +533,8 @@ public sealed class CompanionPortalHostService
             return CompanionPortalBindResolution.Success(parsedAddress);
         }
 
-        if (!request.AllowRemoteClients || !request.AcceptRemoteClients)
-        {
-            return CompanionPortalBindResolution.Failed("Companion portal preview only supports non-loopback hosts when --self-hosted and --accept-remote-clients are both supplied.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.AccessToken))
-        {
-            return CompanionPortalBindResolution.Failed($"Companion portal self-hosted preview requires --auth-token with at least {MinimumAccessTokenLength} characters.");
-        }
-
-        if (host.Equals("0.0.0.0", StringComparison.OrdinalIgnoreCase) ||
-            host.Equals("*", StringComparison.OrdinalIgnoreCase))
-        {
-            return CompanionPortalBindResolution.Success(IPAddress.Any);
-        }
-
-        if (host.Equals("::", StringComparison.OrdinalIgnoreCase) ||
-            host.Equals("[::]", StringComparison.OrdinalIgnoreCase))
-        {
-            return CompanionPortalBindResolution.Success(IPAddress.IPv6Any);
-        }
-
-        return IPAddress.TryParse(host, out var remoteAddress) && !IPAddress.IsLoopback(remoteAddress)
-            ? CompanionPortalBindResolution.Success(remoteAddress)
-            : CompanionPortalBindResolution.Failed("Companion portal self-hosted preview requires an explicit IP bind host such as 0.0.0.0 or a non-loopback address.");
+        return CompanionPortalBindResolution.Failed(
+            "The built-in companion portal server is loopback-only. Remote clients require a separately configured HTTPS reverse proxy or TLS-capable host.");
     }
 
     private static string FormatPreviewHostForUrl(IPAddress address)

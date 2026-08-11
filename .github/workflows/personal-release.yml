@@ -26,8 +26,15 @@ jobs:
       - name: Resolve version
         id: version
         shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $value = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          $value = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_VERSION } else { $env:REF_NAME.TrimStart('v') }
+          if ($value -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Release version is invalid."
+          }
           "value=$value" >> $env:GITHUB_OUTPUT
       - name: Restore, build, and test clean revision
         shell: pwsh
@@ -38,21 +45,32 @@ jobs:
           dotnet list GoatShot.slnx package --vulnerable --include-transitive
       - name: Package Receipts release assets
         shell: powershell
-        run: .\scripts\package-release.ps1 -Version '${{ steps.version.outputs.value }}' -BuildId '${{ github.sha }}'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+          BUILD_ID: ${{ github.sha }}
+        run: .\scripts\package-release.ps1 -Version $env:RELEASE_VERSION -BuildId $env:BUILD_ID
       - name: Verify portable package
         shell: powershell
-        run: .\scripts\verify-portable-package.ps1 -PackagePath '.\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64-portable.zip' -RunCliSmoke
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: .\scripts\verify-portable-package.ps1 -PackagePath ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-win-x64-portable.zip" -RunCliSmoke
       - name: Verify single executable
         shell: powershell
-        run: .\scripts\verify-single-exe-package.ps1 -Version '${{ steps.version.outputs.value }}'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: .\scripts\verify-single-exe-package.ps1 -Version $env:RELEASE_VERSION
       - name: Verify installer package
         shell: powershell
-        run: .\scripts\verify-installer-package.ps1 -Version '${{ steps.version.outputs.value }}'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: .\scripts\verify-installer-package.ps1 -Version $env:RELEASE_VERSION
       - name: Create public release proof bundle
         shell: powershell
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
         run: |
           .\scripts\create-release-proof-bundle.ps1 `
-            -Version '${{ steps.version.outputs.value }}' `
+            -Version $env:RELEASE_VERSION `
             -OutputRoot '.\artifacts\tag-release-proof' `
             -SkipCommands `
             -SkipTrancheNotes `
@@ -63,11 +81,11 @@ jobs:
               '.\artifacts\portable-package-verification\portable-package-verification.md',
               '.\artifacts\installer-package-verification\installer-package-verification.json',
               '.\artifacts\installer-package-verification\installer-package-verification.md',
-              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe.sha256",
-              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.exe.sha256",
-              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.build.json",
-              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-win-x64.spdx.json",
-              ".\artifacts\dist\Receipts-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt"
+              ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-win-x64-single-exe.exe.sha256",
+              ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-win-x64.exe.sha256",
+              ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-win-x64.build.json",
+              ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-win-x64.spdx.json",
+              ".\artifacts\dist\Receipts-$env:RELEASE_VERSION-THIRD-PARTY-NOTICES.txt"
             )
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -91,8 +109,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $version = '${{ steps.version.outputs.value }}'
+          $version = $env:RELEASE_VERSION
           $releaseAssets = @(
             Get-ChildItem -LiteralPath '.\artifacts\dist' -Filter "Receipts-$version-*" -File
             Get-ChildItem -LiteralPath '.\artifacts\tag-release-proof' -Filter 'Receipts-release-proof-*.zip' -File
@@ -100,4 +120,4 @@ jobs:
           if ($releaseAssets.Count -eq 0) {
             throw 'No Receipts release assets were found.'
           }
-          gh release create '${{ github.ref_name }}' @releaseAssets --prerelease --title 'Receipts ${{ github.ref_name }}' --notes 'Unsigned Windows x64 Receipts preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'
+          gh release create $env:RELEASE_TAG @releaseAssets --prerelease --title "Receipts $env:RELEASE_TAG" --notes 'Unsigned Windows x64 Receipts preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'

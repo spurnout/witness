@@ -36,7 +36,7 @@ public static class CaptureTaskWindowRenderer
         }
 
         services.Settings.AiEnabled = true;
-        services.Settings.CustomScriptCommand = "Write-Output 'https://example.test/captures/{id}'";
+        services.Settings.CustomScriptCommand = "Write-Output ('https://example.test/captures/' + {id})";
         services.Settings.CustomWebhookUrl = "https://example.test/hooks/goatshot?token=preview-token";
         services.Settings.DefaultShareDestination = "Custom webhook";
 

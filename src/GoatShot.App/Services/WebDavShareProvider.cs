@@ -41,6 +41,11 @@ public sealed class WebDavShareProvider : IShareProvider
             return Task.FromResult(new ProviderHealth(false, "WebDAV base URL is not configured."));
         }
 
+        if (!UsesSecureTransport(_settings.WebDavBaseUrl))
+        {
+            return Task.FromResult(new ProviderHealth(false, "WebDAV requires HTTPS; plaintext HTTP is allowed only on loopback."));
+        }
+
         if (!string.IsNullOrWhiteSpace(_settings.WebDavUsername) && !_secretStore.HasWebDavPassword)
         {
             return Task.FromResult(new ProviderHealth(false, "WebDAV username is configured but no DPAPI-saved password exists."));
@@ -56,6 +61,11 @@ public sealed class WebDavShareProvider : IShareProvider
         if (string.IsNullOrWhiteSpace(_settings.WebDavBaseUrl))
         {
             return new ShareUploadResult(false, null, "WebDAV upload needs a base URL setting.");
+        }
+
+        if (!UsesSecureTransport(_settings.WebDavBaseUrl))
+        {
+            return new ShareUploadResult(false, null, "WebDAV requires HTTPS; plaintext HTTP is allowed only on loopback.");
         }
 
         if (string.IsNullOrWhiteSpace(request.FilePath) || !File.Exists(request.FilePath))
@@ -155,7 +165,29 @@ public sealed class WebDavShareProvider : IShareProvider
             baseUrl = $"https://{baseUrl}";
         }
 
-        return baseUrl;
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) || !UsesSecureTransport(uri))
+        {
+            throw new InvalidOperationException($"{settingName} must use HTTPS; plaintext HTTP is allowed only on loopback.");
+        }
+
+        return uri.ToString();
+    }
+
+    private static bool UsesSecureTransport(string value)
+    {
+        var normalized = value.Trim();
+        if (!normalized.Contains("://", StringComparison.Ordinal))
+        {
+            normalized = $"https://{normalized}";
+        }
+
+        return Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && UsesSecureTransport(uri);
+    }
+
+    private static bool UsesSecureTransport(Uri uri)
+    {
+        return uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && uri.IsLoopback);
     }
 
     private static string NormalizeCloudFolderPath(string? value)

@@ -101,6 +101,23 @@ public sealed class OAuthFlowServiceTests
     }
 
     [TestMethod]
+    public async Task CallbackServer_IgnoresWrongStateBeforeValidCallback()
+    {
+        var server = new OAuthCallbackServerService();
+        await using var session = server.Start("expected-state", 0, TimeSpan.FromSeconds(5), CancellationToken.None);
+        var wait = session.WaitForCallbackAsync();
+
+        using var http = new HttpClient();
+        var rejected = await http.GetAsync(new Uri($"{session.CallbackUri}?code=attacker-code&state=wrong-state"));
+        Assert.AreEqual(System.Net.HttpStatusCode.BadRequest, rejected.StatusCode);
+        await http.GetAsync(new Uri($"{session.CallbackUri}?code=valid-code&state=expected-state"));
+
+        var result = await wait;
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual("valid-code", result.Code);
+    }
+
+    [TestMethod]
     public async Task BrowserFlow_AuthorizeAsync_UsesPkceCallbackAndTokenExchange()
     {
         var handler = new StubHandler(

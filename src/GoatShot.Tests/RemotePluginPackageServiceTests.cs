@@ -238,7 +238,10 @@ public sealed class RemotePluginPackageServiceTests
                 AllowedPluginActionIds = { "sample.redaction-note:*", "sample.redaction-note:write-note" }
             };
             var localPlugins = new LocalPluginService(paths, settings);
-            var service = new RemotePluginPackageService(paths, localPlugins, settings: settings);
+            var settingsStore = new SettingsStore();
+            settingsStore.UsePath(Path.Combine(paths.LocalRoot, "settings.json"));
+            settingsStore.Save(settings);
+            var service = new RemotePluginPackageService(paths, localPlugins, settings: settings, settingsStore: settingsStore);
 
             var stage = await service.PlanInstallAsync("sample.redaction-note", registryPath, stagePackage: true);
             var install = service.InstallStagedPackage("sample.redaction-note", replaceExisting: true);
@@ -249,6 +252,10 @@ public sealed class RemotePluginPackageServiceTests
             Assert.AreEqual(0, settings.TrustedPluginIds.Count);
             Assert.AreEqual(0, settings.EnabledPluginIds.Count);
             Assert.AreEqual(0, settings.AllowedPluginActionIds.Count);
+            var reloaded = settingsStore.Load();
+            Assert.AreEqual(0, reloaded.TrustedPluginIds.Count);
+            Assert.AreEqual(0, reloaded.EnabledPluginIds.Count);
+            Assert.AreEqual(0, reloaded.AllowedPluginActionIds.Count);
 
             var plugin = localPlugins.Discover().Single(item =>
                 item.PluginId.Equals("sample.redaction-note", StringComparison.OrdinalIgnoreCase));
@@ -890,6 +897,28 @@ public sealed class RemotePluginPackageServiceTests
               ]
             }
             """;
+    }
+
+    [TestMethod]
+    public async Task ValidateRegistryAsync_RejectsOversizedRemoteMetadata()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var oversized = new byte[RemotePluginPackageService.DefaultMaxRegistryBytes + 1];
+            using var httpClient = new HttpClient(new FakeHttpHandler(new Dictionary<string, byte[]>
+            {
+                ["https://registry.example.test/registry.json"] = oversized
+            }));
+            var service = new RemotePluginPackageService(
+                paths,
+                new LocalPluginService(paths, new AppSettings()),
+                httpClient);
+
+            var result = await service.ValidateRegistryAsync("https://registry.example.test/registry.json");
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsTrue(result.Issues.Any(issue => issue.Contains("safety limit", StringComparison.OrdinalIgnoreCase)));
+        });
     }
 
     private static async Task WithTempPathsAsync(Func<AppPaths, Task> action)

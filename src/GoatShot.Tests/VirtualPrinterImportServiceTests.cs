@@ -202,7 +202,7 @@ public sealed class VirtualPrinterImportServiceTests
             var importStore = new SettingsStore();
             importStore.UsePath(Path.Combine(root, "import-settings.json"));
             var importResult = await new WorkflowProfileService(importSettings, importStore)
-                .ImportAsync(profilePath);
+                .ImportAsync(profilePath, new WorkflowProfileImportOptions { IncludeSensitiveValues = true });
 
             Assert.IsTrue(importResult.Succeeded, importResult.Message);
             Assert.IsTrue(importSettings.EnableVirtualPrinterImport);

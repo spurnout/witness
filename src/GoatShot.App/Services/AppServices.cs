@@ -234,7 +234,7 @@ public sealed class AppServices : IDisposable
         var secretStore = new SecretStore(paths);
         var providerDiagnostics = new ProviderDiagnosticsService(settings, secretStore);
         var localPlugins = new LocalPluginService(paths, settings);
-        var remotePlugins = new RemotePluginPackageService(paths, localPlugins, settings: settings);
+        var remotePlugins = new RemotePluginPackageService(paths, localPlugins, settings: settings, settingsStore: settingsStore);
         var personSegmentationModels = new PersonSegmentationModelPackageService(paths);
         var personSegmentation = new PersonSegmentationInferenceService(bundledTools);
         var browserExtensionBridge = new BrowserExtensionNativeBridgeService(paths, workspaceStore);

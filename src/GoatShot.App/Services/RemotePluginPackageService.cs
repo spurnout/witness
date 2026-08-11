@@ -19,6 +19,7 @@ public sealed class RemotePluginPackageService
     public const string CurrentInstallSchemaVersion = "receipts.plugin-install.v1";
     public const string LegacyInstallSchemaVersion = "goatshot.plugin-install.v1";
     public const long DefaultMaxPackageBytes = 50L * 1024L * 1024L;
+    public const long DefaultMaxRegistryBytes = 2L * 1024L * 1024L;
 
     private static readonly Regex IdPattern = new("^[a-z0-9][a-z0-9._-]{2,63}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex Sha256Pattern = new("^[a-f0-9]{64}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -34,19 +35,22 @@ public sealed class RemotePluginPackageService
     private readonly HttpClient _httpClient;
     private readonly long _maxPackageBytes;
     private readonly AppSettings _settings;
+    private readonly SettingsStore? _settingsStore;
 
     public RemotePluginPackageService(
         AppPaths paths,
         LocalPluginService localPlugins,
         HttpClient? httpClient = null,
         long maxPackageBytes = DefaultMaxPackageBytes,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        SettingsStore? settingsStore = null)
     {
         _paths = paths;
         _localPlugins = localPlugins;
         _httpClient = httpClient ?? SharedHttpClient;
         _maxPackageBytes = maxPackageBytes;
         _settings = settings ?? new AppSettings();
+        _settingsStore = settingsStore;
     }
 
     public async Task<RemotePluginRegistryValidationResult> ValidateRegistryAsync(
@@ -703,6 +707,11 @@ public sealed class RemotePluginPackageService
             return result;
         }
 
+        if (replaceExisting)
+        {
+            ClearPluginTrustState(stageManifest.PluginId);
+        }
+
         if (Directory.Exists(targetDirectory))
         {
             if (!replaceExisting)
@@ -731,7 +740,10 @@ public sealed class RemotePluginPackageService
             CopyDirectory(pluginSource, targetDirectory);
             result.ManifestPath = Path.Combine(targetDirectory, "plugin.json");
             WriteInstallManifest(targetDirectory, stageManifest);
-            ClearPluginTrustState(stageManifest.PluginId);
+            if (!replaceExisting)
+            {
+                ClearPluginTrustState(stageManifest.PluginId);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -754,6 +766,7 @@ public sealed class RemotePluginPackageService
         _settings.AllowedPluginActionIds.RemoveAll(value =>
             value.Equals($"{pluginId}:*", StringComparison.OrdinalIgnoreCase) ||
             value.StartsWith($"{pluginId}:", StringComparison.OrdinalIgnoreCase));
+        _settingsStore?.Save(_settings);
     }
 
     private void ApplyStagedInstall(RemotePluginUpdateApplyItem item, bool replaceExisting)
@@ -1131,7 +1144,7 @@ public sealed class RemotePluginPackageService
         {
             if (TryCreateHttpUri(registryLocation, out remoteUri))
             {
-                using var response = await _httpClient.GetAsync(remoteUri, cancellationToken);
+                using var response = await _httpClient.GetAsync(remoteUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     validation.Issues.Add($"Registry HTTP request failed with status {(int)response.StatusCode}.");
@@ -1139,7 +1152,13 @@ public sealed class RemotePluginPackageService
                     return new LoadedRemotePluginRegistry(null, validation, null, remoteUri);
                 }
 
-                json = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (response.Content.Headers.ContentLength is { } contentLength && contentLength > DefaultMaxRegistryBytes)
+                {
+                    throw new InvalidOperationException($"Registry content length exceeds {DefaultMaxRegistryBytes} byte safety limit.");
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                json = Encoding.UTF8.GetString(await ReadBoundedAsync(stream, DefaultMaxRegistryBytes, cancellationToken));
                 validation.RegistryLocation = SensitiveTextDetector.Redact(remoteUri.ToString());
             }
             else
@@ -1149,7 +1168,7 @@ public sealed class RemotePluginPackageService
                 json = await File.ReadAllTextAsync(localPath, cancellationToken);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException or UriFormatException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException or UriFormatException or InvalidOperationException)
         {
             validation.Issues.Add(SensitiveTextDetector.Redact(ex.Message));
             validation.Message = "Remote plugin registry validation failed.";

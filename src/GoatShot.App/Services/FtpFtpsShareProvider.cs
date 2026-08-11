@@ -45,6 +45,11 @@ public sealed class FtpFtpsShareProvider : IShareProvider
             return Task.FromResult(new ProviderHealth(false, "FTP/FTPS password is not saved with Windows DPAPI."));
         }
 
+        if (!UsesFtps())
+        {
+            return Task.FromResult(new ProviderHealth(false, "FTPS is required; plaintext FTP is not supported."));
+        }
+
         return Task.FromResult(new ProviderHealth(true, "FTP/FTPS is configured for local upload attempts."));
     }
 
@@ -56,6 +61,16 @@ public sealed class FtpFtpsShareProvider : IShareProvider
             string.IsNullOrWhiteSpace(_settings.FtpUsername))
         {
             return new ShareUploadResult(false, null, "FTP/FTPS upload needs host and username settings.");
+        }
+
+        if (!_secretStore.HasFtpPassword)
+        {
+            return new ShareUploadResult(false, null, "FTP/FTPS upload needs a DPAPI-saved password.");
+        }
+
+        if (!UsesFtps())
+        {
+            return new ShareUploadResult(false, null, "FTPS is required; plaintext FTP is not supported.");
         }
 
         var password = _secretStore.ReadFtpPassword();
@@ -70,14 +85,12 @@ public sealed class FtpFtpsShareProvider : IShareProvider
         }
 
         var requestUri = BuildUploadUri(request);
-        var useFtps = _settings.FtpUseFtps ||
-            _settings.FtpHost.Trim().StartsWith("ftps://", StringComparison.OrdinalIgnoreCase);
         var uploadRequest = new FtpUploadRequest(
             requestUri,
             _settings.FtpUsername.Trim(),
             password.Trim(),
-            useFtps,
-            request.FilePath);
+            EnableSsl: true,
+            FilePath: request.FilePath);
         var uploadResult = await _ftpClient.UploadAsync(uploadRequest, cancellationToken);
         var shareUrl = BuildPublicUrl(Path.GetFileName(requestUri.LocalPath));
         if (!string.IsNullOrWhiteSpace(shareUrl))
@@ -95,6 +108,12 @@ public sealed class FtpFtpsShareProvider : IShareProvider
             string.IsNullOrWhiteSpace(shareUrl)
                 ? $"FTP/FTPS upload completed: {statusDescription}"
                 : $"FTP/FTPS upload completed and copied URL: {shareUrl}");
+    }
+
+    private bool UsesFtps()
+    {
+        return _settings.FtpUseFtps ||
+            _settings.FtpHost.Trim().StartsWith("ftps://", StringComparison.OrdinalIgnoreCase);
     }
 
     private Uri BuildUploadUri(ShareUploadRequest request)

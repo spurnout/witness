@@ -155,16 +155,16 @@ public sealed class WorkflowActionDryRunService
         string ocrPath)
     {
         return template
-            .Replace("{file}", EscapePowerShellLiteral(request.FilePath), StringComparison.OrdinalIgnoreCase)
-            .Replace("{metadata}", EscapePowerShellLiteral(metadataPath), StringComparison.OrdinalIgnoreCase)
-            .Replace("{ocr}", EscapePowerShellLiteral(ocrPath), StringComparison.OrdinalIgnoreCase)
-            .Replace("{id}", EscapePowerShellLiteral(MetadataValue(request, "id")), StringComparison.OrdinalIgnoreCase)
-            .Replace("{capture_type}", EscapePowerShellLiteral(request.CaptureType), StringComparison.OrdinalIgnoreCase);
+            .Replace("{file}", ToPowerShellLiteral(request.FilePath), StringComparison.OrdinalIgnoreCase)
+            .Replace("{metadata}", ToPowerShellLiteral(metadataPath), StringComparison.OrdinalIgnoreCase)
+            .Replace("{ocr}", ToPowerShellLiteral(ocrPath), StringComparison.OrdinalIgnoreCase)
+            .Replace("{id}", ToPowerShellLiteral(MetadataValue(request, "id")), StringComparison.OrdinalIgnoreCase)
+            .Replace("{capture_type}", ToPowerShellLiteral(request.CaptureType), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string EscapePowerShellLiteral(string value)
+    private static string ToPowerShellLiteral(string value)
     {
-        return value.Replace("'", "''", StringComparison.Ordinal);
+        return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
     }
 
     private static string MetadataValue(ShareUploadRequest request, string key, string fallback = "")

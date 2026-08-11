@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GoatShot.App.Models;
 
 namespace GoatShot.App.Services;
@@ -11,6 +14,15 @@ public sealed class SettingsStore
     {
         WriteIndented = true
     };
+    private static readonly byte[] WebhookEntropy = Encoding.UTF8.GetBytes("Receipts.Settings.WebhookUrls.v1");
+    private static readonly string[] ProtectedWebhookProperties =
+    [
+        "customWebhookUrl",
+        "slackWebhookUrl",
+        "discordWebhookUrl",
+        "teamsWebhookUrl"
+    ];
+    private const string ProtectedPrefix = "dpapi:v1:";
 
     private string _path = Path.Combine(AppPaths.DefaultLocalRoot(), "settings.json");
 
@@ -31,9 +43,10 @@ public sealed class SettingsStore
         try
         {
             var json = ReadAllTextWithRetry(_path);
-            var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            var (decryptedJson, hadPlaintextWebhook) = UnprotectWebhookUrls(json);
+            var settings = JsonSerializer.Deserialize<AppSettings>(decryptedJson, JsonOptions) ?? new AppSettings();
             var migration = SettingsMigrationService.Migrate(settings);
-            if (migration.Changed)
+            if (migration.Changed || hadPlaintextWebhook)
             {
                 Save(settings);
             }
@@ -56,8 +69,57 @@ public sealed class SettingsStore
             Directory.CreateDirectory(directory);
         }
 
-        var json = JsonSerializer.Serialize(settings, JsonOptions);
+        var json = ProtectWebhookUrls(JsonSerializer.Serialize(settings, JsonOptions));
         WriteAllTextAtomicallyWithRetry(_path, json);
+    }
+
+    private static string ProtectWebhookUrls(string json)
+    {
+        var root = JsonNode.Parse(json)?.AsObject() ?? new JsonObject();
+        foreach (var property in ProtectedWebhookProperties)
+        {
+            var value = root[property]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(value) || value.StartsWith(ProtectedPrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var protectedBytes = ProtectedData.Protect(
+                Encoding.UTF8.GetBytes(value),
+                WebhookEntropy,
+                DataProtectionScope.CurrentUser);
+            root[property] = ProtectedPrefix + Convert.ToBase64String(protectedBytes);
+        }
+
+        return root.ToJsonString(JsonOptions);
+    }
+
+    private static (string Json, bool HadPlaintextWebhook) UnprotectWebhookUrls(string json)
+    {
+        var root = JsonNode.Parse(json)?.AsObject() ?? new JsonObject();
+        var hadPlaintext = false;
+        foreach (var property in ProtectedWebhookProperties)
+        {
+            var value = root[property]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (!value.StartsWith(ProtectedPrefix, StringComparison.Ordinal))
+            {
+                hadPlaintext = true;
+                continue;
+            }
+
+            var protectedBytes = Convert.FromBase64String(value[ProtectedPrefix.Length..]);
+            root[property] = Encoding.UTF8.GetString(ProtectedData.Unprotect(
+                protectedBytes,
+                WebhookEntropy,
+                DataProtectionScope.CurrentUser));
+        }
+
+        return (root.ToJsonString(JsonOptions), hadPlaintext);
     }
 
     private static string ReadAllTextWithRetry(string path)

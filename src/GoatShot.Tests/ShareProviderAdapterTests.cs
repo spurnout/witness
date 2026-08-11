@@ -1815,9 +1815,9 @@ public sealed class ShareProviderAdapterTests
             var settings = new AppSettings
             {
                 CustomScriptCommand =
-                    "$metadata = Get-Content -LiteralPath '{metadata}' -Raw; " +
-                    "$ocr = Get-Content -LiteralPath '{ocr}' -Raw; " +
-                    $"Set-Content -LiteralPath '{EscapePowerShellLiteral(proofPath)}' -Value ('id={{id}};type={{capture_type}};file={{file}};ocr=' + $ocr + ';metadata=' + $metadata)"
+                    "$metadata = Get-Content -LiteralPath {metadata} -Raw; " +
+                    "$ocr = Get-Content -LiteralPath {ocr} -Raw; " +
+                    $"Set-Content -LiteralPath '{EscapePowerShellLiteral(proofPath)}' -Value ('id=' + {{id}} + ';type=' + {{capture_type}} + ';file=' + {{file}} + ';ocr=' + $ocr + ';metadata=' + $metadata)"
             };
             var provider = new CustomScriptShareProvider(paths, settings);
             var item = CreateCaptureItem(paths, "script-adapter.png", 44);
@@ -1838,6 +1838,21 @@ public sealed class ShareProviderAdapterTests
             StringAssert.Contains(proof, $"file={item.FilePath}");
             StringAssert.Contains(proof, "ocr=OCR proof text");
             StringAssert.Contains(proof, "\"sourceApp\": \"UnitTestApp\"");
+        });
+    }
+
+    [TestMethod]
+    public async Task CustomScriptProvider_TreatsCraftedFilenameAsOnePowerShellLiteral()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var settings = new AppSettings { CustomScriptCommand = "Get-Item -LiteralPath {file} | Out-Null" };
+            var provider = new CustomScriptShareProvider(paths, settings);
+            var item = CreateCaptureItem(paths, "capture'; throw 'INJECTED'; #.png", 11);
+
+            var result = await provider.UploadAsync(ToRequest(item), CancellationToken.None);
+
+            Assert.IsTrue(result.Succeeded, result.Message);
         });
     }
 

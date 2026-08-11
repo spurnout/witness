@@ -182,6 +182,34 @@ public sealed class PersonSegmentationModelPackageServiceTests
         });
     }
 
+    [TestMethod]
+    public async Task StageModelAsync_RejectsRemoteModelBeforeBufferingPastLimit()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var bytes = Encoding.UTF8.GetBytes("model response larger than limit");
+            var manifestPath = await WriteManifestAsync(
+                paths,
+                modelUri: "https://models.example.test/oversized.onnx",
+                sha256: Sha256(bytes),
+                sizeBytes: bytes.Length);
+            using var httpClient = new HttpClient(new FakeHttpHandler(new Dictionary<string, byte[]>
+            {
+                ["https://models.example.test/oversized.onnx"] = bytes
+            }));
+            var service = new PersonSegmentationModelPackageService(paths, httpClient, maxModelBytes: 8);
+
+            var result = await service.StageModelAsync(new PersonSegmentationModelPackageRequest
+            {
+                ManifestLocation = manifestPath,
+                AcceptDownload = true
+            });
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsTrue(result.Issues.Any(issue => issue.Contains("safety limit", StringComparison.OrdinalIgnoreCase)));
+        });
+    }
+
     private static async Task<ModelFixture> WriteLocalModelManifestAsync(
         AppPaths paths,
         string? sha256 = null,

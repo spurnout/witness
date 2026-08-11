@@ -275,6 +275,9 @@ public sealed class WorkflowProfileService
 
     private void Apply(WorkflowProfile profile, WorkflowProfileImportOptions options)
     {
+        var importTrustedAutomation = options.IncludeSensitiveValues;
+        if (importTrustedAutomation)
+        {
         _settings.DefaultShareDestination = string.IsNullOrWhiteSpace(profile.Sharing.DefaultShareDestination)
             ? "Clipboard image"
             : profile.Sharing.DefaultShareDestination;
@@ -428,14 +431,11 @@ public sealed class WorkflowProfileService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (options.IncludeSensitiveValues && profile.IncludesSensitiveValues)
-        {
-            _settings.CustomScriptCommand = profile.Sharing.CustomScriptCommand ?? string.Empty;
-            _settings.CustomWebhookUrl = profile.Sharing.CustomWebhookUrl ?? string.Empty;
-            _settings.SlackWebhookUrl = profile.Sharing.SlackWebhookUrl ?? string.Empty;
-            _settings.DiscordWebhookUrl = profile.Sharing.DiscordWebhookUrl ?? string.Empty;
-            _settings.TeamsWebhookUrl = profile.Sharing.TeamsWebhookUrl ?? string.Empty;
-        }
+        _settings.CustomScriptCommand = profile.Sharing.CustomScriptCommand ?? string.Empty;
+        _settings.CustomWebhookUrl = profile.Sharing.CustomWebhookUrl ?? string.Empty;
+        _settings.SlackWebhookUrl = profile.Sharing.SlackWebhookUrl ?? string.Empty;
+        _settings.DiscordWebhookUrl = profile.Sharing.DiscordWebhookUrl ?? string.Empty;
+        _settings.TeamsWebhookUrl = profile.Sharing.TeamsWebhookUrl ?? string.Empty;
 
         _settings.SlackMessageTemplate = string.IsNullOrWhiteSpace(profile.Sharing.SlackMessageTemplate)
             ? "Receipts capture ready: {file} ({bytes} bytes)"
@@ -446,6 +446,7 @@ public sealed class WorkflowProfileService
         _settings.TeamsMessageTemplate = string.IsNullOrWhiteSpace(profile.Sharing.TeamsMessageTemplate)
             ? "Receipts capture ready: {file} ({bytes} bytes)"
             : profile.Sharing.TeamsMessageTemplate;
+        }
 
         if (profile.Recording is not null)
         {
@@ -458,13 +459,13 @@ public sealed class WorkflowProfileService
                 .ToList();
         }
 
-        _settings.EnableWatchFolders = profile.WatchFolders.EnableWatchFolders;
+        _settings.EnableWatchFolders = importTrustedAutomation && profile.WatchFolders.EnableWatchFolders;
         _settings.WatchFolderIncludeSubdirectories = profile.WatchFolders.IncludeSubdirectories;
         _settings.WatchFolderAutoImport = profile.WatchFolders.AutoImport;
         _settings.WatchFolderCopyImageAfterImport = profile.WatchFolders.CopyImageAfterImport;
         _settings.WatchFolderStripMetadataAfterImport = profile.WatchFolders.StripMetadataAfterImport;
-        _settings.WatchFolderShareAfterImport = profile.WatchFolders.ShareAfterImport;
-        _settings.EnableVirtualPrinterImport = profile.WatchFolders.EnableVirtualPrinterImport;
+        _settings.WatchFolderShareAfterImport = importTrustedAutomation && profile.WatchFolders.ShareAfterImport;
+        _settings.EnableVirtualPrinterImport = importTrustedAutomation && profile.WatchFolders.EnableVirtualPrinterImport;
         _settings.VirtualPrinterImportFolder = profile.WatchFolders.VirtualPrinterImportFolder ?? string.Empty;
         _settings.VirtualPrinterImportIncludeSubdirectories = profile.WatchFolders.VirtualPrinterImportIncludeSubdirectories;
         _settings.WatchFolders = profile.WatchFolders.WatchFolders
@@ -473,6 +474,13 @@ public sealed class WorkflowProfileService
             .ToList();
 
         var importedRules = profile.AutomationRules.Select(CloneRule).ToList();
+        if (!importTrustedAutomation)
+        {
+            foreach (var rule in importedRules)
+            {
+                rule.IsEnabled = false;
+            }
+        }
         if (options.ReplaceAutomationRules)
         {
             _settings.AutomationRules = importedRules;

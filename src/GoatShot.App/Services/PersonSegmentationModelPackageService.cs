@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -11,6 +12,7 @@ public sealed class PersonSegmentationModelPackageService
     public const string LegacyManifestSchemaVersion = "goatshot.person-segmentation-model.v1";
     public const string CurrentStageSchemaVersion = "receipts.person-segmentation-model-stage.v1";
     public const long DefaultMaxModelBytes = 750L * 1024L * 1024L;
+    public const long DefaultMaxManifestBytes = 1024L * 1024L;
 
     private static readonly Regex IdPattern = new("^[a-z0-9][a-z0-9._-]{2,63}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex Sha256Pattern = new("^[a-f0-9]{64}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -219,7 +221,11 @@ public sealed class PersonSegmentationModelPackageService
         var normalized = Environment.ExpandEnvironmentVariables(manifestLocation.Trim());
         if (TryCreateHttpUri(normalized, out var manifestUri))
         {
-            var json = await _httpClient.GetStringAsync(manifestUri, cancellationToken);
+            var json = Encoding.UTF8.GetString(await ReadRemoteBytesAsync(
+                manifestUri,
+                DefaultMaxManifestBytes,
+                "Model manifest",
+                cancellationToken));
             var manifest = JsonSerializer.Deserialize<PersonSegmentationModelManifest>(json, JsonOptions) ??
                 throw new JsonException("Manifest JSON did not contain an object.");
             return new LoadedPersonSegmentationModelManifest(
@@ -348,13 +354,7 @@ public sealed class PersonSegmentationModelPackageService
                 throw new InvalidOperationException("Remote model URI could not be resolved.");
             }
 
-            var bytes = await _httpClient.GetByteArrayAsync(reference.Uri, cancellationToken);
-            if (bytes.LongLength > _maxModelBytes)
-            {
-                throw new InvalidOperationException($"Model package is {bytes.LongLength} byte(s), over the {_maxModelBytes} byte safety limit.");
-            }
-
-            return bytes;
+            return await ReadRemoteBytesAsync(reference.Uri, _maxModelBytes, "Model package", cancellationToken);
         }
 
         if (string.IsNullOrWhiteSpace(reference.LocalPath))
@@ -374,6 +374,43 @@ public sealed class PersonSegmentationModelPackageService
         }
 
         return await File.ReadAllBytesAsync(reference.LocalPath, cancellationToken);
+    }
+
+    private async Task<byte[]> ReadRemoteBytesAsync(
+        Uri uri,
+        long maximumBytes,
+        string label,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        if (response.Content.Headers.ContentLength is { } declaredLength && declaredLength > maximumBytes)
+        {
+            throw new InvalidOperationException($"{label} declares {declaredLength} byte(s), over the {maximumBytes} byte safety limit.");
+        }
+
+        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var destination = new MemoryStream();
+        var buffer = new byte[81_920];
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                return destination.ToArray();
+            }
+
+            if (destination.Length + read > maximumBytes)
+            {
+                throw new InvalidOperationException($"{label} exceeded the {maximumBytes} byte safety limit.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
     }
 
     private string GetStageDirectory(string modelId, string version)

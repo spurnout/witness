@@ -328,6 +328,30 @@ public sealed class AndroidAdbCaptureServiceTests
     }
 
     [TestMethod]
+    public async Task CaptureScreenrecordAsync_RejectsShellMetacharactersInRemoteDirectory()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var runner = new FakeAdbRunner { DevicesOutput = ReadyDeviceOutput("phone-1") };
+            var service = new AndroidAdbCaptureService(
+                paths,
+                new WorkspaceStore(paths, new AppSettings()),
+                runner);
+
+            var result = await service.CaptureScreenrecordAsync(new AndroidAdbScreenrecordRequest
+            {
+                AdbPath = CreateFakeAdb(paths),
+                DurationSeconds = 3,
+                RemoteDirectory = "/sdcard/Movies/Receipts;id"
+            });
+
+            Assert.IsFalse(result.Succeeded);
+            StringAssert.Contains(result.Message, "without traversal");
+            Assert.IsFalse(runner.TextCalls.Any(call => call.Contains("mkdir", StringComparer.OrdinalIgnoreCase)));
+        });
+    }
+
+    [TestMethod]
     public async Task CaptureScreenrecordAsync_RequiresDeviceSerialWhenMultipleReady()
     {
         await WithTempPathsAsync(async paths =>

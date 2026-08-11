@@ -13,6 +13,15 @@ public sealed class BrowserExtensionPayloadContractServiceTests
     };
 
     [TestMethod]
+    public void RedactUrl_DropsSensitiveAndNonSensitiveFragments()
+    {
+        var redacted = BrowserExtensionPayloadContractService.RedactUrl(
+            "https://app.example.test/callback?view=open#access_token=super-secret");
+
+        Assert.AreEqual("https://app.example.test/callback?view=open", redacted);
+    }
+
+    [TestMethod]
     public void Validate_AcceptsConsentedFullPagePayload()
     {
         var payload = CreateValidPayload();
