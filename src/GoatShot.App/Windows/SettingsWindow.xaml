@@ -206,8 +206,22 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14" />
+                <TextBlock Text="After capture" Foreground="{StaticResource MutedInkBrush}" />
+                <ComboBox x:Name="PostCaptureActionBox"
+                          Margin="0,6,0,6"
+                          Style="{StaticResource GoatComboBox}"
+                          AutomationProperties.Name="Behavior after a capture completes"
+                          SelectionChanged="PostCaptureAction_SelectionChanged" />
+                <TextBlock x:Name="PostCaptureActionHelpText"
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
                 <CheckBox x:Name="CopyAfterCaptureBox" Content="Copy image to clipboard after capture" />
                 <CheckBox x:Name="IncludeCursorBox" Content="Include cursor in captures" />
+                <CheckBox x:Name="HoverAutoSelectBox"
+                          Content="Highlight the window under the cursor while selecting"
+                          AutomationProperties.Name="Highlight the window under the cursor while selecting" />
                 <TextBlock Text="Region capture context padding" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
                 <TextBox x:Name="CaptureContextPaddingBox"
                          Margin="0,6,0,6"

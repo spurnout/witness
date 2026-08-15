@@ -278,8 +278,12 @@ public partial class SettingsWindow : Window
         var settings = _services.Settings;
         LibraryRootBox.Text = settings.LibraryRoot;
         FileNameTemplateBox.Text = settings.FileNameTemplate;
+        PopulatePostCaptureActionBox();
+        SelectComboBoxItemByTag(PostCaptureActionBox, PostCaptureActionCatalog.Normalize(settings.PostCaptureAction));
+        UpdatePostCaptureActionHelpText();
         CopyAfterCaptureBox.IsChecked = settings.AutoCopyImageAfterCapture;
         IncludeCursorBox.IsChecked = settings.IncludeCursor;
+        HoverAutoSelectBox.IsChecked = settings.EnableCaptureHoverAutoSelect;
         CaptureContextPaddingBox.Text = settings.CaptureContextPadding.ToString(CultureInfo.InvariantCulture);
         PrivateModeBox.IsChecked = settings.PrivateCaptureMode;
         RunAtStartupBox.IsChecked = _services.Startup.GetState().IsRegistered;
@@ -1421,6 +1425,8 @@ public partial class SettingsWindow : Window
         settings.LibraryRoot = LibraryRootBox.Text.Trim();
         settings.FileNameTemplate = FileNameTemplateBox.Text.Trim();
         settings.AutoCopyImageAfterCapture = CopyAfterCaptureBox.IsChecked == true;
+        settings.PostCaptureAction = PostCaptureActionCatalog.Normalize(SelectedComboBoxTag(PostCaptureActionBox));
+        settings.EnableCaptureHoverAutoSelect = HoverAutoSelectBox.IsChecked == true;
         settings.IncludeCursor = IncludeCursorBox.IsChecked == true;
         settings.CaptureContextPadding = int.TryParse(
             CaptureContextPaddingBox.Text.Trim(),
@@ -2126,6 +2132,41 @@ public partial class SettingsWindow : Window
         }
 
         comboBox.SelectedIndex = 0;
+    }
+
+    /// <summary>Fills the dropdown from the catalog so the option list has one source of truth.</summary>
+    private void PopulatePostCaptureActionBox()
+    {
+        if (PostCaptureActionBox.Items.Count > 0)
+        {
+            return;
+        }
+
+        foreach (var option in PostCaptureActionCatalog.Options)
+        {
+            PostCaptureActionBox.Items.Add(new ComboBoxItem
+            {
+                Content = option.Label,
+                Tag = option.StorageValue
+            });
+        }
+    }
+
+    private void PostCaptureAction_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdatePostCaptureActionHelpText();
+    }
+
+    private void UpdatePostCaptureActionHelpText()
+    {
+        var action = PostCaptureActionCatalog.Parse(SelectedComboBoxTag(PostCaptureActionBox));
+        PostCaptureActionHelpText.Text = PostCaptureActionCatalog.Describe(action).Description +
+            " Copying is governed by the checkbox below, so clearing that box while Copy quietly is selected saves the capture without touching the clipboard.";
+    }
+
+    private static string SelectedComboBoxTag(System.Windows.Controls.ComboBox comboBox)
+    {
+        return (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
     }
 
     private static void SelectComboBoxItemByTag(System.Windows.Controls.ComboBox comboBox, string tag)
