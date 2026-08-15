@@ -115,6 +115,58 @@ public static class CaptureOverlayGeometry
             .FirstOrDefault();
     }
 
+    /// <summary>
+    /// Screenpresso-style hover resolution: what a click right now would capture. Topmost window
+    /// wins rather than smallest-area, because with overlapping windows a pure containment test
+    /// picks whichever happens to be smaller instead of whichever is actually on top. Equal
+    /// z-orders fall back to list order, which LINQ's stable sort preserves.
+    /// </summary>
+    public static CaptureOverlayTarget? ResolveHoverTarget(
+        int screenX,
+        int screenY,
+        IReadOnlyList<CaptureOverlayTarget> targets,
+        CaptureOverlayHoverMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        if (mode == CaptureOverlayHoverMode.Off)
+        {
+            return null;
+        }
+
+        var window = targets
+            .Where(target => target.Kind == CaptureOverlayTargetKind.Window)
+            .Where(target => ContainsPoint(Normalize(target.Bounds), screenX, screenY))
+            .OrderBy(target => target.ZOrder)
+            .FirstOrDefault();
+
+        if (window is null)
+        {
+            return targets
+                .Where(target => target.Kind == CaptureOverlayTargetKind.Monitor)
+                .FirstOrDefault(target => ContainsPoint(Normalize(target.Bounds), screenX, screenY));
+        }
+
+        if (mode != CaptureOverlayHoverMode.Control)
+        {
+            return window;
+        }
+
+        var child = targets
+            .Where(target => target.Kind is CaptureOverlayTargetKind.ContentArea or CaptureOverlayTargetKind.ControlArea)
+            .Where(target => string.Equals(target.ParentId, window.Id, StringComparison.Ordinal))
+            .Where(target => ContainsPoint(Normalize(target.Bounds), screenX, screenY))
+            .OrderBy(Area)
+            .FirstOrDefault();
+
+        return child ?? window;
+    }
+
+    private static long Area(CaptureOverlayTarget target)
+    {
+        var bounds = Normalize(target.Bounds);
+        return (long)bounds.Width * bounds.Height;
+    }
+
     private static CaptureBounds SnapEdges(
         CaptureBounds raw,
         IReadOnlyList<CaptureOverlayTarget> targets,
@@ -326,9 +378,25 @@ public sealed record CaptureOverlayTarget(
     string DisplayName,
     CaptureOverlayTargetKind Kind,
     CaptureBounds Bounds,
-    bool ShowInChooser = true)
+    bool ShowInChooser = true,
+    int ZOrder = 0,
+    string? ParentId = null,
+    long NativeHandle = 0)
 {
     public override string ToString() => DisplayName;
+}
+
+/// <summary>How much detail hover auto-select resolves under the cursor.</summary>
+public enum CaptureOverlayHoverMode
+{
+    /// <summary>Auto-select is disabled; the overlay is drag-only.</summary>
+    Off,
+
+    /// <summary>Whole windows and monitors.</summary>
+    Window,
+
+    /// <summary>Panes and controls inside the hovered window.</summary>
+    Control
 }
 
 public enum CaptureOverlayTargetKind

@@ -109,6 +109,124 @@ public sealed class CaptureOverlayGeometryTests
         Assert.AreEqual(3, crop.CursorScreenY);
     }
 
+    [TestMethod]
+    public void ResolveHoverTarget_PrefersTheTopmostWindowRatherThanTheSmallestOne()
+    {
+        // The small window is behind the big one. Smallest-area containment would pick it; z-order
+        // is what actually decides which window a click would land on.
+        var behind = new CaptureOverlayTarget(
+            "window:behind",
+            "Window: Behind",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 100, Y = 100, Width = 200, Height = 200 },
+            ZOrder: 5);
+        var front = new CaptureOverlayTarget(
+            "window:front",
+            "Window: Front",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 50, Y = 50, Width = 600, Height = 600 },
+            ZOrder: 1);
+
+        var hovered = CaptureOverlayGeometry.ResolveHoverTarget(
+            150,
+            150,
+            [behind, front],
+            CaptureOverlayHoverMode.Window);
+
+        Assert.AreSame(front, hovered);
+    }
+
+    [TestMethod]
+    public void ResolveHoverTarget_DrillsIntoTheSmallestChildOfTheHoveredWindowInControlMode()
+    {
+        var window = new CaptureOverlayTarget(
+            "window:app",
+            "Window: App",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 0, Y = 0, Width = 800, Height = 600 });
+        var content = new CaptureOverlayTarget(
+            "window:app:content",
+            "Content area: App",
+            CaptureOverlayTargetKind.ContentArea,
+            new CaptureBounds { X = 8, Y = 60, Width = 784, Height = 532 },
+            ShowInChooser: false,
+            ParentId: "window:app");
+        var pane = new CaptureOverlayTarget(
+            "control:pane",
+            "Control: Pane",
+            CaptureOverlayTargetKind.ControlArea,
+            new CaptureBounds { X = 20, Y = 80, Width = 300, Height = 200 },
+            ShowInChooser: false,
+            ParentId: "window:app");
+
+        Assert.AreSame(
+            pane,
+            CaptureOverlayGeometry.ResolveHoverTarget(100, 120, [window, content, pane], CaptureOverlayHoverMode.Control));
+        Assert.AreSame(
+            window,
+            CaptureOverlayGeometry.ResolveHoverTarget(100, 120, [window, content, pane], CaptureOverlayHoverMode.Window));
+    }
+
+    [TestMethod]
+    public void ResolveHoverTarget_IgnoresChildrenBelongingToADifferentWindow()
+    {
+        var window = new CaptureOverlayTarget(
+            "window:app",
+            "Window: App",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 0, Y = 0, Width = 800, Height = 600 });
+        var foreignPane = new CaptureOverlayTarget(
+            "control:other",
+            "Control: Other",
+            CaptureOverlayTargetKind.ControlArea,
+            new CaptureBounds { X = 20, Y = 80, Width = 300, Height = 200 },
+            ShowInChooser: false,
+            ParentId: "window:somewhere-else");
+
+        var hovered = CaptureOverlayGeometry.ResolveHoverTarget(
+            100,
+            120,
+            [window, foreignPane],
+            CaptureOverlayHoverMode.Control);
+
+        Assert.AreSame(window, hovered);
+    }
+
+    [TestMethod]
+    public void ResolveHoverTarget_FallsBackToTheMonitorOverBareDesktop()
+    {
+        var monitor = new CaptureOverlayTarget(
+            "monitor:1",
+            "Primary monitor",
+            CaptureOverlayTargetKind.Monitor,
+            new CaptureBounds { X = 0, Y = 0, Width = 1920, Height = 1080 });
+        var window = new CaptureOverlayTarget(
+            "window:app",
+            "Window: App",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 100, Y = 100, Width = 200, Height = 200 });
+
+        var hovered = CaptureOverlayGeometry.ResolveHoverTarget(
+            1500,
+            900,
+            [monitor, window],
+            CaptureOverlayHoverMode.Control);
+
+        Assert.AreSame(monitor, hovered);
+    }
+
+    [TestMethod]
+    public void ResolveHoverTarget_ReturnsNothingWhenAutoSelectIsOff()
+    {
+        var window = new CaptureOverlayTarget(
+            "window:app",
+            "Window: App",
+            CaptureOverlayTargetKind.Window,
+            new CaptureBounds { X = 0, Y = 0, Width = 800, Height = 600 });
+
+        Assert.IsNull(CaptureOverlayGeometry.ResolveHoverTarget(10, 10, [window], CaptureOverlayHoverMode.Off));
+    }
+
     private static CaptureBounds VirtualBounds()
     {
         return new CaptureBounds
