@@ -2,9 +2,11 @@ namespace GoatShot.App.Models;
 
 public sealed class AppSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 17;
+    public int SettingsSchemaVersion { get; set; } = 18;
     public string LibraryRoot { get; set; } = string.Empty;
     public bool AutoCopyImageAfterCapture { get; set; } = true;
+    public string PostCaptureAction { get; set; } = "CopyQuietly";
+    public bool EnableCaptureHoverAutoSelect { get; set; } = true;
     public bool IncludeCursor { get; set; } = true;
     public int CaptureContextPadding { get; set; }
     public bool PrivateCaptureMode { get; set; }

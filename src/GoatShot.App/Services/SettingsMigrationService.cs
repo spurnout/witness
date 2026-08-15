@@ -4,7 +4,7 @@ namespace GoatShot.App.Services;
 
 public static class SettingsMigrationService
 {
-    public const int CurrentSchemaVersion = 17;
+    public const int CurrentSchemaVersion = 18;
 
     /// <summary>Schema version that introduced the rebindable keybind catalog.</summary>
     private const int KeybindCatalogSchemaVersion = 17;
@@ -15,6 +15,7 @@ public static class SettingsMigrationService
         var incomingSchemaVersion = settings.SettingsSchemaVersion;
 
         changed |= MigrateLegacyBrandingDefaults(settings);
+        changed |= NormalizePostCaptureAction(settings);
 
         if (settings.SettingsSchemaVersion < CurrentSchemaVersion)
         {
@@ -345,6 +346,23 @@ public static class SettingsMigrationService
         }
 
         settings.Keybinds.Add(new KeybindAssignment { Action = action, Gesture = gesture });
+        return true;
+    }
+
+    /// <summary>
+    /// Schema 18 introduced the post-capture behavior setting. Older files have no value at all and
+    /// hand-edited ones can hold anything, so both collapse to the shipped default here rather than
+    /// at every read site.
+    /// </summary>
+    private static bool NormalizePostCaptureAction(AppSettings settings)
+    {
+        var normalized = PostCaptureActionCatalog.Normalize(settings.PostCaptureAction);
+        if (string.Equals(settings.PostCaptureAction, normalized, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        settings.PostCaptureAction = normalized;
         return true;
     }
 

@@ -46,6 +46,45 @@ public sealed class SettingsMigrationServiceTests
     }
 
     [TestMethod]
+    public void Migrate_NormalizesAnUnusablePostCaptureActionToQuietCopy()
+    {
+        var settings = new AppSettings
+        {
+            SettingsSchemaVersion = 17,
+            PostCaptureAction = "   "
+        };
+
+        SettingsMigrationService.Migrate(settings);
+
+        Assert.AreEqual("CopyQuietly", settings.PostCaptureAction);
+        Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
+    }
+
+    [TestMethod]
+    public void Migrate_KeepsAnExplicitPostCaptureChoiceAndCanonicalizesItsCasing()
+    {
+        var settings = new AppSettings
+        {
+            SettingsSchemaVersion = 17,
+            PostCaptureAction = "showactionswindow"
+        };
+
+        SettingsMigrationService.Migrate(settings);
+
+        Assert.AreEqual("ShowActionsWindow", settings.PostCaptureAction);
+    }
+
+    [TestMethod]
+    public void NewSettings_DefaultToQuietCopyWithHoverAutoSelectOn()
+    {
+        var settings = new AppSettings();
+
+        Assert.AreEqual("CopyQuietly", settings.PostCaptureAction);
+        Assert.IsTrue(settings.EnableCaptureHoverAutoSelect);
+        Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
+    }
+
+    [TestMethod]
     public void Migrate_LeavesDefaultReplayHotkeysOutOfTheStoredOverrides()
     {
         var settings = new AppSettings { SettingsSchemaVersion = 16 };
