@@ -244,11 +244,11 @@
                                     <StackPanel Margin="0,4">
                                         <TextBlock Text="{Binding Prompt}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource InkBrush}" />
                                         <TextBlock Foreground="{StaticResource MutedInkBrush}">
-                                            <Run Text="{Binding Action}" />
+                                            <Run Text="{Binding Action, Mode=OneWay}" />
                                             <Run Text=" uses=" />
-                                            <Run Text="{Binding UseCount}" />
+                                            <Run Text="{Binding UseCount, Mode=OneWay}" />
                                             <Run Text=" model=" />
-                                            <Run Text="{Binding ModelId}" />
+                                            <Run Text="{Binding ModelId, Mode=OneWay}" />
                                         </TextBlock>
                                     </StackPanel>
                                 </DataTemplate>

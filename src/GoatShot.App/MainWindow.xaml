@@ -908,7 +908,7 @@
                                                     <StackPanel Margin="5">
                                                         <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="10">
-                                                            <Run Text="{Binding StatusLabel}" /><Run Text=" via " /><Run Text="{Binding Destination}" />
+                                                            <Run Text="{Binding StatusLabel, Mode=OneWay}" /><Run Text=" via " /><Run Text="{Binding Destination, Mode=OneWay}" />
                                                         </TextBlock>
                                                     </StackPanel>
                                                 </DataTemplate>
