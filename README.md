@@ -42,6 +42,8 @@ The release is self-contained. A separate .NET, FFmpeg, or segmentation installa
 - Region, window, monitor, all-monitor, fixed-size, last-region, delayed, and scrolling screenshots
 - Print Screen hotkeys that work while Receipts is in the tray
 - Auto-copy after capture by default
+- Captures finish quietly by default: the image is copied to the clipboard and saved to the library with no window to dismiss. Settings → General → **After capture** switches to the capture actions window or straight into the editor.
+- On the capture overlay, pointing at a window highlights it and a click captures it. `Ctrl` targets a pane inside that window, `Shift` turns auto-select and snapping off, and dragging still selects a free region. Settings → General has a toggle to disable the highlight.
 - GIF and MP4 recording with monitor, window, and region targets
 - Optional microphone, system-audio, webcam, cursor, timer, and keystroke overlays
 - Android screenshot, bounded recording, and preview support through an in-process Windows USB/ADB transport, with an external `adb.exe` override for troubleshooting
