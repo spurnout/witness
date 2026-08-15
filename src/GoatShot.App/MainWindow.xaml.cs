@@ -705,7 +705,7 @@ public partial class MainWindow : Window
         SetStatus(item.IsPrivate
             ? $"Private capture saved temporarily: {item.FilePath}"
             : $"Captured {item.Kind}: {item.FileName}");
-        ShowCaptureTaskWindow(item);
+        RunPostCaptureAction(item);
         return item;
     }
 
@@ -2881,6 +2881,47 @@ public partial class MainWindow : Window
                 retry = resultWindow.ShowDialog() == true;
             }
         }
+    }
+
+    /// <summary>
+    /// What happens once a capture is saved. Quiet copy is the default so the fast path is
+    /// hotkey to clipboard with nothing to dismiss; the other modes are opt-in from Settings.
+    /// </summary>
+    private void RunPostCaptureAction(CaptureItem item)
+    {
+        if (_auditMode)
+        {
+            return;
+        }
+
+        switch (PostCaptureActionCatalog.Parse(_services.Settings.PostCaptureAction))
+        {
+            case PostCaptureAction.ShowActionsWindow:
+                ShowCaptureTaskWindow(item);
+                break;
+            case PostCaptureAction.OpenEditor:
+                OpenEditorForItem(item);
+                break;
+            default:
+                NotifyQuietCapture(item);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Quiet mode shows nothing while the workspace is open, because the status line already said
+    /// what happened. With the workspace hidden there would otherwise be no confirmation at all.
+    /// </summary>
+    private void NotifyQuietCapture(CaptureItem item)
+    {
+        if (IsVisible)
+        {
+            return;
+        }
+
+        _services.Tray?.ShowCaptureNotification(_services.Settings.AutoCopyImageAfterCapture
+            ? $"Copied to clipboard: {item.FileName}"
+            : $"Saved: {item.FileName}");
     }
 
     private void ShowCaptureTaskWindow(CaptureItem item)

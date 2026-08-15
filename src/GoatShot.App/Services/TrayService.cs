@@ -44,6 +44,23 @@ public sealed class TrayService : IDisposable
         _notifyIcon.DoubleClick += (_, _) => window.Dispatcher.Invoke(window.ShowWorkspaceCommand);
     }
 
+    /// <summary>
+    /// Feedback for quiet capture mode. The workspace status line covers the case where the window
+    /// is open, so this is the only signal a tray-only capture gets: short, non-blocking, no window.
+    /// </summary>
+    public void ShowCaptureNotification(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        _notifyIcon.BalloonTipTitle = BrandIdentity.ProductName;
+        _notifyIcon.BalloonTipText = message;
+        _notifyIcon.BalloonTipIcon = Forms.ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(2000);
+    }
+
     private void Hotkeys_RegistrationsChanged(object? sender, EventArgs e) => RefreshShortcutLabels();
 
     /// <summary>
