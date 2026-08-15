@@ -48,7 +48,7 @@ public static class CaptureOverlayTargetCatalog
                 return true;
             }
 
-            if (!TryBuildWindowTarget(handle, out var windowTarget))
+            if (!TryBuildWindowTarget(handle, windowCount, out var windowTarget))
             {
                 return true;
             }
@@ -71,7 +71,7 @@ public static class CaptureOverlayTargetCatalog
                         return false;
                     }
 
-                    if (TryBuildControlTarget(child, windowTarget.Bounds, controlCount, out var controlTarget))
+                    if (TryBuildControlTarget(child, windowTarget, controlCount, out var controlTarget))
                     {
                         targets.Add(controlTarget);
                         controlCount++;
@@ -87,7 +87,50 @@ public static class CaptureOverlayTargetCatalog
         return targets;
     }
 
-    private static bool TryBuildWindowTarget(IntPtr handle, out CaptureOverlayTarget target)
+    /// <summary>
+    /// Child targets for a single window, resolved on demand. The eager catalog caps controls
+    /// globally, which starves every window late in z-order; hover only ever needs the window under
+    /// the cursor, so it asks for that one window's children instead of paying for all of them.
+    /// </summary>
+    public static IReadOnlyList<CaptureOverlayTarget> BuildChildTargets(
+        CaptureOverlayTarget windowTarget,
+        int maxControls = MaxControlTargets)
+    {
+        ArgumentNullException.ThrowIfNull(windowTarget);
+        var targets = new List<CaptureOverlayTarget>();
+        var content = BuildContentAreaTarget(windowTarget);
+        if (content is not null)
+        {
+            targets.Add(content);
+        }
+
+        var handle = new IntPtr(windowTarget.NativeHandle);
+        if (handle == IntPtr.Zero || maxControls <= 0)
+        {
+            return targets;
+        }
+
+        var count = 0;
+        EnumChildWindows(handle, (child, _) =>
+        {
+            if (count >= maxControls)
+            {
+                return false;
+            }
+
+            if (TryBuildControlTarget(child, windowTarget, count, out var controlTarget))
+            {
+                targets.Add(controlTarget);
+                count++;
+            }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return targets;
+    }
+
+    private static bool TryBuildWindowTarget(IntPtr handle, int zOrder, out CaptureOverlayTarget target)
     {
         target = null!;
         if (handle == IntPtr.Zero || !IsWindowVisible(handle) || IsIconic(handle))
@@ -110,7 +153,10 @@ public static class CaptureOverlayTargetCatalog
             $"window:{handle.ToInt64():X}",
             $"Window: {TrimForDisplay(title, 72)} ({bounds.Width} x {bounds.Height})",
             CaptureOverlayTargetKind.Window,
-            bounds);
+            bounds,
+            ShowInChooser: true,
+            ZOrder: zOrder,
+            NativeHandle: handle.ToInt64());
         return true;
     }
 
@@ -136,12 +182,15 @@ public static class CaptureOverlayTargetCatalog
                 Width = Math.Max(1, window.Width - (sideInset * 2)),
                 Height = Math.Max(1, window.Height - topInset - bottomInset)
             },
-            ShowInChooser: false);
+            ShowInChooser: false,
+            ZOrder: windowTarget.ZOrder,
+            ParentId: windowTarget.Id,
+            NativeHandle: windowTarget.NativeHandle);
     }
 
     private static bool TryBuildControlTarget(
         IntPtr handle,
-        CaptureBounds parentBounds,
+        CaptureOverlayTarget parent,
         int index,
         out CaptureOverlayTarget target)
     {
@@ -154,7 +203,7 @@ public static class CaptureOverlayTargetCatalog
         if (!TryGetBounds(handle, out var bounds) ||
             bounds.Width < 120 ||
             bounds.Height < 70 ||
-            !Contains(parentBounds, bounds))
+            !Contains(parent.Bounds, bounds))
         {
             return false;
         }
@@ -172,7 +221,10 @@ public static class CaptureOverlayTargetCatalog
             $"Control: {TrimForDisplay(label, 56)} ({bounds.Width} x {bounds.Height})",
             CaptureOverlayTargetKind.ControlArea,
             bounds,
-            ShowInChooser: false);
+            ShowInChooser: false,
+            ZOrder: parent.ZOrder,
+            ParentId: parent.Id,
+            NativeHandle: handle.ToInt64());
         return true;
     }
 
