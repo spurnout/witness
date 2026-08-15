@@ -47,7 +47,10 @@ public sealed class ScreenshotService
     {
         using var background = CaptureVirtualScreenBitmap(includeCursor: false);
         var source = ImageInterop.ToBitmapSource(background);
-        var overlay = new RegionCaptureWindow(source, _settings.CaptureContextPadding);
+        var overlay = new RegionCaptureWindow(
+            source,
+            _settings.CaptureContextPadding,
+            enableHoverAutoSelect: _settings.EnableCaptureHoverAutoSelect);
         if (owner?.IsVisible == true)
         {
             overlay.Owner = owner;

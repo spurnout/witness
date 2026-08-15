@@ -22,20 +22,29 @@ public partial class RegionCaptureWindow : Window
     private readonly CaptureBounds _virtualBounds;
     private readonly IReadOnlyList<CaptureOverlayTarget> _targets;
     private readonly int _contextPadding;
+    private readonly bool _hoverAutoSelectEnabled;
+    private readonly Func<CaptureOverlayTarget, IReadOnlyList<CaptureOverlayTarget>> _childTargetProvider;
+    private readonly Dictionary<long, IReadOnlyList<CaptureOverlayTarget>> _childTargetCache = new();
     private WpfPoint? _start;
+    private WpfPoint _lastHoverPosition;
     private CaptureOverlaySelection? _lastSelection;
+    private CaptureOverlayTarget? _hoverTarget;
 
     public RegionCaptureWindow(
         BitmapSource frozenScreen,
         int contextPadding = 0,
         IReadOnlyList<CaptureOverlayTarget>? targets = null,
-        CaptureBounds? virtualBounds = null)
+        CaptureBounds? virtualBounds = null,
+        bool enableHoverAutoSelect = true,
+        Func<CaptureOverlayTarget, IReadOnlyList<CaptureOverlayTarget>>? childTargetProvider = null)
     {
         InitializeComponent();
 
         _virtualBounds = virtualBounds ?? CaptureOverlayTargetCatalog.GetVirtualScreenBounds();
         _targets = targets ?? CaptureOverlayTargetCatalog.BuildLiveTargets();
         _contextPadding = Math.Clamp(contextPadding, 0, CaptureOverlayGeometry.MaxContextPadding);
+        _hoverAutoSelectEnabled = enableHoverAutoSelect;
+        _childTargetProvider = childTargetProvider ?? (window => CaptureOverlayTargetCatalog.BuildChildTargets(window));
 
         Left = _virtualBounds.X;
         Top = _virtualBounds.Y;
@@ -79,6 +88,7 @@ public partial class RegionCaptureWindow : Window
         SelectionRectangle.Visibility = Visibility.Visible;
         SizeBadge.Visibility = Visibility.Visible;
         LensBorder.Visibility = Visibility.Visible;
+        HoverRectangle.Visibility = Visibility.Collapsed;
         Root.CaptureMouse();
         UpdateSelection(_start.Value, _start.Value);
     }
@@ -87,10 +97,125 @@ public partial class RegionCaptureWindow : Window
     {
         if (_start is not WpfPoint start || e.LeftButton != MouseButtonState.Pressed)
         {
+            UpdateHover(e.GetPosition(Root));
             return;
         }
 
         UpdateSelection(start, e.GetPosition(Root));
+    }
+
+    /// <summary>
+    /// Resolves what a click would capture and draws it. Control drill-down is scoped to the
+    /// hovered window so the expensive child enumeration only ever runs for one window at a time.
+    /// </summary>
+    private void UpdateHover(WpfPoint position)
+    {
+        _lastHoverPosition = position;
+        var mode = ResolveHoverMode();
+        if (mode == CaptureOverlayHoverMode.Off)
+        {
+            ClearHover();
+            return;
+        }
+
+        var screenX = (int)Math.Round(_virtualBounds.X + position.X);
+        var screenY = (int)Math.Round(_virtualBounds.Y + position.Y);
+        var target = CaptureOverlayGeometry.ResolveHoverTarget(
+            screenX,
+            screenY,
+            _targets,
+            CaptureOverlayHoverMode.Window);
+
+        if (target is not null &&
+            mode == CaptureOverlayHoverMode.Control &&
+            target.Kind == CaptureOverlayTargetKind.Window)
+        {
+            var scoped = new List<CaptureOverlayTarget> { target };
+            scoped.AddRange(GetChildTargets(target));
+            target = CaptureOverlayGeometry.ResolveHoverTarget(
+                screenX,
+                screenY,
+                scoped,
+                CaptureOverlayHoverMode.Control) ?? target;
+        }
+
+        if (target is null)
+        {
+            ClearHover();
+            return;
+        }
+
+        _hoverTarget = target;
+        DrawHover(ResolveTargetSelection(target));
+    }
+
+    private CaptureOverlayHoverMode ResolveHoverMode()
+    {
+        if (!_hoverAutoSelectEnabled || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            return CaptureOverlayHoverMode.Off;
+        }
+
+        return Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+            ? CaptureOverlayHoverMode.Control
+            : CaptureOverlayHoverMode.Window;
+    }
+
+    private IReadOnlyList<CaptureOverlayTarget> GetChildTargets(CaptureOverlayTarget window)
+    {
+        if (_childTargetCache.TryGetValue(window.NativeHandle, out var cached))
+        {
+            return cached;
+        }
+
+        var children = _childTargetProvider(window);
+        _childTargetCache[window.NativeHandle] = children;
+        return children;
+    }
+
+    private void DrawHover(CaptureOverlaySelection selection)
+    {
+        var bounds = selection.FinalBounds;
+        var left = bounds.X - _virtualBounds.X;
+        var top = bounds.Y - _virtualBounds.Y;
+
+        Canvas.SetLeft(HoverRectangle, left);
+        Canvas.SetTop(HoverRectangle, top);
+        HoverRectangle.Width = bounds.Width;
+        HoverRectangle.Height = bounds.Height;
+        HoverRectangle.Visibility = Visibility.Visible;
+
+        SizeText.Text = $"{bounds.Width} x {bounds.Height}";
+        SelectionHintText.Text = selection.StatusText;
+        Canvas.SetLeft(SizeBadge, left);
+        Canvas.SetTop(SizeBadge, Math.Max(0, top - 54));
+        SizeBadge.Visibility = Visibility.Visible;
+    }
+
+    private void ClearHover()
+    {
+        _hoverTarget = null;
+        HoverRectangle.Visibility = Visibility.Collapsed;
+        if (_lastSelection is null)
+        {
+            SizeBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>Runs a whole target through the drag geometry so padding and status text match.</summary>
+    private CaptureOverlaySelection ResolveTargetSelection(CaptureOverlayTarget target)
+    {
+        var bounds = target.Bounds;
+        return CaptureOverlayGeometry.ResolveSelection(
+            bounds.X,
+            bounds.Y,
+            bounds.X + bounds.Width,
+            bounds.Y + bounds.Height,
+            new CaptureOverlayGeometryOptions(
+                _virtualBounds,
+                [target],
+                CaptureOverlayGeometry.DefaultSnapThreshold,
+                _contextPadding));
     }
 
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -106,6 +231,15 @@ public partial class RegionCaptureWindow : Window
         var selection = _lastSelection;
         if (selection is null || selection.RawBounds.Width < 3 || selection.RawBounds.Height < 3)
         {
+            // A click with no drag captures whatever the hover highlight was showing. From here on
+            // only Esc cancels, so a stray click no longer throws the capture away.
+            if (_hoverTarget is { } hovered)
+            {
+                SelectedBounds = ResolveTargetSelection(hovered).FinalBounds;
+                DialogResult = true;
+                return;
+            }
+
             DialogResult = false;
             return;
         }
@@ -116,6 +250,12 @@ public partial class RegionCaptureWindow : Window
 
     private void Window_KeyDown(object sender, WpfKeyEventArgs e)
     {
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift)
+        {
+            RefreshHover();
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             DialogResult = false;
@@ -136,6 +276,25 @@ public partial class RegionCaptureWindow : Window
             MoveOrResizeKeyboardSelection(e.Key, Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
             e.Handled = true;
         }
+    }
+
+    private void Window_KeyUp(object sender, WpfKeyEventArgs e)
+    {
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift)
+        {
+            RefreshHover();
+        }
+    }
+
+    /// <summary>Re-resolves the highlight after a modifier change, without needing a mouse move.</summary>
+    private void RefreshHover()
+    {
+        if (_start is not null && Mouse.LeftButton == MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        UpdateHover(_lastHoverPosition);
     }
 
     private void MoveOrResizeKeyboardSelection(Key key, bool resize)
@@ -291,14 +450,9 @@ public partial class RegionCaptureWindow : Window
         SelectionRectangle.Visibility = Visibility.Visible;
         SizeBadge.Visibility = Visibility.Visible;
         LensBorder.Visibility = Visibility.Collapsed;
+        HoverRectangle.Visibility = Visibility.Collapsed;
 
-        var bounds = target.Bounds;
-        var selection = CaptureOverlayGeometry.ResolveSelection(
-            bounds.X,
-            bounds.Y,
-            bounds.X + bounds.Width,
-            bounds.Y + bounds.Height,
-            new CaptureOverlayGeometryOptions(_virtualBounds, [target], CaptureOverlayGeometry.DefaultSnapThreshold, _contextPadding));
+        var selection = ResolveTargetSelection(target);
         _lastSelection = selection;
         DrawSelection(selection);
         return selection;

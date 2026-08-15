@@ -10,7 +10,8 @@
         Cursor="Cross"
         AutomationProperties.Name="Select a capture region"
         AutomationProperties.HelpText="Drag with the mouse, choose a window or monitor, or use arrow keys to move the keyboard selection. Hold Shift and use arrows to resize. Press Enter to capture or Escape to cancel."
-        KeyDown="Window_KeyDown">
+        KeyDown="Window_KeyDown"
+        KeyUp="Window_KeyUp">
     <Grid x:Name="Root"
           AutomationProperties.Name="Region capture overlay"
           Focusable="True"
@@ -20,6 +21,13 @@
         <Image x:Name="FrozenScreen" Stretch="Fill" />
         <Rectangle Fill="#66071016" />
         <Canvas x:Name="SelectionCanvas">
+            <Rectangle x:Name="HoverRectangle"
+                       Visibility="Collapsed"
+                       Stroke="#7FE0FF"
+                       StrokeThickness="2"
+                       StrokeDashArray="4 3"
+                       Fill="#1A7FE0FF"
+                       IsHitTestVisible="False" />
             <Rectangle x:Name="SelectionRectangle"
                        Visibility="Collapsed"
                        Stroke="#30E6C3"
@@ -92,7 +100,7 @@
                        FontSize="13"
                        MaxWidth="560"
                        TextWrapping="Wrap"
-                       Text="Drag a region, pick a window/monitor, or use arrows to move the keyboard selection. Shift+arrows resize. Enter captures; Esc cancels. Shift while dragging disables snap." />
+                       Text="Point at a window to highlight it and click to capture it, or drag a region. Ctrl targets a pane inside the window; Shift turns auto-select and snapping off. Arrows move the keyboard selection, Shift+arrows resize. Enter captures; Esc cancels." />
         </Border>
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"
