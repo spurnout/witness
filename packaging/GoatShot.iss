@@ -48,7 +48,10 @@ Name: "{group}\Receipts"; Filename: "{app}\Receipts.exe"
 Name: "{autodesktop}\Receipts"; Filename: "{app}\Receipts.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Receipts"; ValueData: """{app}\Receipts.exe"""; Flags: uninsdeletevalue; Tasks: startup
+; Must stay byte-for-byte identical to StartupRegistrationService.BuildStartupCommand, which writes
+; "<exe>" --background. Without the argument the app starts with a visible window instead of going to
+; the tray, and StartupRegistrationService.GetState reports the command as stale on every upgrade.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Receipts"; ValueData: """{app}\Receipts.exe"" --background"; Flags: uninsdeletevalue; Tasks: startup
 ; The app registers browser native-messaging hosts at runtime; dontcreatekey +
 ; uninsdeletekey schedules their removal at uninstall without creating them here,
 ; so browsers don't keep a host pointing at the deleted Receipts.exe. The legacy
