@@ -846,8 +846,15 @@ public sealed class ReplayRecordingServiceTests
                     path.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)));
 
             Assert.AreEqual(0, coordinator.GetStatus().SegmentCount);
-            Assert.IsTrue(messages.Any(message =>
+
+            // The gap status is published from the capture loop, which is not ordered against the
+            // file cleanup the previous wait observed. Poll for it instead of assuming it already
+            // landed, otherwise this assertion fails intermittently.
+            var sawGapMessage = await TryWaitUntilAsync(() => messages.Any(message =>
                 message.Contains("synchronized capture gap", StringComparison.OrdinalIgnoreCase)));
+            Assert.IsTrue(
+                sawGapMessage,
+                $"Expected a synchronized capture gap status. Saw: {string.Join(" | ", messages)}");
 
             await service.StopAsync();
         }
@@ -1119,12 +1126,37 @@ public sealed class ReplayRecordingServiceTests
                 sourceId,
                 displayName));
 
+    /// <summary>
+    /// The replay producer is driven by wall-clock segment durations, so these waits are sensitive to
+    /// CPU contention: on a loaded machine a five-second budget expired before the expected segments
+    /// existed and the suite failed intermittently. The poll exits as soon as the condition holds, so
+    /// a longer ceiling costs nothing when things are healthy and only buys headroom when they are not.
+    /// </summary>
+    private static readonly TimeSpan WaitBudget = TimeSpan.FromSeconds(20);
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var timeout = new CancellationTokenSource(WaitBudget);
         while (!condition())
         {
             await Task.Delay(10, timeout.Token);
+        }
+    }
+
+    /// <summary>
+    /// Polls like <see cref="WaitUntilAsync"/> but reports the timeout as false, so the caller can
+    /// fail with a message describing what it actually observed.
+    /// </summary>
+    private static async Task<bool> TryWaitUntilAsync(Func<bool> condition)
+    {
+        try
+        {
+            await WaitUntilAsync(condition);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
     }
 

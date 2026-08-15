@@ -6,7 +6,18 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Needed to reference System.Windows.Input.Key when testing keybind capture mapping. -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <!--
+    UseWPF switches the SDK to the Windows Desktop implicit-using set, which omits these two.
+    Re-add them so the existing suite keeps compiling unchanged.
+  -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -4,11 +4,15 @@ namespace GoatShot.App.Services;
 
 public static class SettingsMigrationService
 {
-    public const int CurrentSchemaVersion = 16;
+    public const int CurrentSchemaVersion = 17;
+
+    /// <summary>Schema version that introduced the rebindable keybind catalog.</summary>
+    private const int KeybindCatalogSchemaVersion = 17;
 
     public static SettingsMigrationResult Migrate(AppSettings settings)
     {
         var changed = false;
+        var incomingSchemaVersion = settings.SettingsSchemaVersion;
 
         changed |= MigrateLegacyBrandingDefaults(settings);
 
@@ -113,6 +117,15 @@ public static class SettingsMigrationService
             settings.HotkeyProfiles = new List<HotkeyWorkflowProfile>();
             changed = true;
         }
+
+        if (settings.Keybinds is null)
+        {
+            settings.Keybinds = new List<KeybindAssignment>();
+            changed = true;
+        }
+
+        changed |= AdoptLegacyReplayHotkeys(settings, incomingSchemaVersion);
+        changed |= KeybindCatalog.SyncReplayHotkeyMirror(settings);
 
         if (settings.ProviderProfiles is null)
         {
@@ -298,6 +311,41 @@ public static class SettingsMigrationService
         changed |= EnsureOAuthProvider(settings.OAuth, "OneNote", "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", "https://login.microsoftonline.com/common/oauth2/v2.0/token", "Notes.Create Files.Read offline_access");
 
         return new SettingsMigrationResult(changed);
+    }
+
+    /// <summary>
+    /// Before schema 17 the replay gestures lived only on <see cref="ReplayBufferSettings"/>. Carry any
+    /// customization into the keybind catalog once, so upgrading users keep the chord they configured.
+    /// </summary>
+    private static bool AdoptLegacyReplayHotkeys(AppSettings settings, int incomingSchemaVersion)
+    {
+        if (incomingSchemaVersion >= KeybindCatalogSchemaVersion || settings.Replay is null)
+        {
+            return false;
+        }
+
+        var changed = false;
+        changed |= AdoptLegacyReplayHotkey(settings, HotkeyAction.ToggleReplay, settings.Replay.ToggleHotkey);
+        changed |= AdoptLegacyReplayHotkey(settings, HotkeyAction.SaveReplay, settings.Replay.SaveHotkey);
+        return changed;
+    }
+
+    private static bool AdoptLegacyReplayHotkey(AppSettings settings, HotkeyAction action, string? legacyGesture)
+    {
+        if (settings.Keybinds.Any(assignment => assignment.Action == action))
+        {
+            return false;
+        }
+
+        var gesture = KeybindCatalog.NormalizeGesture(legacyGesture);
+        if (gesture.Length == 0 ||
+            gesture.Equals(KeybindCatalog.DefaultGesture(action), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        settings.Keybinds.Add(new KeybindAssignment { Action = action, Gesture = gesture });
+        return true;
     }
 
     private static bool MigrateLegacyBrandingDefaults(AppSettings settings)

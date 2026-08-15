@@ -9,7 +9,7 @@ public sealed class SettingsSectionCatalogTests
     public void All_ProvidesPrimarySettingsSectionsInNavigationOrder()
     {
         CollectionAssert.AreEqual(
-            new[] { "General", "Recording", "Sharing", "Automation", "Plugins", "Ai" },
+            new[] { "General", "Keybinds", "Recording", "Sharing", "Automation", "Plugins", "Ai" },
             SettingsSectionCatalog.All.Select(section => section.Key).ToArray());
 
         Assert.IsTrue(SettingsSectionCatalog.All.All(section => !string.IsNullOrWhiteSpace(section.Label)));
@@ -19,7 +19,7 @@ public sealed class SettingsSectionCatalogTests
     [TestMethod]
     public void Find_IsCaseInsensitiveAndRejectsUnknownKeys()
     {
-        Assert.AreEqual("Sharing Providers", SettingsSectionCatalog.Find("sharing")?.Label);
+        Assert.AreEqual("Sharing", SettingsSectionCatalog.Find("sharing")?.Label);
         Assert.AreEqual("Plugins", SettingsSectionCatalog.Find("plugins")?.Label);
         Assert.AreEqual("AI", SettingsSectionCatalog.Find("AI")?.Label);
         Assert.IsNull(SettingsSectionCatalog.Find("missing"));

@@ -10,6 +10,23 @@
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
         controls:AppWindowChrome.IsEnabled="True">
     <Window.Resources>
+        <!--
+            Wraps controls that only take effect while their master toggle is on. The indent and the
+            left rule show the dependency, and IsEnabled inheritance greys the whole group so nothing
+            reads as configurable while it is inert.
+        -->
+        <Style x:Key="DependentGroup" TargetType="{x:Type Border}">
+            <Setter Property="Margin" Value="18,4,0,4" />
+            <Setter Property="Padding" Value="12,2,0,2" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="SettingsRailItem" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Foreground" Value="{StaticResource MutedInkBrush}" />
             <Setter Property="Background" Value="Transparent" />
@@ -58,15 +75,65 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="18,14">
-            <StackPanel>
-                <TextBlock Text="Receipts Settings"
-                           FontSize="20"
-                           FontWeight="Bold" />
-                <TextBlock Text="Grouped controls for capture, recording, sharing, automation, plugins, AI, and local privacy posture."
-                           Foreground="{StaticResource MutedInkBrush}"
-                           TextWrapping="Wrap"
-                           Margin="0,2,20,0" />
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Receipts Settings"
+                               FontSize="20"
+                               FontWeight="Bold" />
+                    <TextBlock Text="Grouped controls for capture, keybinds, recording, sharing, automation, plugins, AI, and local privacy posture."
+                               Foreground="{StaticResource MutedInkBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,20,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Width="280" VerticalAlignment="Top">
+                    <TextBox x:Name="SettingsSearchBox"
+                             AutomationProperties.Name="Search settings"
+                             AutomationProperties.HelpText="Type to find a setting by name, then choose a result to jump to it."
+                             TextChanged="SettingsSearch_TextChanged"
+                             PreviewKeyDown="SettingsSearch_PreviewKeyDown" />
+                    <TextBlock x:Name="SettingsSearchHintText"
+                               Text="Search settings"
+                               Foreground="{StaticResource MutedInkBrush}"
+                               FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="2,4,0,0" />
+                    <!-- A popup so results overlay the page instead of reflowing the header. -->
+                    <Popup x:Name="SettingsSearchPopup"
+                           PlacementTarget="{Binding ElementName=SettingsSearchBox}"
+                           Placement="Bottom"
+                           HorizontalOffset="0"
+                           VerticalOffset="4"
+                           AllowsTransparency="True"
+                           StaysOpen="True">
+                        <Border Background="#0D1820"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="2"
+                                Width="280">
+                            <ListBox x:Name="SettingsSearchResults"
+                                     MaxHeight="240"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     AutomationProperties.Name="Settings search results"
+                                     SelectionChanged="SettingsSearchResults_SelectionChanged"
+                                     PreviewKeyDown="SettingsSearchResults_PreviewKeyDown">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}">
+                                        <Setter Property="Padding" Value="8,6" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="1">
@@ -109,7 +176,29 @@
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
                 <TextBlock Text="Library root" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="LibraryRootBox" Margin="0,6,0,14" />
+                <TextBox x:Name="LibraryRootBox" Margin="0,6,0,6" />
+                <Border x:Name="LegacyLibraryNotice"
+                        Background="#101B23"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12,10"
+                        Margin="0,0,0,14"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Name="LegacyLibraryNoticeText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Legacy library folder notice" />
+                        <Button x:Name="MoveLegacyLibraryButton"
+                                Content="Move library"
+                                Click="MoveLegacyLibrary_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
                 <TextBlock Text="Filename template" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="FileNameTemplateBox" Margin="0,6,0,6" />
                 <TextBlock Text="{}{date}, {time}, {datetime}, {capture_type}, {app}, {process}, {window_title}, {monitor}, {width}, {height}, {counter}, {project}"
@@ -138,12 +227,15 @@
                         Margin="0,10,0,8">
                     <StackPanel>
                         <TextBlock Text="Personal installation" FontWeight="SemiBold" />
-                        <TextBlock x:Name="PersonalInstallStatusText"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,4,0,10"
-                                   AutomationProperties.Name="Personal installation and runtime status"
-                                   AutomationProperties.LiveSetting="Polite" />
+                        <Grid x:Name="PersonalInstallStatusGrid"
+                              Margin="0,8,0,10"
+                              AutomationProperties.Name="Personal installation and runtime status"
+                              AutomationProperties.LiveSetting="Polite">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="132" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                        </Grid>
                         <WrapPanel>
                             <Button Content="Install or repair"
                                     Click="InstallOrRepair_Click"
@@ -173,6 +265,48 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14" />
+
+                <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
+
+                <TextBlock x:Name="KeybindsSettingsSection"
+                           Text="Keybinds"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="System-wide shortcuts. These work while Receipts runs in the background, even when another app has focus. Select a shortcut, then press the keys you want. Changes apply after you save."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,20,12" />
+
+                <Border x:Name="KeybindConflictBanner"
+                        Background="#2A2213"
+                        BorderBrush="{StaticResource WarnBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12,10"
+                        Margin="0,0,0,12"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="KeybindConflictText"
+                               Foreground="{StaticResource WarnBrush}"
+                               TextWrapping="Wrap"
+                               AutomationProperties.Name="Keybind conflict warning"
+                               AutomationProperties.LiveSetting="Assertive" />
+                </Border>
+
+                <StackPanel x:Name="KeybindRowsPanel" Margin="0,0,0,4" />
+
+                <TextBlock x:Name="KeybindCaptureHintText"
+                           Text="Esc cancels while recording. Backspace clears a shortcut so the action has no global key."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,4,20,10" />
+                <WrapPanel Margin="0,0,0,4">
+                    <Button Content="Restore default keybinds"
+                            Click="RestoreDefaultKeybinds_Click"
+                            Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.Name="Restore all keybinds to their defaults" />
+                </WrapPanel>
 
                 <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
 
@@ -437,9 +571,13 @@
                         <CheckBox x:Name="ReplayConsentBox"
                                   Content="I understand Replay continuously captures the configured source while armed"
                                   AutomationProperties.Name="Consent to arm Replay" />
-                        <CheckBox x:Name="ReplayAutoArmBox"
-                                  Content="Automatically arm Replay at Windows sign-in for this profile"
-                                  Margin="0,6,0,10" />
+                        <!-- Auto-arm is ignored unless consent is granted, so it follows consent. -->
+                        <Border Style="{StaticResource DependentGroup}"
+                                Margin="18,6,0,10"
+                                IsEnabled="{Binding ElementName=ReplayConsentBox, Path=IsChecked}">
+                            <CheckBox x:Name="ReplayAutoArmBox"
+                                      Content="Automatically arm Replay at Windows sign-in for this profile" />
+                        </Border>
                         <TextBlock Text="Capture strategy" Foreground="{StaticResource MutedInkBrush}" />
                         <ComboBox x:Name="ReplaySourceKindBox"
                                   Margin="0,6,0,8"
@@ -507,20 +645,18 @@
                                  AcceptsReturn="True"
                                  VerticalScrollBarVisibility="Auto"
                                  Margin="0,6,0,8" />
-                        <UniformGrid Columns="2">
-                            <StackPanel Margin="0,0,8,0">
-                                <TextBlock Text="Arm / pause hotkey" Foreground="{StaticResource MutedInkBrush}" />
-                                <TextBox x:Name="ReplayToggleHotkeyBox"
-                                         Margin="0,6,0,8"
-                                         AutomationProperties.Name="Replay arm and pause hotkey" />
-                            </StackPanel>
-                            <StackPanel Margin="8,0,0,0">
-                                <TextBlock Text="Save Replay hotkey" Foreground="{StaticResource MutedInkBrush}" />
-                                <TextBox x:Name="ReplaySaveHotkeyBox"
-                                         Margin="0,6,0,8"
-                                         AutomationProperties.Name="Save Replay hotkey" />
-                            </StackPanel>
-                        </UniformGrid>
+                        <TextBlock x:Name="ReplayHotkeySummaryText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,2,0,6"
+                                   AutomationProperties.Name="Replay shortcut summary" />
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Content="Edit replay shortcuts"
+                                    Click="EditReplayKeybinds_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    AutomationProperties.Name="Go to the Keybinds section to edit replay shortcuts" />
+                        </WrapPanel>
                         <TextBlock x:Name="ReplaySourceHelpText"
                                    Foreground="{StaticResource MutedInkBrush}"
                                    FontSize="12"
@@ -549,7 +685,7 @@
                            Margin="0,4,0,8"
                            AutomationProperties.Name="Provider readiness summary" />
                 <UniformGrid x:Name="ProviderSetupSummaryGrid"
-                             Columns="3"
+                             Columns="2"
                              Margin="0,0,0,8" />
                 <TextBlock x:Name="ProviderSetupDetailText"
                            Foreground="{StaticResource MutedInkBrush}"
@@ -557,7 +693,7 @@
                            TextWrapping="Wrap"
                            Margin="0,0,0,6"
                            AutomationProperties.Name="Provider readiness detail" />
-                <TextBlock Text="Detailed local diagnostics: receipts providers --not-ready --json. OAuth consent, refresh behavior, and live account uploads remain separate parked proof lanes."
+                <TextBlock Text="For a full per-destination breakdown, run: receipts providers --not-ready --json"
                            Foreground="{StaticResource MutedInkBrush}"
                            FontSize="12"
                            TextWrapping="Wrap"
@@ -1331,11 +1467,18 @@
                           Content="Enable watch folders while Receipts is running"
                           Checked="AutomationSummaryInput_Changed"
                           Unchecked="AutomationSummaryInput_Changed" />
-                <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
-                <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
-                <CheckBox x:Name="WatchCopyAfterImportBox" Content="Copy imported image to clipboard" />
-                <CheckBox x:Name="WatchStripMetadataBox" Content="Create metadata-stripped PNG copy for imported images" />
-                <CheckBox x:Name="WatchShareAfterImportBox" Content="Run quick share after importing watched files" />
+                <!-- These only take effect while watching is on, so they follow the master toggle
+                     rather than sitting enabled and doing nothing. -->
+                <Border Style="{StaticResource DependentGroup}"
+                        IsEnabled="{Binding ElementName=EnableWatchFoldersBox, Path=IsChecked}">
+                    <StackPanel>
+                        <CheckBox x:Name="WatchSubdirectoriesBox" Content="Include subdirectories" />
+                        <CheckBox x:Name="WatchAutoImportBox" Content="Auto-import images and videos added to watch folders" />
+                        <CheckBox x:Name="WatchCopyAfterImportBox" Content="Copy imported image to clipboard" />
+                        <CheckBox x:Name="WatchStripMetadataBox" Content="Create metadata-stripped PNG copy for imported images" />
+                        <CheckBox x:Name="WatchShareAfterImportBox" Content="Run quick share after importing watched files" />
+                    </StackPanel>
+                </Border>
                 <TextBlock Text="Watch folders, one per line" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="WatchFoldersBox"
                          AcceptsReturn="True"
@@ -1666,7 +1809,11 @@
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
                 <CheckBox x:Name="AiEnabledBox" Content="Enable AI features after provider configuration" />
-                <CheckBox x:Name="ConfirmAiBox" Content="Ask before sending a screenshot to AI" />
+                <!-- Only consulted when an AI action actually runs, which requires the toggle above. -->
+                <Border Style="{StaticResource DependentGroup}"
+                        IsEnabled="{Binding ElementName=AiEnabledBox, Path=IsChecked}">
+                    <CheckBox x:Name="ConfirmAiBox" Content="Ask before sending a screenshot to AI" />
+                </Border>
                 <TextBlock Text="Gemini API endpoint" Foreground="{StaticResource MutedInkBrush}" />
                 <TextBox x:Name="GeminiEndpointBox" Margin="0,6,0,14" />
                 <TextBlock Text="Default Gemini image model" Foreground="{StaticResource MutedInkBrush}" />
@@ -1741,13 +1888,25 @@
             </ScrollViewer>
         </Grid>
 
-        <StackPanel Grid.Row="2"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="18,14,18,18">
-            <Button Content="Cancel" Click="Cancel_Click" Style="{StaticResource SecondaryButton}" />
-            <Button Content="Save" Click="Save_Click" />
-        </StackPanel>
+        <Grid Grid.Row="2" Margin="18,14,18,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SettingsDirtyText"
+                       Grid.Column="0"
+                       Text="No unsaved changes"
+                       Foreground="{StaticResource MutedInkBrush}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       AutomationProperties.Name="Unsaved changes status"
+                       AutomationProperties.LiveSetting="Polite" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Cancel" Click="Cancel_Click" Style="{StaticResource SecondaryButton}" />
+                <Button Content="Save" Click="Save_Click" />
+            </StackPanel>
+        </Grid>
     </Grid>
     </DockPanel>
 </Window>

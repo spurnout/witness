@@ -35,12 +35,22 @@ public static class SettingsWindowRenderer
             Height = 820,
             ShowInTaskbar = false
         };
+        // This window is closed programmatically; a modal confirmation would hang the render.
+        window.SuppressUnsavedChangesPrompt = true;
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             window.Show();
-            if (IsAutomationImageEffectSection(sectionKey))
+            if (TryReadSearchQuery(sectionKey) is { } searchQuery)
+            {
+                window.PreviewSettingsSearch(searchQuery);
+            }
+            else if (sectionKey?.Trim().Equals("Dirty", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                window.PreviewUnsavedChanges();
+            }
+            else if (IsAutomationImageEffectSection(sectionKey))
             {
                 window.SelectAutomationImageEffectRuleFields();
             }
@@ -76,6 +86,16 @@ public static class SettingsWindowRenderer
         {
             window.Close();
         }
+    }
+
+    /// <summary>Renders the search results for "Search:&lt;query&gt;" so the filter can be proofed.</summary>
+    private static string? TryReadSearchQuery(string? sectionKey)
+    {
+        const string prefix = "Search:";
+        var value = sectionKey?.Trim();
+        return value is not null && value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? value[prefix.Length..].Trim()
+            : null;
     }
 
     private static bool IsAutomationAdvancedSection(string? sectionKey)

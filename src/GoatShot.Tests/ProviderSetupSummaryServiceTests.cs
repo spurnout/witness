@@ -29,13 +29,86 @@ public sealed class ProviderSetupSummaryServiceTests
         Assert.AreEqual(0, summary.BlockedByPolicyProviders);
         Assert.AreEqual(1, summary.RoadmapProviders);
         Assert.AreEqual(2, summary.OAuthProviderCount);
-        StringAssert.Contains(summary.Headline, "2 ready");
-        StringAssert.Contains(summary.Headline, "2 need setup");
+        StringAssert.Contains(summary.Headline, "5 share destinations");
+        StringAssert.Contains(summary.Headline, "2 ready to try");
         StringAssert.Contains(summary.Detail, "GitHub repository");
         StringAssert.Contains(Card(summary, "Ready to try").Detail, "Local folder");
-        StringAssert.Contains(Card(summary, "Need setup").Detail, "GitHub Issues");
-        StringAssert.Contains(Card(summary, "OAuth live proof pending").Detail, "Dropbox");
-        StringAssert.Contains(Card(summary, "Roadmap").Detail, "YouTube");
+        StringAssert.Contains(Card(summary, "Needs setup").Detail, "GitHub Issues");
+        StringAssert.Contains(Card(summary, "Not available yet").Detail, "YouTube");
+    }
+
+    [TestMethod]
+    public void Create_ShowsOnlyTilesThatPartitionTheProviderList()
+    {
+        var summary = new ProviderSetupSummaryService().Create(new[]
+        {
+            Record("Local folder", "None", "Ready", ready: true),
+            Record("Dropbox", "OAuth", "Needs configuration", missingSecrets: new[] { "Dropbox access token" }),
+            Record("Slack", "Incoming webhook", "Blocked by policy"),
+            Record("YouTube", "OAuth", "Roadmap", implemented: false)
+        });
+
+        // Every provider is counted exactly once, so the tiles can be trusted to add up.
+        Assert.AreEqual(
+            summary.TotalProviders,
+            summary.Cards.Sum(card => int.Parse(card.CountLabel, System.Globalization.NumberStyles.AllowThousands, System.Globalization.CultureInfo.InvariantCulture)),
+            "Readiness tiles must partition the provider list.");
+        Assert.AreEqual(4, summary.Cards.Count);
+        Assert.IsFalse(
+            summary.Cards.Any(card => card.Title.Contains("OAuth", StringComparison.OrdinalIgnoreCase)),
+            "OAuth is a cross-cutting subset, not a partition bucket, so it must not sit beside the tiles.");
+    }
+
+    [TestMethod]
+    public void Create_HeadlineStatesTheTotalRatherThanRepeatingTheTileBreakdown()
+    {
+        var summary = new ProviderSetupSummaryService().Create(new[]
+        {
+            Record("Local folder", "None", "Ready", ready: true),
+            Record("Dropbox", "OAuth", "Needs configuration"),
+            Record("YouTube", "OAuth", "Roadmap", implemented: false)
+        });
+
+        StringAssert.Contains(summary.Headline, "3 share destinations");
+        StringAssert.Contains(summary.Headline, "1 ready to try");
+
+        // The tiles partition the same total, so repeating every bucket in the headline would only
+        // duplicate a breakdown the reader can already see and check.
+        Assert.IsFalse(
+            summary.Headline.Contains("not available", StringComparison.OrdinalIgnoreCase),
+            "Headline should not restate the full tile breakdown.");
+    }
+
+    [TestMethod]
+    public void Create_UsesSingularWordingForASingleDestination()
+    {
+        var summary = new ProviderSetupSummaryService().Create(new[]
+        {
+            Record("Local folder", "None", "Ready", ready: true)
+        });
+
+        StringAssert.Contains(summary.Headline, "1 share destination,");
+    }
+
+    [TestMethod]
+    public void Create_ExplainsOAuthSignInWithoutInternalVocabulary()
+    {
+        var summary = new ProviderSetupSummaryService().Create(new[]
+        {
+            Record("Local folder", "None", "Ready", ready: true),
+            Record("Dropbox", "OAuth", "Ready", ready: true)
+        });
+
+        var text = $"{summary.Headline} {summary.Detail} " +
+            string.Join(" ", summary.Cards.Select(card => $"{card.Title} {card.Detail}"));
+
+        StringAssert.Contains(summary.Detail, "browser");
+        foreach (var jargon in new[] { "parked", "proof lane", "roadmap", "adapter" })
+        {
+            Assert.IsFalse(
+                text.Contains(jargon, StringComparison.OrdinalIgnoreCase),
+                $"'{jargon}' is internal vocabulary and should not reach the settings screen.");
+        }
     }
 
     [TestMethod]
@@ -50,7 +123,7 @@ public sealed class ProviderSetupSummaryServiceTests
         Assert.AreEqual(1, summary.BlockedByPolicyProviders);
         Assert.AreEqual(1, summary.NeedsConfigurationProviders);
         StringAssert.Contains(summary.Detail, "Policy blocks 1 provider");
-        StringAssert.Contains(Card(summary, "Policy blocked").Detail, "Slack");
+        StringAssert.Contains(Card(summary, "Blocked by policy").Detail, "Slack");
     }
 
     [TestMethod]

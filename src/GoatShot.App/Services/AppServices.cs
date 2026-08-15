@@ -312,7 +312,7 @@ public sealed class AppServices : IDisposable
         var diagnosticBundles = new DiagnosticBundleService(paths, settings, workspaceStore, diagnostics, providerDiagnostics);
         var documentationPackets = new DocumentationPacketService(paths, aiHistory, bugReports);
         var stepRecorder = new StepRecorderService(paths, screenshots, workspaceStore, ocr);
-        var hotkeys = new HotkeyService(settings.Replay);
+        var hotkeys = new HotkeyService(settings.Keybinds);
 
         StartupTrace.Write("AppServices graph ready");
         return new AppServices(
@@ -405,7 +405,7 @@ public sealed class AppServices : IDisposable
 
     public void AttachTray(MainWindow window)
     {
-        Tray ??= new TrayService(window);
+        Tray ??= new TrayService(window, Hotkeys);
     }
 
     public void SaveSettings()

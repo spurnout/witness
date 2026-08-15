@@ -47,6 +47,8 @@ public static class SettingsWindowAccessibilityAuditor
             Height = 820,
             ShowInTaskbar = false
         };
+        // Closed programmatically; a modal confirmation would hang the audit.
+        window.SuppressUnsavedChangesPrompt = true;
 
         try
         {

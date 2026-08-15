@@ -28,6 +28,69 @@ public sealed class SettingsMigrationServiceTests
     }
 
     [TestMethod]
+    public void Migrate_CarriesCustomizedLegacyReplayHotkeysIntoTheKeybindCatalog()
+    {
+        var settings = new AppSettings
+        {
+            SettingsSchemaVersion = 16,
+            Keybinds = null!
+        };
+        settings.Replay.ToggleHotkey = "Alt+F10";
+        settings.Replay.SaveHotkey = "Alt+F11";
+
+        SettingsMigrationService.Migrate(settings);
+
+        var resolved = KeybindCatalog.Resolve(settings.Keybinds);
+        Assert.AreEqual("Alt+F10", resolved.Single(keybind => keybind.Action == HotkeyAction.ToggleReplay).Gesture);
+        Assert.AreEqual("Alt+F11", resolved.Single(keybind => keybind.Action == HotkeyAction.SaveReplay).Gesture);
+    }
+
+    [TestMethod]
+    public void Migrate_LeavesDefaultReplayHotkeysOutOfTheStoredOverrides()
+    {
+        var settings = new AppSettings { SettingsSchemaVersion = 16 };
+
+        SettingsMigrationService.Migrate(settings);
+
+        Assert.AreEqual(0, settings.Keybinds.Count, "Unchanged defaults should not be persisted as overrides.");
+    }
+
+    [TestMethod]
+    public void Migrate_DoesNotResurrectLegacyReplayHotkeysAfterTheUserUnbindsThem()
+    {
+        var settings = new AppSettings
+        {
+            SettingsSchemaVersion = SettingsMigrationService.CurrentSchemaVersion,
+            Keybinds =
+            [
+                new KeybindAssignment { Action = HotkeyAction.ToggleReplay, Gesture = string.Empty }
+            ]
+        };
+        settings.Replay.ToggleHotkey = "Alt+F10";
+
+        SettingsMigrationService.Migrate(settings);
+
+        var resolved = KeybindCatalog.Resolve(settings.Keybinds);
+        Assert.IsFalse(resolved.Single(keybind => keybind.Action == HotkeyAction.ToggleReplay).IsBound);
+    }
+
+    [TestMethod]
+    public void Migrate_MirrorsResolvedReplayGesturesBackOntoReplaySettings()
+    {
+        var settings = new AppSettings
+        {
+            Keybinds =
+            [
+                new KeybindAssignment { Action = HotkeyAction.SaveReplay, Gesture = "ctrl+alt+F9" }
+            ]
+        };
+
+        SettingsMigrationService.Migrate(settings);
+
+        Assert.AreEqual("Ctrl+Alt+F9", settings.Replay.SaveHotkey);
+    }
+
+    [TestMethod]
     public void Migrate_AddsCurrentVersionAndDefaultRoadmapSettings()
     {
         var settings = new AppSettings

@@ -103,6 +103,38 @@ public static class TrayMenuPreviewRenderer
 
     private static UIElement BuildActionRow(TrayMenuActionDefinition definition)
     {
+        var row = new DockPanel { LastChildFill = true };
+
+        // Mirrors the shortcut column of the real menu, using catalog defaults since this preview
+        // runs without app services.
+        if (definition.ActionKind is { } actionKind &&
+            TrayMenuActionCatalog.HotkeyFor(actionKind) is { } hotkey)
+        {
+            var gesture = KeybindCatalog.ToDisplay(KeybindCatalog.DefaultGesture(hotkey));
+            if (gesture.Length > 0)
+            {
+                var shortcut = new TextBlock
+                {
+                    Text = gesture,
+                    Foreground = Brush("#A9BAC8"),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(12, 0, 0, 0)
+                };
+                DockPanel.SetDock(shortcut, Dock.Right);
+                row.Children.Add(shortcut);
+            }
+        }
+
+        row.Children.Add(new TextBlock
+        {
+            Text = definition.Label,
+            Foreground = Brush("#F5FAFF"),
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+
         return new Border
         {
             MinHeight = 32,
@@ -111,14 +143,7 @@ public static class TrayMenuPreviewRenderer
             Background = Brush("#111F2A"),
             BorderBrush = Brush("#24394A"),
             BorderThickness = new Thickness(1),
-            Child = new TextBlock
-            {
-                Text = definition.Label,
-                Foreground = Brush("#F5FAFF"),
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            }
+            Child = row
         };
     }
 

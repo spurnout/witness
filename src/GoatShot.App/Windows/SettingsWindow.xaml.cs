@@ -59,6 +59,8 @@ public partial class SettingsWindow : Window
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         await RefreshRecordingDevicesAsync();
         await RefreshPluginUpdatesForDefaultRegistryAsync();
+        // Arm only after deferred population finishes, so programmatic fills are not read as edits.
+        ArmDirtyTracking();
     }
 
     public void SelectSection(string? key, bool alignSectionToTop = false)
@@ -150,6 +152,13 @@ public partial class SettingsWindow : Window
             };
             System.Windows.Automation.AutomationProperties.SetName(item, $"{section.Label} settings section");
             SettingsSectionBox.Items.Add(item);
+
+            // The rail and the heading are the same name by construction, so they cannot drift apart
+            // the way "Sharing Providers" / "Sharing" and "Automation" / "Automation / Watch Folders" did.
+            if (FindSettingsSectionTarget(section.Key) is TextBlock heading)
+            {
+                heading.Text = section.Label;
+            }
         }
 
         SettingsSectionBox.SelectedIndex = SettingsSectionBox.Items.Count > 0 ? 0 : -1;
@@ -241,6 +250,7 @@ public partial class SettingsWindow : Window
         return SettingsSectionCatalog.Find(key)?.Key switch
         {
             "General" => GeneralSettingsSection,
+            "Keybinds" => KeybindsSettingsSection,
             "Recording" => RecordingSettingsSection,
             "Sharing" => SharingSettingsSection,
             "Automation" => AutomationSettingsSection,
@@ -276,6 +286,8 @@ public partial class SettingsWindow : Window
         RefreshPersonalInstallStatus();
         ManagedPolicyStatusText.Text = ManagedPolicyService.LoadEffective(settings).Summary;
         OcrLanguageBox.Text = settings.OcrLanguageTag;
+        RefreshLegacyLibraryNotice();
+        LoadKeybinds(settings);
         LoadRecordingSettings(settings.Recording ??= new RecordingSettings());
         LoadReplaySettings(settings.Replay ??= new ReplayBufferSettings());
         ConfirmUploadBox.IsChecked = settings.ConfirmBeforeUpload;
@@ -739,6 +751,8 @@ public partial class SettingsWindow : Window
         }
 
         _services.SaveSettings();
+        _services.Hotkeys.Reload(settings.Keybinds);
+        ClearSettingsDirty();
         DialogResult = true;
     }
 
@@ -796,17 +810,122 @@ public partial class SettingsWindow : Window
             : File.Exists(Environment.ExpandEnvironmentVariables(_services.Settings.ExternalWhisperExecutablePath))
                 ? "external Whisper configured"
                 : "external Whisper path missing";
-        PersonalInstallStatusText.Text =
-            $"Current {install.CurrentVersion} ({install.BuildId}); installed {(string.IsNullOrWhiteSpace(install.InstalledVersion) ? "not installed" : install.InstalledVersion)} at {install.InstalledPath}. " +
-            $"Running {(install.RunningInstalledCopy ? "installed copy" : "download/development copy")}; update {(install.InstalledVersion.Length > 0 && _services.PersonalInstall.IsNewerThanInstalled() ? "available" : "not available")}. " +
-            $"Startup {(install.StartupRegistered && install.StartupCommandCurrent ? "enabled for tray-only launch" : "disabled or needs repair")}. " +
-            $"Bundled runtime: {runtime.Message} FFmpeg {(ffmpegAsset is null ? "development/PATH resolution" : ffmpegAsset.Version)}; segmentation: {segmentation.Message} " +
-            $"Transcription preference: {_services.Settings.TranscriptionProvider}; {whisper}; Gemini speech-to-text remains explicit per-action opt-in.";
+
+        var rows = PersonalInstallStatusPresenter.Build(
+            install,
+            install.InstalledVersion.Length > 0 && _services.PersonalInstall.IsNewerThanInstalled(),
+            runtime.Succeeded,
+            runtime.Message,
+            ffmpegAsset?.Version,
+            segmentation.Available,
+            segmentation.Message,
+            _services.Settings.TranscriptionProvider,
+            whisper);
+        RenderInstallStatusRows(rows);
     }
+
+    private void RenderInstallStatusRows(IReadOnlyList<InstallStatusRow> rows)
+    {
+        PersonalInstallStatusGrid.Children.Clear();
+        PersonalInstallStatusGrid.RowDefinitions.Clear();
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            PersonalInstallStatusGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var label = new TextBlock
+            {
+                Text = row.Label,
+                Foreground = (MediaBrush)FindResource("MutedInkBrush"),
+                FontSize = 12,
+                Margin = new Thickness(0, 3, 12, 3),
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetRow(label, index);
+            Grid.SetColumn(label, 0);
+            PersonalInstallStatusGrid.Children.Add(label);
+
+            var value = new TextBlock
+            {
+                Text = row.Value,
+                Foreground = InstallStatusBrush(row.Tone),
+                FontSize = 12,
+                Margin = new Thickness(0, 3, 0, 3),
+                TextWrapping = TextWrapping.Wrap
+            };
+            // Announce label and value together so the row is meaningful to a screen reader.
+            System.Windows.Automation.AutomationProperties.SetName(value, $"{row.Label}: {row.Value}");
+            Grid.SetRow(value, index);
+            Grid.SetColumn(value, 1);
+            PersonalInstallStatusGrid.Children.Add(value);
+        }
+    }
+
+    private MediaBrush InstallStatusBrush(InstallStatusTone tone) => tone switch
+    {
+        InstallStatusTone.Ok => (MediaBrush)FindResource("AccentBrush"),
+        InstallStatusTone.Attention => (MediaBrush)FindResource("WarnBrush"),
+        _ => (MediaBrush)FindResource("InkBrush")
+    };
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
+    }
+
+    // Explains why an upgraded install still points at a folder named for the old brand, and offers
+    // the move rather than performing it silently.
+    private void RefreshLegacyLibraryNotice()
+    {
+        var plan = LegacyLibraryRelocationService.Describe(LibraryRootBox.Text);
+        if (plan is null)
+        {
+            LegacyLibraryNotice.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        LegacyLibraryNoticeText.Text =
+            $"This folder is still named {BrandIdentity.LegacyLibraryDirectoryName}, from before the app was " +
+            $"renamed to {BrandIdentity.ProductName}. Your captures are fine where they are. " +
+            $"You can move them to {plan.Target} if you would rather the names matched.";
+        LegacyLibraryNotice.Visibility = Visibility.Visible;
+    }
+
+    private void MoveLegacyLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        var plan = LegacyLibraryRelocationService.Describe(LibraryRootBox.Text);
+        if (plan is null)
+        {
+            return;
+        }
+
+        var confirmation = System.Windows.MessageBox.Show(
+            this,
+            plan.Prompt,
+            "Move capture library",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var result = LegacyLibraryRelocationService.Relocate(plan);
+        if (result.Succeeded)
+        {
+            LibraryRootBox.Text = result.LibraryRoot;
+            RefreshLegacyLibraryNotice();
+        }
+
+        System.Windows.MessageBox.Show(
+            this,
+            result.Succeeded
+                ? $"{result.Message} Save to apply the new location."
+                : result.Message,
+            "Move capture library",
+            MessageBoxButton.OK,
+            result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private static List<string> SplitLines(string text)
@@ -1313,6 +1432,7 @@ public partial class SettingsWindow : Window
         settings.PrivateCaptureMode = PrivateModeBox.IsChecked == true;
         settings.RunAtStartup = RunAtStartupBox.IsChecked == true;
         settings.OcrLanguageTag = OcrLanguageBox.Text.Trim();
+        ApplyKeybindSettings(settings);
         ApplyRecordingSettings(settings.Recording ??= new RecordingSettings());
         ApplyReplaySettings(settings);
         settings.ConfirmBeforeUpload = ConfirmUploadBox.IsChecked == true;
@@ -1700,8 +1820,7 @@ public partial class SettingsWindow : Window
         ReplayOcrIndexBox.IsChecked = replay.EnableLocalOcrIndexing;
         ReplayAnalysisSensitivityBox.Text = replay.AnalysisSensitivity.ToString("0.##", CultureInfo.InvariantCulture);
         ReplayPrivacyProcessesBox.Text = string.Join(Environment.NewLine, replay.PrivacyExcludedProcessNames);
-        ReplayToggleHotkeyBox.Text = replay.ToggleHotkey;
-        ReplaySaveHotkeyBox.Text = replay.SaveHotkey;
+        RefreshReplayHotkeySummary();
         RefreshReplaySourceChoices(replay.CaptureSource.SourceId);
         UpdateReplaySourceHelp();
     }
@@ -1735,8 +1854,10 @@ public partial class SettingsWindow : Window
                 .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            ToggleHotkey = ReplayToggleHotkeyBox.Text.Trim(),
-            SaveHotkey = ReplaySaveHotkeyBox.Text.Trim()
+            // Replay gestures are owned by the Keybinds section; carry the current values through so
+            // Normalize() cannot resurrect a default over a chord the user just rebound.
+            ToggleHotkey = existing.ToggleHotkey,
+            SaveHotkey = existing.SaveHotkey
         }.Normalize();
     }
 

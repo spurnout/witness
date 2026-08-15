@@ -1,3 +1,4 @@
+using GoatShot.App.Models;
 using GoatShot.App.Services;
 
 namespace GoatShot.Tests;
@@ -30,6 +31,33 @@ public sealed class TrayMenuActionCatalogTests
             Assert.IsFalse(string.IsNullOrWhiteSpace(action.Group));
             Assert.IsTrue(action.ActionKind.HasValue);
         }
+    }
+
+    [TestMethod]
+    public void HotkeyFor_MapsEveryTrayEntryThatHasAGlobalShortcut()
+    {
+        Assert.AreEqual(HotkeyAction.RegionCapture, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.CaptureRegion));
+        Assert.AreEqual(HotkeyAction.ColorPicker, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.PickColor));
+        Assert.AreEqual(HotkeyAction.SaveReplay, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.SaveReplay));
+
+        // Entries with no global shortcut must report none rather than borrowing another action's.
+        Assert.IsNull(TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.Exit));
+        Assert.IsNull(TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.OpenSettings));
+    }
+
+    [TestMethod]
+    public void HotkeyFor_NeverPointsTwoTrayEntriesAtTheSameShortcut()
+    {
+        var mapped = TrayMenuActionCatalog.Actions
+            .Select(action => TrayMenuActionCatalog.HotkeyFor(action.ActionKind!.Value))
+            .Where(hotkey => hotkey.HasValue)
+            .Select(hotkey => hotkey!.Value)
+            .ToArray();
+
+        Assert.AreEqual(mapped.Length, mapped.Distinct().Count());
+        Assert.IsTrue(
+            mapped.All(hotkey => KeybindCatalog.Definitions.Any(definition => definition.Action == hotkey)),
+            "Every mapped shortcut must exist in the keybind catalog.");
     }
 
     [TestMethod]

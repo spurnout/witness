@@ -39,15 +39,65 @@ public partial class MainWindow : Window
         _auditMode = auditMode;
         _startHidden = startHidden;
         InitializeComponent();
-        SaveReplayButton.ToolTip = $"Save the configured preceding interval ({FormatHotkey(_services.Settings.Replay.SaveHotkey)})";
-        ReplayStateButton.ToolTip = $"Replay keeps only a bounded local rolling buffer until you save it. Arm/pause: {FormatHotkey(_services.Settings.Replay.ToggleHotkey)}";
+        SaveReplayButton.ToolTip = $"Save the configured preceding interval{DescribeHotkey(HotkeyAction.SaveReplay)}";
+        ReplayStateButton.ToolTip = $"Replay keeps only a bounded local rolling buffer until you save it.{DescribeHotkey(HotkeyAction.ToggleReplay, " Arm/pause: {0}")}";
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         CaptureList.ItemsSource = _captures;
         QueueList.ItemsSource = _uploadQueueItems;
     }
 
-    private static string FormatHotkey(string value) =>
-        string.Join(" + ", (value ?? string.Empty).Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    // Settings being reset or a secret being dropped is exactly the kind of thing that must not pass
+    // silently, so it is reported once at startup rather than only living in the status line.
+    private void ReportSettingsLoadIssues()
+    {
+        var diagnostics = _services.SettingsStore.LastLoadDiagnostics;
+        if (!diagnostics.HasIssues)
+        {
+            return;
+        }
+
+        var summary = string.Join(Environment.NewLine, diagnostics.Warnings);
+        SetStatus(diagnostics.RecoveredFromUnreadableFile
+            ? "Settings could not be read and were reset to defaults."
+            : "Some saved settings could not be restored.");
+
+        _ = Dispatcher.BeginInvoke(
+            () => System.Windows.MessageBox.Show(
+                this,
+                summary,
+                diagnostics.RecoveredFromUnreadableFile ? "Receipts settings were reset" : "Receipts settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning),
+            DispatcherPriority.ApplicationIdle);
+    }
+
+    private void Hotkeys_RegistrationsChanged(object? sender, EventArgs e) =>
+        Dispatcher.Invoke(RefreshHotkeySurfaces);
+
+    // Re-reads every surface that quotes a gesture. Called on attach and again whenever the user
+    // rebinds, so hints never advertise a chord that is no longer registered.
+    private void RefreshHotkeySurfaces()
+    {
+        HotkeyText.Text = string.Join(Environment.NewLine, _services.Hotkeys.RegistrationReport);
+        var instantCapture = _services.Hotkeys.IsRegistered(HotkeyAction.AllInOneCapture)
+            ? _services.Hotkeys.DisplayGesture(HotkeyAction.AllInOneCapture)
+            : string.Empty;
+        EmptyStateHotkeyRun.Text = instantCapture.Length == 0 ? "the Screen button" : instantCapture;
+        InstantCaptureHintText.Text = instantCapture.Length == 0
+            ? "Set an instant capture shortcut in Settings"
+            : $"{instantCapture} = instant region capture";
+        SaveReplayButton.ToolTip = $"Save the configured preceding interval{DescribeHotkey(HotkeyAction.SaveReplay)}";
+        ReplayStateButton.ToolTip = "Replay keeps only a bounded local rolling buffer until you save it." +
+            DescribeHotkey(HotkeyAction.ToggleReplay, " Arm/pause: {0}");
+    }
+
+    // Reads the gesture the hotkey service actually resolved rather than the persisted mirror, so a
+    // tooltip never advertises a chord the user has since rebound or cleared.
+    private string DescribeHotkey(HotkeyAction action, string format = " ({0})")
+    {
+        var gesture = _services.Hotkeys.DisplayGesture(action);
+        return gesture.Length == 0 ? string.Empty : string.Format(CultureInfo.CurrentCulture, format, gesture);
+    }
 
     public async void CaptureRegionCommand(string? hotkeyProfile = null) => await CaptureRegionAsync(hotkeyProfile);
     public async void CaptureWindowCommand(string? hotkeyProfile = null) => await CaptureActiveWindowAsync(hotkeyProfile);
@@ -144,8 +194,9 @@ public partial class MainWindow : Window
 
         _services.Hotkeys.Attach(this);
         _services.Hotkeys.ActionTriggered += Hotkeys_ActionTriggered;
-        HotkeyText.Text = string.Join(Environment.NewLine, _services.Hotkeys.RegistrationReport);
-        EmptyStateHotkeyRun.Text = _services.Hotkeys.IsRegistered(HotkeyAction.AllInOneCapture) ? HotkeyService.AllInOneCaptureLabel : "the Screen button";
+        _services.Hotkeys.RegistrationsChanged += Hotkeys_RegistrationsChanged;
+        RefreshHotkeySurfaces();
+        ReportSettingsLoadIssues();
 
         _services.Automation.StatusChanged += Service_StatusChanged;
         _services.Automation.CaptureImported += Automation_CaptureImported;

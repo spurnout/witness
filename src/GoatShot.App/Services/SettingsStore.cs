@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -5,6 +6,20 @@ using System.Text.Json.Nodes;
 using GoatShot.App.Models;
 
 namespace GoatShot.App.Services;
+
+/// <summary>
+/// What happened during the most recent <see cref="SettingsStore.Load"/>. Surfaced so the app can
+/// tell the user when configuration was reset or a secret was dropped, instead of failing silently.
+/// </summary>
+public sealed record SettingsLoadDiagnostics(
+    bool RecoveredFromUnreadableFile,
+    string? PreservedCopyPath,
+    IReadOnlyList<string> Warnings)
+{
+    public static SettingsLoadDiagnostics Clean { get; } = new(false, null, []);
+
+    public bool HasIssues => RecoveredFromUnreadableFile || Warnings.Count > 0;
+}
 
 public sealed class SettingsStore
 {
@@ -26,6 +41,9 @@ public sealed class SettingsStore
 
     private string _path = Path.Combine(AppPaths.DefaultLocalRoot(), "settings.json");
 
+    /// <summary>Result of the most recent <see cref="Load"/>; clean until one runs.</summary>
+    public SettingsLoadDiagnostics LastLoadDiagnostics { get; private set; } = SettingsLoadDiagnostics.Clean;
+
     public void UsePath(string path)
     {
         _path = path;
@@ -33,6 +51,7 @@ public sealed class SettingsStore
 
     public AppSettings Load()
     {
+        LastLoadDiagnostics = SettingsLoadDiagnostics.Clean;
         if (!File.Exists(_path))
         {
             var created = new AppSettings();
@@ -43,21 +62,66 @@ public sealed class SettingsStore
         try
         {
             var json = ReadAllTextWithRetry(_path);
-            var (decryptedJson, hadPlaintextWebhook) = UnprotectWebhookUrls(json);
+            var (decryptedJson, hadPlaintextWebhook, warnings) = UnprotectWebhookUrls(json);
             var settings = JsonSerializer.Deserialize<AppSettings>(decryptedJson, JsonOptions) ?? new AppSettings();
             var migration = SettingsMigrationService.Migrate(settings);
-            if (migration.Changed || hadPlaintextWebhook)
+            LastLoadDiagnostics = new SettingsLoadDiagnostics(false, null, warnings);
+            if (migration.Changed || hadPlaintextWebhook || warnings.Count > 0)
             {
                 Save(settings);
             }
 
             return settings;
         }
-        catch
+        catch (Exception ex)
         {
+            // The caller re-saves immediately after Load, so returning defaults here would overwrite
+            // the user's real configuration for good. Move the unreadable file aside first.
+            var preserved = TryPreserveUnreadableFile();
             var fallback = new AppSettings();
             SettingsMigrationService.Migrate(fallback);
+            LastLoadDiagnostics = new SettingsLoadDiagnostics(
+                true,
+                preserved,
+                [
+                    preserved is null
+                        ? $"Settings could not be read ({ex.GetType().Name}) and the existing file could not be preserved."
+                        : $"Settings could not be read ({ex.GetType().Name}). The previous file was kept at {preserved}."
+                ]);
             return fallback;
+        }
+    }
+
+    /// <summary>
+    /// Renames the unreadable settings file so a later <see cref="Save"/> cannot destroy it. Returns
+    /// the new path, or null when even the rename failed.
+    /// </summary>
+    private string? TryPreserveUnreadableFile()
+    {
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                return null;
+            }
+
+            var directory = Path.GetDirectoryName(_path);
+            var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            var name = $"{Path.GetFileNameWithoutExtension(_path)}.unreadable-{stamp}{Path.GetExtension(_path)}";
+            var target = string.IsNullOrWhiteSpace(directory) ? name : Path.Combine(directory, name);
+            if (File.Exists(target))
+            {
+                target = string.IsNullOrWhiteSpace(directory)
+                    ? $"{name}.{Guid.NewGuid():N}"
+                    : Path.Combine(directory, $"{name}.{Guid.NewGuid():N}");
+            }
+
+            File.Move(_path, target);
+            return target;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -94,10 +158,11 @@ public sealed class SettingsStore
         return root.ToJsonString(JsonOptions);
     }
 
-    private static (string Json, bool HadPlaintextWebhook) UnprotectWebhookUrls(string json)
+    private static (string Json, bool HadPlaintextWebhook, IReadOnlyList<string> Warnings) UnprotectWebhookUrls(string json)
     {
         var root = JsonNode.Parse(json)?.AsObject() ?? new JsonObject();
         var hadPlaintext = false;
+        var warnings = new List<string>();
         foreach (var property in ProtectedWebhookProperties)
         {
             var value = root[property]?.GetValue<string>();
@@ -112,15 +177,36 @@ public sealed class SettingsStore
                 continue;
             }
 
-            var protectedBytes = Convert.FromBase64String(value[ProtectedPrefix.Length..]);
-            root[property] = Encoding.UTF8.GetString(ProtectedData.Unprotect(
-                protectedBytes,
-                WebhookEntropy,
-                DataProtectionScope.CurrentUser));
+            // A blob written by a different Windows account or machine cannot be unprotected here.
+            // Drop that one secret and keep the rest of the file rather than failing the whole load.
+            try
+            {
+                var protectedBytes = Convert.FromBase64String(value[ProtectedPrefix.Length..]);
+                root[property] = Encoding.UTF8.GetString(ProtectedData.Unprotect(
+                    protectedBytes,
+                    WebhookEntropy,
+                    DataProtectionScope.CurrentUser));
+            }
+            catch (Exception ex) when (ex is CryptographicException or FormatException)
+            {
+                root[property] = string.Empty;
+                warnings.Add(
+                    $"The saved {DescribeWebhookProperty(property)} could not be decrypted on this " +
+                    "Windows account and was cleared. Re-enter it in Settings.");
+            }
         }
 
-        return (root.ToJsonString(JsonOptions), hadPlaintext);
+        return (root.ToJsonString(JsonOptions), hadPlaintext, warnings);
     }
+
+    private static string DescribeWebhookProperty(string property) => property switch
+    {
+        "slackWebhookUrl" => "Slack webhook URL",
+        "discordWebhookUrl" => "Discord webhook URL",
+        "teamsWebhookUrl" => "Microsoft Teams webhook URL",
+        "customWebhookUrl" => "custom webhook URL",
+        _ => property
+    };
 
     private static string ReadAllTextWithRetry(string path)
     {

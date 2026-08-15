@@ -2,7 +2,7 @@ namespace GoatShot.App.Models;
 
 public sealed class AppSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 16;
+    public int SettingsSchemaVersion { get; set; } = 17;
     public string LibraryRoot { get; set; } = string.Empty;
     public bool AutoCopyImageAfterCapture { get; set; } = true;
     public bool IncludeCursor { get; set; } = true;
@@ -129,6 +129,7 @@ public sealed class AppSettings
     public List<string> EnabledPluginIds { get; set; } = new();
     public List<string> AllowedPluginActionIds { get; set; } = new();
     public List<AutomationRule> AutomationRules { get; set; } = new();
+    public List<KeybindAssignment> Keybinds { get; set; } = new();
     public List<HotkeyWorkflowProfile> HotkeyProfiles { get; set; } = new();
     public List<RecordingWorkflowProfile> RecordingProfiles { get; set; } = new();
     public List<ProviderWorkflowProfile> ProviderProfiles { get; set; } = new();

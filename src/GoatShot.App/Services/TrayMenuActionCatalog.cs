@@ -1,3 +1,5 @@
+using GoatShot.App.Models;
+
 namespace GoatShot.App.Services;
 
 public enum TrayMenuActionKind
@@ -72,4 +74,23 @@ public static class TrayMenuActionCatalog
     ];
 
     public static IEnumerable<TrayMenuActionDefinition> Actions => All.Where(item => !item.IsSeparator);
+
+    /// <summary>
+    /// Tray entries that are also driven by a global hotkey. The tray menu is exactly where someone
+    /// looks when they have not memorised the shortcut, so these are labelled with the live gesture.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<TrayMenuActionKind, HotkeyAction> HotkeyByAction =
+        new Dictionary<TrayMenuActionKind, HotkeyAction>
+        {
+            [TrayMenuActionKind.CaptureRegion] = HotkeyAction.RegionCapture,
+            [TrayMenuActionKind.CaptureWindow] = HotkeyAction.WindowCapture,
+            [TrayMenuActionKind.ToggleRecording] = HotkeyAction.ToggleRecording,
+            [TrayMenuActionKind.ToggleReplay] = HotkeyAction.ToggleReplay,
+            [TrayMenuActionKind.SaveReplay] = HotkeyAction.SaveReplay,
+            [TrayMenuActionKind.PickColor] = HotkeyAction.ColorPicker,
+            [TrayMenuActionKind.OpenPixelRuler] = HotkeyAction.PixelRuler
+        };
+
+    public static HotkeyAction? HotkeyFor(TrayMenuActionKind actionKind) =>
+        HotkeyByAction.TryGetValue(actionKind, out var action) ? action : null;
 }

@@ -32,39 +32,41 @@ public sealed class ProviderSetupSummaryService
             BlockedByPolicyProviders = blocked.Count,
             RoadmapProviders = roadmap.Count,
             OAuthProviderCount = oauth.Count,
-            Headline = $"{ready.Count} ready, {needsConfiguration.Count} need setup, {blocked.Count} policy-blocked, {roadmap.Count} roadmap.",
+            // States the total and the one number worth acting on. The breakdown lives in the tiles
+            // below, which partition the same total -- restating all four here only invited the
+            // reader to check arithmetic that previously did not add up.
+            Headline =
+                $"{records.Count} share destination{(records.Count == 1 ? string.Empty : "s")}, " +
+                $"{ready.Count} ready to try.",
             Detail = BuildDetail(needsConfiguration, blocked, oauth)
         };
 
+        // These four buckets partition the provider list: every destination appears in exactly one.
+        // OAuth deliberately is not a tile here -- it cuts across ready and needs-setup, and showing
+        // it alongside made the numbers look like they failed to add up.
         summary.Cards.Add(CreateCard(
             "Ready to try",
             ready.Count,
             ready,
-            "Local settings and saved secret markers are present.",
+            "Nothing is set up yet.",
             "Ready"));
         summary.Cards.Add(CreateCard(
-            "Need setup",
+            "Needs setup",
             needsConfiguration.Count,
             needsConfiguration,
-            "Missing fields or saved secrets are listed in provider diagnostics.",
+            "Every available destination is set up.",
             "NeedsConfiguration"));
         summary.Cards.Add(CreateCard(
-            "Policy blocked",
+            "Blocked by policy",
             blocked.Count,
             blocked,
-            "Effective managed policy prevents local share attempts.",
+            "No destination is blocked on this machine.",
             "Blocked"));
         summary.Cards.Add(CreateCard(
-            "OAuth live proof pending",
-            oauth.Count,
-            oauth,
-            "Local tokens or client IDs do not prove live consent or refresh behavior.",
-            "OAuth"));
-        summary.Cards.Add(CreateCard(
-            "Roadmap",
+            "Not available yet",
             roadmap.Count,
             roadmap,
-            "Adapter implementation is not available yet.",
+            "Every destination in the list can be used.",
             "Roadmap"));
 
         return summary;
@@ -94,25 +96,25 @@ public sealed class ProviderSetupSummaryService
         IReadOnlyList<ProviderDiagnosticRecord> blocked,
         IReadOnlyList<ProviderDiagnosticRecord> oauth)
     {
-        if (blocked.Count > 0)
-        {
-            return $"Policy blocks {blocked.Count} provider(s). Run provider diagnostics or admin-policy explain before testing uploads.";
-        }
+        var lead = blocked.Count > 0
+            ? $"Policy blocks {blocked.Count} provider(s) on this machine. Ask your administrator before testing uploads."
+            : needsConfiguration.Count > 0
+                ? DescribeFirstMissingItem(needsConfiguration)
+                : "Every available destination is set up.";
 
-        if (needsConfiguration.Count > 0)
-        {
-            var first = needsConfiguration.First();
-            var missing = first.MissingSettings.Concat(first.MissingSecrets).FirstOrDefault();
-            return string.IsNullOrWhiteSpace(missing)
-                ? $"{first.ProviderName} needs setup before a local share attempt."
-                : $"{first.ProviderName} needs {missing}. Run provider diagnostics for the full list.";
-        }
+        // OAuth is reported here rather than as a tile: it describes how you sign in, not whether the
+        // destination is ready, and several ready destinations use it too.
+        return oauth.Count == 0
+            ? lead
+            : $"{lead} {oauth.Count} of these sign in through your browser, and will ask you to connect the first time you use them.";
+    }
 
-        if (oauth.Count > 0)
-        {
-            return "OAuth-backed providers may have local token markers, but live consent and refresh proof remain parked.";
-        }
-
-        return "Provider diagnostics are available from the CLI for detailed readiness and missing-item lists.";
+    private static string DescribeFirstMissingItem(IReadOnlyList<ProviderDiagnosticRecord> needsConfiguration)
+    {
+        var first = needsConfiguration[0];
+        var missing = first.MissingSettings.Concat(first.MissingSecrets).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(missing)
+            ? $"{first.ProviderName} needs setup before you can share to it."
+            : $"{first.ProviderName} needs {missing}. Open its fields below for the full list.";
     }
 }

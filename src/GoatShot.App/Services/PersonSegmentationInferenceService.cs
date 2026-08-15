@@ -56,7 +56,16 @@ public sealed class PersonSegmentationInferenceService : IDisposable
         using var source = new Bitmap(inputPath);
         using var resized = new Bitmap(source, new Size(InferenceSize, InferenceSize));
         var input = CreateInputTensor(resized);
-        var inputName = session.InputMetadata.Keys.Single();
+        // Every other failure here returns a Failed result; a model with an unexpected input count
+        // should not be the one case that throws out of the task instead.
+        if (session.InputMetadata.Count != 1)
+        {
+            return PersonSegmentationInferenceResult.Failed(
+                $"The bundled model exposes {session.InputMetadata.Count} inputs; exactly one is required. " +
+                "Run Repair from Settings to restore the expected model.");
+        }
+
+        var inputName = session.InputMetadata.Keys.First();
         using var results = session.Run([NamedOnnxValue.CreateFromTensor(inputName, input)]);
         var output = results.FirstOrDefault(result => result.Name.Equals("out", StringComparison.OrdinalIgnoreCase))
             ?? results.First();

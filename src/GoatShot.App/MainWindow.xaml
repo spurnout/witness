@@ -401,7 +401,7 @@
                                     IsEnabled="False"
                                     Style="{StaticResource CaptureModeButton}"
                                     AutomationProperties.Name="Save preceding Replay buffer"
-                                    ToolTip="Save the configured preceding interval (Ctrl+Shift+PrintScreen)" />
+                                    ToolTip="Save the configured preceding interval" />
                             <Button Content="GIF"
                                     Click="Recording_Click"
                                     Style="{StaticResource CaptureModeButton}"
@@ -427,7 +427,8 @@
                             </Button>
                         </StackPanel>
                     </ScrollViewer>
-                    <TextBlock Grid.Column="1"
+                    <TextBlock x:Name="InstantCaptureHintText"
+                               Grid.Column="1"
                                Text="PrtScn = instant region capture"
                                Foreground="{StaticResource WorkspaceMutedTextBrush}"
                                FontSize="12"
@@ -520,16 +521,6 @@
                                 <DockPanel>
                                     <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
                                     <TextBlock Text="Trash" />
-                                </DockPanel>
-                            </Button>
-
-                            <TextBlock Text="COLLECTIONS" Style="{StaticResource SectionLabel}" Margin="10,24,0,10" />
-                            <Button Style="{StaticResource UnavailableNavButton}"
-                                    AutomationProperties.Name="Collections unavailable"
-                                    AutomationProperties.HelpText="Collections are not available in this release.">
-                                <DockPanel>
-                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
-                                    <TextBlock Text="Coming later" />
                                 </DockPanel>
                             </Button>
                         </StackPanel>

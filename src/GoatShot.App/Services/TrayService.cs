@@ -7,8 +7,9 @@ public sealed class TrayService : IDisposable
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly System.Drawing.Icon _trayIcon;
     private readonly Dictionary<TrayMenuActionKind, Forms.ToolStripItem> _actionItems = new();
+    private readonly HotkeyService? _hotkeys;
 
-    public TrayService(MainWindow window)
+    public TrayService(MainWindow window, HotkeyService? hotkeys = null)
     {
         var menu = new Forms.ContextMenuStrip();
         foreach (var definition in TrayMenuActionCatalog.All)
@@ -24,6 +25,13 @@ public sealed class TrayService : IDisposable
             _actionItems[actionKind] = item;
         }
 
+        _hotkeys = hotkeys;
+        if (_hotkeys is not null)
+        {
+            RefreshShortcutLabels();
+            _hotkeys.RegistrationsChanged += Hotkeys_RegistrationsChanged;
+        }
+
         _trayIcon = LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
@@ -34,6 +42,33 @@ public sealed class TrayService : IDisposable
         };
 
         _notifyIcon.DoubleClick += (_, _) => window.Dispatcher.Invoke(window.ShowWorkspaceCommand);
+    }
+
+    private void Hotkeys_RegistrationsChanged(object? sender, EventArgs e) => RefreshShortcutLabels();
+
+    /// <summary>
+    /// Writes each action's current gesture into the menu's shortcut column. ShortcutKeyDisplayString
+    /// only labels the item, so the tray never competes with the real global registration.
+    /// </summary>
+    private void RefreshShortcutLabels()
+    {
+        if (_hotkeys is null)
+        {
+            return;
+        }
+
+        foreach (var (actionKind, item) in _actionItems)
+        {
+            if (item is not Forms.ToolStripMenuItem menuItem ||
+                TrayMenuActionCatalog.HotkeyFor(actionKind) is not { } hotkey)
+            {
+                continue;
+            }
+
+            var gesture = _hotkeys.DisplayGesture(hotkey);
+            menuItem.ShortcutKeyDisplayString = gesture.Length == 0 ? null : gesture;
+            menuItem.ShowShortcutKeys = gesture.Length > 0;
+        }
     }
 
     private static System.Drawing.Icon LoadTrayIcon()
@@ -161,6 +196,11 @@ public sealed class TrayService : IDisposable
 
     public void Dispose()
     {
+        if (_hotkeys is not null)
+        {
+            _hotkeys.RegistrationsChanged -= Hotkeys_RegistrationsChanged;
+        }
+
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _trayIcon.Dispose();
