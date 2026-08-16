@@ -2792,6 +2792,7 @@ public partial class MainWindow : Window
             $"Storage: {(item.IsPrivate ? "temporary private file" : "workspace index")}{Environment.NewLine}" +
             $"Source app: {OcrValue(item.SourceApp)}{Environment.NewLine}" +
             $"Source window: {OcrSummary(item.SourceWindowTitle)}{Environment.NewLine}" +
+            $"Source URL: {OcrValue(item.SourceUrl)}{Environment.NewLine}" +
             $"Monitor: {OcrValue(item.SourceMonitorName)}{Environment.NewLine}" +
             $"Receipt ID: {OcrValue(item.ReceiptId)}{Environment.NewLine}" +
             $"Source receipt: {OcrValue(item.SourceReceiptId)}{Environment.NewLine}" +

@@ -326,6 +326,7 @@ public sealed class WorkspaceStore
             SourceApp = source?.ProcessName,
             SourceWindowTitle = source?.WindowTitle,
             SourceMonitorName = source?.MonitorName,
+            SourceUrl = source?.SourceUrl,
             HotkeyProfile = HotkeyProfileNames.Normalize(hotkeyProfile),
             Notes = privateCapture
                 ? "Private capture: not added to persistent workspace index."

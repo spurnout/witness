@@ -17,6 +17,7 @@ public sealed class CaptureItem
     public string? SourceApp { get; set; }
     public string? SourceWindowTitle { get; set; }
     public string? SourceMonitorName { get; set; }
+    public string? SourceUrl { get; set; }
     public string? HotkeyProfile { get; set; }
     public string? OcrText { get; set; }
     public string? OcrLanguageTag { get; set; }

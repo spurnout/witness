@@ -55,6 +55,10 @@ public sealed class BrowserExtensionNativeBridgeServiceTests
             Assert.AreEqual(CaptureKind.BrowserPage, result.Item.Kind);
             Assert.AreEqual("browser-extension", result.Item.SourceApp);
             Assert.AreEqual("Orders for [REDACTED:email-address]", result.Item.SourceWindowTitle);
+            // The page URL lands as a structured field AFTER RedactForStorage, so a token-bearing
+            // URL is stored as its redaction marker — same invariant as the sidecar JSON.
+            StringAssert.Contains(result.Item.SourceUrl, "[REDACTED");
+            Assert.IsFalse(result.Item.SourceUrl!.Contains("fake-token-1234567890", StringComparison.Ordinal));
             Assert.IsTrue(result.Item.FilePath.StartsWith(paths.ImagesRoot, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(File.Exists(result.Item.FilePath));
             Assert.IsTrue(File.Exists(result.Item.ThumbnailPath));
@@ -87,6 +91,8 @@ public sealed class BrowserExtensionNativeBridgeServiceTests
             Assert.IsNotNull(result.Item);
             Assert.AreEqual(CaptureKind.BrowserPage, result.Item.Kind);
             Assert.AreEqual("browser-extension", result.Item.SourceApp);
+            StringAssert.Contains(result.Item.SourceUrl, "[REDACTED");
+            Assert.IsFalse(result.Item.SourceUrl!.Contains("fake-token-1234567890", StringComparison.Ordinal));
             Assert.IsTrue(result.Item.FilePath.StartsWith(paths.ImagesRoot, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(File.Exists(result.Item.FilePath));
             StringAssert.Contains(result.Item.Notes!, "Stitch package:");

@@ -234,7 +234,8 @@ public sealed class BrowserExtensionNativeBridgeService
             {
                 ProcessName = "browser-extension",
                 WindowTitle = payload.Page.Title,
-                MonitorName = $"{payload.Viewport.Width}x{payload.Viewport.Height} viewport, {payload.FullPage.Width}x{payload.FullPage.Height} page"
+                MonitorName = $"{payload.Viewport.Width}x{payload.Viewport.Height} viewport, {payload.FullPage.Width}x{payload.FullPage.Height} page",
+                SourceUrl = payload.Page.Url
             });
     }
 
@@ -258,7 +259,8 @@ public sealed class BrowserExtensionNativeBridgeService
             {
                 ProcessName = "browser-extension",
                 WindowTitle = payload.Page.Title,
-                MonitorName = $"{payload.Viewport.Width}x{payload.Viewport.Height} viewport, {payload.FullPage.Width}x{payload.FullPage.Height} page"
+                MonitorName = $"{payload.Viewport.Width}x{payload.Viewport.Height} viewport, {payload.FullPage.Width}x{payload.FullPage.Height} page",
+                SourceUrl = payload.Page.Url
             });
     }
 
