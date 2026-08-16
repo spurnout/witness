@@ -9,8 +9,8 @@ public sealed class TrayMenuActionCatalogTests
     [TestMethod]
     public void All_PreservesExpectedTrayMenuShape()
     {
-        Assert.AreEqual(24, TrayMenuActionCatalog.All.Count);
-        Assert.AreEqual(20, TrayMenuActionCatalog.Actions.Count());
+        Assert.AreEqual(25, TrayMenuActionCatalog.All.Count);
+        Assert.AreEqual(21, TrayMenuActionCatalog.Actions.Count());
         Assert.AreEqual(4, TrayMenuActionCatalog.All.Count(item => item.IsSeparator));
         Assert.AreEqual("Capture region", TrayMenuActionCatalog.All.First().Label);
         Assert.AreEqual("Exit", TrayMenuActionCatalog.All.Last().Label);
@@ -38,6 +38,7 @@ public sealed class TrayMenuActionCatalogTests
     {
         Assert.AreEqual(HotkeyAction.RegionCapture, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.CaptureRegion));
         Assert.AreEqual(HotkeyAction.ColorPicker, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.PickColor));
+        Assert.AreEqual(HotkeyAction.OcrRegion, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.OcrTextGrab));
         Assert.AreEqual(HotkeyAction.SaveReplay, TrayMenuActionCatalog.HotkeyFor(TrayMenuActionKind.SaveReplay));
 
         // Entries with no global shortcut must report none rather than borrowing another action's.

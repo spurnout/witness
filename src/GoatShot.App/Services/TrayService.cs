@@ -172,6 +172,9 @@ public sealed class TrayService : IDisposable
                 case TrayMenuActionKind.OpenPixelRuler:
                     window.OpenPixelRulerCommand();
                     break;
+                case TrayMenuActionKind.OcrTextGrab:
+                    window.OcrTextGrabCommand();
+                    break;
                 case TrayMenuActionKind.OpenWorkspace:
                     window.ShowWorkspaceCommand();
                     break;

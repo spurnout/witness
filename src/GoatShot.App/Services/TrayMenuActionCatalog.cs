@@ -21,6 +21,7 @@ public enum TrayMenuActionKind
     ImportClipboard,
     PickColor,
     OpenPixelRuler,
+    OcrTextGrab,
     OpenWorkspace,
     OpenSettings,
     Exit
@@ -66,6 +67,7 @@ public static class TrayMenuActionCatalog
         TrayMenuActionDefinition.Action("Import clipboard", TrayMenuActionKind.ImportClipboard, "Tools"),
         TrayMenuActionDefinition.Action("Color picker", TrayMenuActionKind.PickColor, "Tools"),
         TrayMenuActionDefinition.Action("Pixel ruler", TrayMenuActionKind.OpenPixelRuler, "Tools"),
+        TrayMenuActionDefinition.Action("Grab text from a region", TrayMenuActionKind.OcrTextGrab, "Tools"),
         TrayMenuActionDefinition.Separator(),
         TrayMenuActionDefinition.Action("Open workspace", TrayMenuActionKind.OpenWorkspace, "Workspace"),
         TrayMenuActionDefinition.Action("Settings", TrayMenuActionKind.OpenSettings, "Workspace"),
@@ -88,7 +90,8 @@ public static class TrayMenuActionCatalog
             [TrayMenuActionKind.ToggleReplay] = HotkeyAction.ToggleReplay,
             [TrayMenuActionKind.SaveReplay] = HotkeyAction.SaveReplay,
             [TrayMenuActionKind.PickColor] = HotkeyAction.ColorPicker,
-            [TrayMenuActionKind.OpenPixelRuler] = HotkeyAction.PixelRuler
+            [TrayMenuActionKind.OpenPixelRuler] = HotkeyAction.PixelRuler,
+            [TrayMenuActionKind.OcrTextGrab] = HotkeyAction.OcrRegion
         };
 
     public static HotkeyAction? HotkeyFor(TrayMenuActionKind actionKind) =>

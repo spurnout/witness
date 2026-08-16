@@ -155,6 +155,7 @@ public partial class MainWindow : Window
         RefreshRecordingSetupText();
     }
     public void PickColorCommand() => PickColor();
+    public void OcrTextGrabCommand() => OcrRegionCommand();
     public void OpenPixelRulerCommand() => OpenPixelRuler();
     public async void ImportClipboardCommand() => await ImportClipboardAsync();
     public async void OpenSettingsCommand(string? sectionKey = null) => await OpenSettingsAsync(sectionKey);
