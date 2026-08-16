@@ -281,6 +281,9 @@ public partial class SettingsWindow : Window
         PopulatePostCaptureActionBox();
         SelectComboBoxItemByTag(PostCaptureActionBox, PostCaptureActionCatalog.Normalize(settings.PostCaptureAction));
         UpdatePostCaptureActionHelpText();
+        CaptureActionsAutoDismissBox.Text = CaptureTaskAutoDismiss
+            .NormalizeSeconds(settings.CaptureActionsAutoDismissSeconds)
+            .ToString(CultureInfo.InvariantCulture);
         CopyAfterCaptureBox.IsChecked = settings.AutoCopyImageAfterCapture;
         IncludeCursorBox.IsChecked = settings.IncludeCursor;
         HoverAutoSelectBox.IsChecked = settings.EnableCaptureHoverAutoSelect;
@@ -1426,6 +1429,14 @@ public partial class SettingsWindow : Window
         settings.FileNameTemplate = FileNameTemplateBox.Text.Trim();
         settings.AutoCopyImageAfterCapture = CopyAfterCaptureBox.IsChecked == true;
         settings.PostCaptureAction = PostCaptureActionCatalog.Normalize(SelectedComboBoxTag(PostCaptureActionBox));
+        settings.CaptureActionsAutoDismissSeconds = CaptureTaskAutoDismiss.NormalizeSeconds(
+            int.TryParse(
+                CaptureActionsAutoDismissBox.Text.Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var autoDismissSeconds)
+                ? autoDismissSeconds
+                : CaptureTaskAutoDismiss.DefaultSeconds);
         settings.EnableCaptureHoverAutoSelect = HoverAutoSelectBox.IsChecked == true;
         settings.IncludeCursor = IncludeCursorBox.IsChecked == true;
         settings.CaptureContextPadding = int.TryParse(

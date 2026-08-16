@@ -43,6 +43,7 @@ The release is self-contained. A separate .NET, FFmpeg, or segmentation installa
 - Print Screen hotkeys that work while Receipts is in the tray
 - Auto-copy after capture by default
 - Captures finish quietly by default: the image is copied to the clipboard and saved to the library with no window to dismiss. Settings → General → **After capture** switches to the capture actions window or straight into the editor.
+- When the capture actions window is enabled it fades out on its own after 8 seconds, configurable in Settings → General. Moving the pointer onto it, pressing a key, or clicking an action cancels the countdown; `0` keeps it open until you close it.
 - On the capture overlay, pointing at a window highlights it and a click captures it. `Ctrl` targets a pane inside that window, `Shift` turns auto-select and snapping off, and dragging still selects a free region. Settings → General has a toggle to disable the highlight.
 - GIF and MP4 recording with monitor, window, and region targets
 - Optional microphone, system-audio, webcam, cursor, timer, and keystroke overlays

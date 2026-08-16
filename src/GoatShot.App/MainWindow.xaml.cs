@@ -2931,7 +2931,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new CaptureTaskWindow(CaptureTaskWindowModels.Build(item, _services.Settings))
+        var window = new CaptureTaskWindow(
+            CaptureTaskWindowModels.Build(item, _services.Settings),
+            _services.Settings.CaptureActionsAutoDismissSeconds)
         {
             Owner = this
         };

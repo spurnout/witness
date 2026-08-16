@@ -191,6 +191,7 @@ public sealed class DiagnosticBundleService
             _settings.LibraryRoot,
             _settings.AutoCopyImageAfterCapture,
             _settings.PostCaptureAction,
+            _settings.CaptureActionsAutoDismissSeconds,
             _settings.EnableCaptureHoverAutoSelect,
             _settings.IncludeCursor,
             _settings.PrivateCaptureMode,

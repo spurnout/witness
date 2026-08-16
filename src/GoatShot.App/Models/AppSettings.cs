@@ -6,6 +6,7 @@ public sealed class AppSettings
     public string LibraryRoot { get; set; } = string.Empty;
     public bool AutoCopyImageAfterCapture { get; set; } = true;
     public string PostCaptureAction { get; set; } = "CopyQuietly";
+    public int CaptureActionsAutoDismissSeconds { get; set; } = 8;
     public bool EnableCaptureHoverAutoSelect { get; set; } = true;
     public bool IncludeCursor { get; set; } = true;
     public int CaptureContextPadding { get; set; }

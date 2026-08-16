@@ -1,15 +1,22 @@
 using System.Windows;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using GoatShot.App.Models;
+using GoatShot.App.Services;
 
 namespace GoatShot.App.Windows;
 
 public partial class CaptureTaskWindow : Window
 {
     private readonly CaptureTaskViewModel _model;
+    private readonly int _autoDismissSeconds;
+    private DispatcherTimer? _autoDismissTimer;
+    private bool _autoDismissCancelled;
 
-    public CaptureTaskWindow(CaptureTaskViewModel model)
+    public CaptureTaskWindow(CaptureTaskViewModel model, int autoDismissSeconds = 0)
     {
         _model = model;
+        _autoDismissSeconds = CaptureTaskAutoDismiss.NormalizeSeconds(autoDismissSeconds);
         InitializeComponent();
         EscapeKeyCloseBehavior.Attach(this);
         Title = model.Title;
@@ -29,9 +36,74 @@ public partial class CaptureTaskWindow : Window
         Configure(ScriptDryRunButton, CaptureTaskActionKind.DryRunScript);
         Configure(WebhookDryRunButton, CaptureTaskActionKind.DryRunWebhook);
         Configure(DeleteButton, CaptureTaskActionKind.DeleteLocalFile);
+
+        StartAutoDismiss();
     }
 
     public event EventHandler<CaptureTaskActionKind>? ActionRequested;
+
+    /// <summary>
+    /// Begins the countdown to the fade-out. The window is a convenience surface, so it clears
+    /// itself rather than accumulating on screen across a run of quick captures.
+    /// </summary>
+    private void StartAutoDismiss()
+    {
+        if (!CaptureTaskAutoDismiss.IsEnabled(_autoDismissSeconds))
+        {
+            return;
+        }
+
+        // Any sign the window is actually being used stops the countdown for good. A window that
+        // dissolves while the pointer is travelling toward Share is worse than one that lingers.
+        MouseEnter += (_, _) => CancelAutoDismiss();
+        PreviewMouseDown += (_, _) => CancelAutoDismiss();
+        PreviewKeyDown += (_, _) => CancelAutoDismiss();
+
+        _autoDismissTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(_autoDismissSeconds)
+        };
+        _autoDismissTimer.Tick += (_, _) => BeginFadeOut();
+        _autoDismissTimer.Start();
+    }
+
+    private void CancelAutoDismiss()
+    {
+        if (_autoDismissCancelled)
+        {
+            return;
+        }
+
+        _autoDismissCancelled = true;
+        _autoDismissTimer?.Stop();
+        _autoDismissTimer = null;
+
+        // Cancelling mid-fade has to undo the animation, not just stop the clock. Clearing the
+        // animation first is what lets the local Opacity value take effect again.
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 1d;
+    }
+
+    private void BeginFadeOut()
+    {
+        _autoDismissTimer?.Stop();
+        _autoDismissTimer = null;
+        if (_autoDismissCancelled)
+        {
+            return;
+        }
+
+        var fade = new DoubleAnimation(1d, 0d, new Duration(CaptureTaskAutoDismiss.FadeDuration));
+        fade.Completed += (_, _) =>
+        {
+            if (!_autoDismissCancelled)
+            {
+                Close();
+            }
+        };
+
+        BeginAnimation(OpacityProperty, fade);
+    }
 
     private void Configure(System.Windows.Controls.Button button, CaptureTaskActionKind kind)
     {

@@ -217,6 +217,15 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
+                <TextBlock Text="Capture actions auto-dismiss seconds" Foreground="{StaticResource MutedInkBrush}" />
+                <TextBox x:Name="CaptureActionsAutoDismissBox"
+                         Margin="0,6,0,6"
+                         AutomationProperties.Name="Capture actions auto-dismiss seconds" />
+                <TextBlock Text="The capture actions window fades out after this many seconds. Interacting with it cancels the countdown. Use 0 to leave it open until you close it."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
                 <CheckBox x:Name="CopyAfterCaptureBox" Content="Copy image to clipboard after capture" />
                 <CheckBox x:Name="IncludeCursorBox" Content="Include cursor in captures" />
                 <CheckBox x:Name="HoverAutoSelectBox"
