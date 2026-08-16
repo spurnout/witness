@@ -2914,7 +2914,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void NotifyQuietCapture(CaptureItem item)
     {
-        if (IsVisible)
+        if (!CaptureFeedbackPolicy.ShouldShowTrayNotification(IsVisible, WindowState == WindowState.Minimized))
         {
             return;
         }
