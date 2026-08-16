@@ -381,6 +381,13 @@ public sealed class ReceiptSceneAnalysisService
         }
     }
 
+    /// <summary>
+    /// The exact normalize-then-tokenize pipeline <see cref="CompareTexts"/> uses, exposed so the
+    /// capture comparison feature computes its highlight sets with identical arithmetic.
+    /// </summary>
+    internal static IReadOnlySet<string> TokenizeForComparison(string? text) =>
+        Tokenize(NormalizeText(text ?? string.Empty));
+
     private static string NormalizeText(string value) => string.Join(
         ' ',
         (value ?? string.Empty)
