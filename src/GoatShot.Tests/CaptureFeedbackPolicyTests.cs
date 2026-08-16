@@ -43,4 +43,28 @@ public sealed class CaptureFeedbackPolicyTests
             "Saved: shot.png",
             CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard: false, fileName: "shot.png"));
     }
+
+    [TestMethod]
+    public void IsRecoverableClipboardCopyFailure_CoversEveryWayTheCopyItselfCanFail()
+    {
+        // Each of these has been observed from Clipboard.SetImage or BitmapImage file loads:
+        // busy clipboard, locked or missing file, unrecognized codec, denied access, and a
+        // truncated image file — which throws FileFormatException, a FormatException rather
+        // than an IOException.
+        Assert.IsTrue(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(
+            new System.Runtime.InteropServices.COMException()));
+        Assert.IsTrue(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new IOException()));
+        Assert.IsTrue(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new NotSupportedException()));
+        Assert.IsTrue(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new UnauthorizedAccessException()));
+        Assert.IsTrue(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new FileFormatException()));
+    }
+
+    [TestMethod]
+    public void IsRecoverableClipboardCopyFailure_StillSurfacesGenuineBugs()
+    {
+        // A NullReferenceException or similar is a programming error, not a flaky copy; swallowing
+        // it would hide real defects behind a "Saved" balloon.
+        Assert.IsFalse(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new NullReferenceException()));
+        Assert.IsFalse(CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(new InvalidOperationException()));
+    }
 }

@@ -2845,9 +2845,7 @@ public partial class MainWindow : Window
             CopyImageToClipboard(item);
             return true;
         }
-        catch (Exception ex) when (
-            ex is System.Runtime.InteropServices.ExternalException or IOException
-                or NotSupportedException or UnauthorizedAccessException)
+        catch (Exception ex) when (CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(ex))
         {
             return false;
         }

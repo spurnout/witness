@@ -58,6 +58,11 @@ public partial class CaptureTaskWindow : Window
         PreviewMouseDown += (_, _) => CancelAutoDismiss();
         PreviewKeyDown += (_, _) => CancelAutoDismiss();
 
+        // Escape closes via EscapeKeyCloseBehavior, which marks the key event handled before the
+        // PreviewKeyDown hook above can see it — so cancellation also rides window close itself,
+        // or the drain animation would keep the closed window's object graph alive until it fired.
+        Closed += (_, _) => CancelAutoDismiss();
+
         // The draining bar is the countdown clock: its Completed starts the fade, so the warning
         // the user sees can never drift out of sync with the dismissal it is warning about.
         AutoDismissIndicator.Visibility = Visibility.Visible;

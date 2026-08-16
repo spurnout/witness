@@ -22,4 +22,20 @@ public static class CaptureFeedbackPolicy
     {
         return copiedToClipboard ? $"Copied to clipboard: {fileName}" : $"Saved: {fileName}";
     }
+
+    /// <summary>
+    /// Whether a failed post-capture clipboard copy is an environmental problem the capture flow
+    /// should absorb, as opposed to a programming error that must surface. FormatException covers
+    /// FileFormatException from truncated image files, which is not an IOException; the external
+    /// and IO families cover a busy clipboard and locked, missing, or unreadable files.
+    /// </summary>
+    public static bool IsRecoverableClipboardCopyFailure(Exception exception)
+    {
+        return exception
+            is System.Runtime.InteropServices.ExternalException
+            or IOException
+            or NotSupportedException
+            or UnauthorizedAccessException
+            or FormatException;
+    }
 }

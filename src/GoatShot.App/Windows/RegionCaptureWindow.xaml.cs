@@ -284,7 +284,12 @@ public partial class RegionCaptureWindow : Window
             return;
         }
 
-        if (e.Key == Key.C && LensBorder.Visibility == Visibility.Visible && _lensColorHex is { } hex)
+        // The interactive-element guard keeps typing "C" into the window chooser's search from
+        // silently overwriting the clipboard with a color.
+        if (e.Key == Key.C &&
+            !IsFromInteractiveElement(e.OriginalSource) &&
+            LensBorder.Visibility == Visibility.Visible &&
+            _lensColorHex is { } hex)
         {
             CopyLensColor(hex);
             e.Handled = true;
