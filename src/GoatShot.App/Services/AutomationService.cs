@@ -496,7 +496,12 @@ public sealed class AutomationService
         item.OcrWords = result.Words.ToList();
         var scan = SensitiveTextDetector.Scan(result.Text);
         item.Notes = MergeNote(item.Notes, $"Sensitive scan: {scan.Summary}");
-        await _workspaceStore.UpdateItemAsync(item);
+        if (!item.IsPrivate)
+        {
+            // Private captures must never be written into workspace-index.json; the manual OCR
+            // path already guards this and the SQLite Upsert refuses private items on its own.
+            await _workspaceStore.UpdateItemAsync(item);
+        }
         PublishStatus(result.Message);
 
         return new AutomationActionResult
