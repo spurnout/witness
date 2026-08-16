@@ -284,7 +284,7 @@ public partial class MainWindow : Window
                     SaveReplayCommand();
                     break;
                 case HotkeyAction.OcrRegion:
-                    OcrRegionCommand(HotkeyProfileNames.ForAction(action));
+                    OcrRegionCommand();
                     break;
                 case HotkeyAction.ColorPicker:
                     PickColor();
@@ -1421,12 +1421,64 @@ public partial class MainWindow : Window
         SetStatus(result.Message);
     }
 
-    private async void OcrRegionCommand(string? hotkeyProfile = null)
+    /// <summary>
+    /// Clipboard-only text grab: nothing is added to the library, so the temp frame written for
+    /// the file-based OCR engine is deleted no matter how recognition ends. Failures surface on
+    /// the status line and balloon only — this fires while other apps own the foreground, so a
+    /// modal error box would steal focus from whatever the user is reading.
+    /// </summary>
+    private async void OcrRegionCommand()
     {
-        var item = await CaptureRegionAsync(hotkeyProfile);
-        if (item is not null)
+        var wasVisible = IsVisible;
+        if (wasVisible)
         {
-            await RecognizeAndStoreOcrAsync(item, copyText: true);
+            Hide();
+            await Task.Delay(120);
+        }
+
+        string? tempPath = null;
+        try
+        {
+            using var captured = await _services.Screenshots.CaptureRegionAsync(this);
+            if (captured is null)
+            {
+                SetStatus("Text grab canceled.");
+                return;
+            }
+
+            tempPath = Path.Combine(_services.Paths.TempRoot, $"text-grab-{Guid.NewGuid():N}.png");
+            Directory.CreateDirectory(_services.Paths.TempRoot);
+            captured.Bitmap.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+            var payload = TextGrabPresenter.Compose(await _services.Ocr.RecognizeFileAsync(tempPath));
+            if (payload.HasText)
+            {
+                ClipboardInterop.SetText(payload.ClipboardText);
+            }
+
+            SetStatus(payload.StatusMessage);
+            if (!wasVisible)
+            {
+                _services.Tray?.ShowCaptureNotification(payload.StatusMessage);
+            }
+        }
+        finally
+        {
+            if (tempPath is not null)
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (IOException)
+                {
+                    // Temp cleanup is best-effort; the folder is purged on shutdown anyway.
+                }
+            }
+
+            if (wasVisible)
+            {
+                ShowWorkspaceCommand();
+            }
         }
     }
 
