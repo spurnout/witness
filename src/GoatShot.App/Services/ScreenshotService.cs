@@ -21,20 +21,43 @@ public sealed class ScreenshotService
 
     public Task<CapturedBitmap?> CaptureRegionAsync(Window? owner = null)
     {
+        // Read the foreground BEFORE the overlay opens — the overlay steals it. When the user
+        // click-captures a specific window, its live context replaces this fallback below.
         var sourceContext = GetForegroundSourceContext();
-        var bounds = SelectRegionBounds(owner);
+        var (bounds, target) = SelectRegionBounds(owner);
         if (bounds is null)
         {
             return Task.FromResult<CapturedBitmap?>(null);
+        }
+
+        if (ShouldStampFromTarget(target))
+        {
+            sourceContext = GetSourceContext(new IntPtr(target!.NativeHandle));
         }
 
         _lastRegion = bounds;
         return Task.FromResult<CapturedBitmap?>(CaptureRectangle(bounds, CaptureKind.Region, sourceContext));
     }
 
+    /// <summary>
+    /// Whether the clicked overlay target names the window the capture should be attributed to.
+    /// Monitors have no owning process and synthetic targets carry handle zero; both keep the
+    /// pre-overlay foreground context.
+    /// </summary>
+    internal static bool ShouldStampFromTarget(CaptureOverlayTarget? target)
+    {
+        return target is
+        {
+            NativeHandle: not 0,
+            Kind: CaptureOverlayTargetKind.Window
+                or CaptureOverlayTargetKind.ContentArea
+                or CaptureOverlayTargetKind.ControlArea
+        };
+    }
+
     public Task<CaptureBounds?> SelectRegionBoundsAsync(Window? owner = null)
     {
-        var bounds = SelectRegionBounds(owner);
+        var (bounds, _) = SelectRegionBounds(owner);
         if (bounds is not null)
         {
             _lastRegion = bounds;
@@ -43,7 +66,7 @@ public sealed class ScreenshotService
         return Task.FromResult(bounds);
     }
 
-    private CaptureBounds? SelectRegionBounds(Window? owner = null)
+    private (CaptureBounds? Bounds, CaptureOverlayTarget? Target) SelectRegionBounds(Window? owner = null)
     {
         using var background = CaptureVirtualScreenBitmap(includeCursor: false);
         var source = ImageInterop.ToBitmapSource(background);
@@ -59,10 +82,10 @@ public sealed class ScreenshotService
         var result = overlay.ShowDialog();
         if (result != true || overlay.SelectedBounds is null)
         {
-            return null;
+            return (null, null);
         }
 
-        return overlay.SelectedBounds;
+        return (overlay.SelectedBounds, overlay.SelectedTarget);
     }
 
     public Task<CapturedBitmap> CaptureFullScreenAsync()

@@ -76,6 +76,13 @@ public partial class RegionCaptureWindow : Window
 
     public CaptureBounds? SelectedBounds { get; private set; }
 
+    /// <summary>
+    /// The window, pane, or control the user explicitly clicked to capture, when there was one.
+    /// Drag selections and keyboard captures leave this null — a free rectangle has no single
+    /// owning window to blame.
+    /// </summary>
+    public CaptureOverlayTarget? SelectedTarget { get; private set; }
+
     public void SetPreviewSelection(double left, double top, double width, double height)
     {
         SelectionRectangle.Visibility = Visibility.Visible;
@@ -249,6 +256,7 @@ public partial class RegionCaptureWindow : Window
             if (_hoverTarget is { } hovered)
             {
                 SelectedBounds = ResolveTargetSelection(hovered).FinalBounds;
+                SelectedTarget = hovered;
                 DialogResult = true;
                 return;
             }
@@ -487,6 +495,7 @@ public partial class RegionCaptureWindow : Window
 
         var selection = PreviewTarget(target);
         SelectedBounds = selection.FinalBounds;
+        SelectedTarget = target;
         DialogResult = true;
     }
 
