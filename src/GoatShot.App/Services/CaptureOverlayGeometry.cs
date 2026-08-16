@@ -99,7 +99,7 @@ public static class CaptureOverlayGeometry
             bottom = Math.Clamp(top + ((radius * 2) + 1), top + 1, sourcePixelHeight);
         }
 
-        return new CaptureOverlayLensCrop(left, top, right - left, bottom - top, cursorScreenX, cursorScreenY);
+        return new CaptureOverlayLensCrop(left, top, right - left, bottom - top, cursorScreenX, cursorScreenY, pixelX, pixelY);
     }
 
     public static CaptureOverlayTarget? FindNearestChooserTarget(
@@ -371,7 +371,9 @@ public sealed record CaptureOverlayLensCrop(
     int Width,
     int Height,
     int CursorScreenX,
-    int CursorScreenY);
+    int CursorScreenY,
+    int PixelX,
+    int PixelY);
 
 public sealed record CaptureOverlayTarget(
     string Id,

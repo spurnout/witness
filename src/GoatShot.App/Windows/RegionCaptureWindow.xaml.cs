@@ -31,6 +31,7 @@ public partial class RegionCaptureWindow : Window
     private WpfPoint _lastHoverPosition;
     private CaptureOverlaySelection? _lastSelection;
     private CaptureOverlayTarget? _hoverTarget;
+    private string? _lensColorHex;
 
     public RegionCaptureWindow(
         BitmapSource frozenScreen,
@@ -118,6 +119,11 @@ public partial class RegionCaptureWindow : Window
     private void UpdateHover(WpfPoint position)
     {
         _lastHoverPosition = position;
+
+        // The lens follows plain pointing as well as dragging, so the overlay doubles as a pixel
+        // inspector: coordinates and color track the cursor even before any selection starts.
+        UpdateLens(position);
+
         var mode = ResolveHoverMode();
         if (mode == CaptureOverlayHoverMode.Off)
         {
@@ -278,6 +284,13 @@ public partial class RegionCaptureWindow : Window
             return;
         }
 
+        if (e.Key == Key.C && LensBorder.Visibility == Visibility.Visible && _lensColorHex is { } hex)
+        {
+            CopyLensColor(hex);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
         {
             MoveOrResizeKeyboardSelection(e.Key, Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
@@ -302,6 +315,23 @@ public partial class RegionCaptureWindow : Window
         }
 
         UpdateHover(_lastHoverPosition);
+    }
+
+    /// <summary>
+    /// Feedback lands in the lens itself because it is the one surface guaranteed to be visible
+    /// and next to the cursor when the copy happens. The next mouse move restores the readout.
+    /// </summary>
+    private void CopyLensColor(string hex)
+    {
+        try
+        {
+            ClipboardInterop.SetText(hex);
+            LensText.Text = $"Copied {hex}";
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            LensText.Text = "Clipboard is busy";
+        }
     }
 
     private void MoveOrResizeKeyboardSelection(Key key, bool resize)
@@ -398,7 +428,10 @@ public partial class RegionCaptureWindow : Window
         LensImage.Source = new CroppedBitmap(
             source,
             new Int32Rect(crop.X, crop.Y, crop.Width, crop.Height));
-        LensText.Text = $"{screenX}, {screenY}";
+        _lensColorHex = CaptureOverlayColorReader.TryReadHex(source, crop.PixelX, crop.PixelY);
+        LensText.Text = _lensColorHex is null
+            ? $"{screenX}, {screenY}"
+            : $"{screenX}, {screenY}  {_lensColorHex}";
         LensBorder.Visibility = Visibility.Visible;
 
         var left = current.X + LensMargin;

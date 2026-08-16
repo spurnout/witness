@@ -9,7 +9,7 @@
         ShowInTaskbar="False"
         Cursor="Cross"
         AutomationProperties.Name="Select a capture region"
-        AutomationProperties.HelpText="Drag with the mouse, choose a window or monitor, or use arrow keys to move the keyboard selection. Hold Shift and use arrows to resize. Press Enter to capture or Escape to cancel."
+        AutomationProperties.HelpText="Drag with the mouse, choose a window or monitor, or use arrow keys to move the keyboard selection. Hold Shift and use arrows to resize. Press C to copy the pixel color under the cursor. Press Enter to capture or Escape to cancel."
         KeyDown="Window_KeyDown"
         KeyUp="Window_KeyUp">
     <Grid x:Name="Root"
@@ -100,7 +100,7 @@
                        FontSize="13"
                        MaxWidth="560"
                        TextWrapping="Wrap"
-                       Text="Point at a window to highlight it and click to capture it, or drag a region. Ctrl targets a pane inside the window; Shift turns auto-select and snapping off. Arrows move the keyboard selection, Shift+arrows resize. Enter captures; Esc cancels." />
+                       Text="Point at a window to highlight it and click to capture it, or drag a region. Ctrl targets a pane inside the window; Shift turns auto-select and snapping off. Arrows move the keyboard selection, Shift+arrows resize. C copies the pixel color under the cursor. Enter captures; Esc cancels." />
         </Border>
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"

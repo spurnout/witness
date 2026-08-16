@@ -110,6 +110,22 @@ public sealed class CaptureOverlayGeometryTests
     }
 
     [TestMethod]
+    public void ResolveLensCrop_ReportsTheSourcePixelUnderTheCursor()
+    {
+        // The source bitmap is twice the virtual-bounds size (200% DPI), so screen coordinates
+        // must scale up and negative virtual origins must not shift the result.
+        var crop = CaptureOverlayGeometry.ResolveLensCrop(
+            new CaptureBounds { X = -100, Y = 50, Width = 200, Height = 100 },
+            cursorScreenX: 0,
+            cursorScreenY: 100,
+            sourcePixelWidth: 400,
+            sourcePixelHeight: 200);
+
+        Assert.AreEqual(200, crop.PixelX);
+        Assert.AreEqual(100, crop.PixelY);
+    }
+
+    [TestMethod]
     public void ResolveHoverTarget_PrefersTheTopmostWindowRatherThanTheSmallestOne()
     {
         // The small window is behind the big one. Smallest-area containment would pick it; z-order
