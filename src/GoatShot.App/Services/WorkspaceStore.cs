@@ -153,34 +153,52 @@ public sealed class WorkspaceStore
         });
     }
 
-    public async Task UpdateItemAsync(CaptureItem item)
+    public Task UpdateItemAsync(CaptureItem item) => UpdateItemsAsync([item]);
+
+    /// <summary>
+    /// Batched metadata write: one JSON rewrite regardless of how many items changed. The
+    /// background OCR worker persists whole chunks through this so a large backfill stays
+    /// O(chunks), not O(items), on the index file.
+    /// </summary>
+    public async Task UpdateItemsAsync(IReadOnlyList<CaptureItem> items)
     {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
         await Task.Run(() =>
         {
             lock (_gate)
             {
-                var items = Load().ToList();
-                var index = items.FindIndex(existing =>
-                    existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
-                    existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
+                var existingItems = Load().ToList();
+                foreach (var item in items)
+                {
+                    var index = existingItems.FindIndex(existing =>
+                        existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
+                        existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
 
-                if (index >= 0)
-                {
-                    items[index] = item;
-                }
-                else
-                {
-                    items.Insert(0, item);
+                    if (index >= 0)
+                    {
+                        existingItems[index] = item;
+                    }
+                    else
+                    {
+                        existingItems.Insert(0, item);
+                    }
                 }
 
                 var json = JsonSerializer.Serialize(
-                    items.OrderByDescending(existing => existing.CreatedAt).ToList(),
+                    existingItems.OrderByDescending(existing => existing.CreatedAt).ToList(),
                     JsonOptions);
                 Directory.CreateDirectory(Path.GetDirectoryName(_paths.IndexPath)!);
                 File.WriteAllText(_paths.IndexPath, json);
             }
 
-            _metadataIndex?.Upsert(item);
+            foreach (var item in items)
+            {
+                _metadataIndex?.Upsert(item);
+            }
         });
     }
 
