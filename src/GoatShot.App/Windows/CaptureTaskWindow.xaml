@@ -13,6 +13,17 @@
         controls:AppWindowChrome.IsEnabled="True">
     <DockPanel>
         <controls:AppTitleBar DockPanel.Dock="Top" />
+        <Rectangle x:Name="AutoDismissIndicator"
+                   DockPanel.Dock="Bottom"
+                   Height="3"
+                   Fill="{StaticResource AccentBrush}"
+                   Visibility="Collapsed"
+                   RenderTransformOrigin="0,0.5"
+                   IsHitTestVisible="False">
+            <Rectangle.RenderTransform>
+                <ScaleTransform x:Name="AutoDismissIndicatorScale" ScaleX="1" />
+            </Rectangle.RenderTransform>
+        </Rectangle>
     <Grid Margin="18"
           Background="#081016">
         <Grid.RowDefinitions>

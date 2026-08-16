@@ -1,6 +1,6 @@
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Threading;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 
@@ -10,7 +10,6 @@ public partial class CaptureTaskWindow : Window
 {
     private readonly CaptureTaskViewModel _model;
     private readonly int _autoDismissSeconds;
-    private DispatcherTimer? _autoDismissTimer;
     private bool _autoDismissCancelled;
 
     public CaptureTaskWindow(CaptureTaskViewModel model, int autoDismissSeconds = 0)
@@ -59,12 +58,12 @@ public partial class CaptureTaskWindow : Window
         PreviewMouseDown += (_, _) => CancelAutoDismiss();
         PreviewKeyDown += (_, _) => CancelAutoDismiss();
 
-        _autoDismissTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(_autoDismissSeconds)
-        };
-        _autoDismissTimer.Tick += (_, _) => BeginFadeOut();
-        _autoDismissTimer.Start();
+        // The draining bar is the countdown clock: its Completed starts the fade, so the warning
+        // the user sees can never drift out of sync with the dismissal it is warning about.
+        AutoDismissIndicator.Visibility = Visibility.Visible;
+        var drain = new DoubleAnimation(1d, 0d, new Duration(TimeSpan.FromSeconds(_autoDismissSeconds)));
+        drain.Completed += (_, _) => BeginFadeOut();
+        AutoDismissIndicatorScale.BeginAnimation(ScaleTransform.ScaleXProperty, drain);
     }
 
     private void CancelAutoDismiss()
@@ -75,8 +74,8 @@ public partial class CaptureTaskWindow : Window
         }
 
         _autoDismissCancelled = true;
-        _autoDismissTimer?.Stop();
-        _autoDismissTimer = null;
+        AutoDismissIndicatorScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        AutoDismissIndicator.Visibility = Visibility.Collapsed;
 
         // Cancelling mid-fade has to undo the animation, not just stop the clock. Clearing the
         // animation first is what lets the local Opacity value take effect again.
@@ -86,8 +85,6 @@ public partial class CaptureTaskWindow : Window
 
     private void BeginFadeOut()
     {
-        _autoDismissTimer?.Stop();
-        _autoDismissTimer = null;
         if (_autoDismissCancelled)
         {
             return;
