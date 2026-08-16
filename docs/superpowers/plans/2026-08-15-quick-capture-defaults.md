@@ -1443,3 +1443,16 @@ complete: it fades out after `CaptureActionsAutoDismissSeconds` (default 8, `0` 
 interaction cancels the countdown. Logic lives in `Services/CaptureTaskAutoDismiss.cs` with tests in
 `CaptureTaskAutoDismissTests.cs`. This only ever fires in `ShowActionsWindow` mode, so it is
 invisible under the shipped `CopyQuietly` default.
+
+A follow-up pass (2026-08-15, after `7a5c809`) then hardened and rounded out this feature set:
+
+- `CaptureFeedbackPolicy` decides quiet-capture feedback: the balloon also shows for a minimized
+  workspace (WPF reports `IsVisible == true` there), and its text reports whether the clipboard
+  copy actually landed rather than whether the setting asked for one.
+- `CaptureAndStoreAsync` survives a busy clipboard: a failed copy downgrades the feedback instead
+  of aborting automation rules and the post-capture action.
+- The overlay seeds its hover highlight from the cursor on open, and the lens follows plain
+  pointing, showing the hex color under the cursor; `C` copies it (`CaptureOverlayColorReader`).
+- The actions window drains a thin countdown bar before its fade; the bar's clock is the dismissal
+  clock.
+- Clicking the quiet-capture balloon opens the capture actions window for that capture.
