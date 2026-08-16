@@ -61,7 +61,7 @@ Spec: [docs/superpowers/specs/2026-08-15-quick-capture-defaults-design.md](../sp
   - `PostCaptureActionCatalog.Options` → `IReadOnlyList<PostCaptureActionOption>`
   - `record PostCaptureActionOption(PostCaptureAction Action, string Label, string Description)` with `string StorageValue`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/GoatShot.Tests/PostCaptureActionCatalogTests.cs`:
 
@@ -117,12 +117,12 @@ public sealed class PostCaptureActionCatalogTests
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~PostCaptureActionCatalogTests"`
 Expected: build FAILS with `CS0246: The type or namespace name 'PostCaptureActionCatalog' could not be found`.
 
-- [ ] **Step 3: Add the enum**
+- [x] **Step 3: Add the enum**
 
 Create `src/GoatShot.App/Models/PostCaptureAction.cs`:
 
@@ -143,7 +143,7 @@ public enum PostCaptureAction
 }
 ```
 
-- [ ] **Step 4: Add the catalog**
+- [x] **Step 4: Add the catalog**
 
 Create `src/GoatShot.App/Services/PostCaptureActionCatalog.cs`:
 
@@ -199,12 +199,12 @@ public static class PostCaptureActionCatalog
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~PostCaptureActionCatalogTests"`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GoatShot.App/Models/PostCaptureAction.cs src/GoatShot.App/Services/PostCaptureActionCatalog.cs src/GoatShot.Tests/PostCaptureActionCatalogTests.cs
@@ -227,7 +227,7 @@ git commit -m "feat(capture): add post-capture action catalog"
   - `AppSettings.EnableCaptureHoverAutoSelect` (`bool`, default `true`)
   - `SettingsMigrationService.CurrentSchemaVersion == 18`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `src/GoatShot.Tests/SettingsMigrationServiceTests.cs`, inside the existing class:
 
@@ -272,12 +272,12 @@ Append to `src/GoatShot.Tests/SettingsMigrationServiceTests.cs`, inside the exis
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~SettingsMigrationServiceTests"`
 Expected: build FAILS with `CS0117: 'AppSettings' does not contain a definition for 'PostCaptureAction'`.
 
-- [ ] **Step 3: Add the settings fields**
+- [x] **Step 3: Add the settings fields**
 
 In `src/GoatShot.App/Models/AppSettings.cs`, change the schema default and add the two fields directly under `AutoCopyImageAfterCapture` so the capture-related settings stay together:
 
@@ -290,7 +290,7 @@ In `src/GoatShot.App/Models/AppSettings.cs`, change the schema default and add t
     public bool IncludeCursor { get; set; } = true;
 ```
 
-- [ ] **Step 4: Bump the schema and normalize in the migration**
+- [x] **Step 4: Bump the schema and normalize in the migration**
 
 In `src/GoatShot.App/Services/SettingsMigrationService.cs`, change the constant and add the normalization. The constant:
 
@@ -328,12 +328,12 @@ And add the method next to the other private helpers in the same file:
     }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~SettingsMigrationServiceTests"`
 Expected: PASS, all tests in the class including the pre-existing ones.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GoatShot.App/Models/AppSettings.cs src/GoatShot.App/Services/SettingsMigrationService.cs src/GoatShot.Tests/SettingsMigrationServiceTests.cs
@@ -355,7 +355,7 @@ git commit -m "feat(settings): add post-capture action and hover auto-select set
 
 There is no automated test here — the behavior is a WPF window-opening side effect on a class that needs a live `AppServices`. The verification is the build plus the manual smoke check in Step 5.
 
-- [ ] **Step 1: Add the tray balloon**
+- [x] **Step 1: Add the tray balloon**
 
 In `src/GoatShot.App/Services/TrayService.cs`, add this public method after the constructor:
 
@@ -378,7 +378,7 @@ In `src/GoatShot.App/Services/TrayService.cs`, add this public method after the 
     }
 ```
 
-- [ ] **Step 2: Switch on the setting in MainWindow**
+- [x] **Step 2: Switch on the setting in MainWindow**
 
 In `src/GoatShot.App/MainWindow.xaml.cs`, replace the trailing `ShowCaptureTaskWindow(item);` inside `CaptureAndStoreAsync` (line 708) with `RunPostCaptureAction(item);`, so the tail of the method reads:
 
@@ -436,7 +436,7 @@ Then add both methods immediately above the existing `private void ShowCaptureTa
     }
 ```
 
-- [ ] **Step 3: Log the new settings in the diagnostic bundle**
+- [x] **Step 3: Log the new settings in the diagnostic bundle**
 
 In `src/GoatShot.App/Services/DiagnosticBundleService.cs`, inside `BuildRedactedSettings`, add the two fields under `AutoCopyImageAfterCapture`:
 
@@ -448,7 +448,7 @@ In `src/GoatShot.App/Services/DiagnosticBundleService.cs`, inside `BuildRedacted
             _settings.IncludeCursor,
 ```
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `dotnet build GoatShot.slnx -c Release`
 Expected: build succeeds with no new warnings.
@@ -460,7 +460,7 @@ Expected: PASS, no regressions.
 
 Launch the app, leave the workspace window closed to the tray, and press the region-capture hotkey. Expected: the overlay appears, the drag captures, **no actions window opens**, a tray balloon says "Copied to clipboard: …", and Ctrl+V pastes the image into any app.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GoatShot.App/MainWindow.xaml.cs src/GoatShot.App/Services/TrayService.cs src/GoatShot.App/Services/DiagnosticBundleService.cs
@@ -481,7 +481,7 @@ git commit -m "feat(capture): make quiet clipboard capture the default post-capt
 
 Dirty tracking (`SettingsWindow.Dirty.cs`) and the Ctrl+K settings search (`SettingsWindow.Search.cs`) both walk the logical tree and pick up a `TextBlock` label followed by a control, so neither needs registration work.
 
-- [ ] **Step 1: Add the controls to the XAML**
+- [x] **Step 1: Add the controls to the XAML**
 
 In `src/GoatShot.App/Windows/SettingsWindow.xaml`, replace the two existing lines:
 
@@ -511,7 +511,7 @@ with:
                           AutomationProperties.Name="Highlight the window under the cursor while selecting" />
 ```
 
-- [ ] **Step 2: Populate and load**
+- [x] **Step 2: Populate and load**
 
 In `src/GoatShot.App/Windows/SettingsWindow.xaml.cs`, inside `LoadSettingsCore`, add three lines directly above the existing `CopyAfterCaptureBox.IsChecked = settings.AutoCopyImageAfterCapture;`:
 
@@ -568,7 +568,7 @@ Then add the three helpers next to the other private static combo helpers (near 
 
 If `SelectionChangedEventArgs` or `ComboBoxItem` is unresolved, check the aliases at the top of the file and add `using System.Windows.Controls;` members the same way the neighbouring handlers do.
 
-- [ ] **Step 3: Save**
+- [x] **Step 3: Save**
 
 In `ApplyCurrentSettingsFromControls`, add two lines directly under the existing `settings.AutoCopyImageAfterCapture = CopyAfterCaptureBox.IsChecked == true;`:
 
@@ -577,7 +577,7 @@ In `ApplyCurrentSettingsFromControls`, add two lines directly under the existing
         settings.EnableCaptureHoverAutoSelect = HoverAutoSelectBox.IsChecked == true;
 ```
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `dotnet build GoatShot.slnx -c Release`
 Expected: build succeeds.
@@ -589,7 +589,7 @@ Expected: PASS. The settings renderer and accessibility auditor tests exercise t
 
 Open Settings → General. Expected: "After capture" shows "Copy quietly" with the description below it; changing the selection updates the description immediately and marks the window dirty; Ctrl+K search for "after capture" jumps to it. Save, pick "Show capture actions", take a capture — the actions window returns. Switch back to "Copy quietly" and confirm it stays quiet.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GoatShot.App/Windows/SettingsWindow.xaml src/GoatShot.App/Windows/SettingsWindow.xaml.cs
@@ -611,7 +611,7 @@ git commit -m "feat(settings): expose post-capture behavior and hover auto-selec
   - `CaptureOverlayGeometry.ResolveHoverTarget(int screenX, int screenY, IReadOnlyList<CaptureOverlayTarget> targets, CaptureOverlayHoverMode mode)` → `CaptureOverlayTarget?`
   - `CaptureOverlayTarget` gains `int ZOrder = 0`, `string? ParentId = null`, `long NativeHandle = 0` — all trailing optional parameters, so every existing positional construction keeps compiling.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the existing class in `src/GoatShot.Tests/CaptureOverlayGeometryTests.cs`:
 
@@ -735,12 +735,12 @@ Append to the existing class in `src/GoatShot.Tests/CaptureOverlayGeometryTests.
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~CaptureOverlayGeometryTests"`
 Expected: build FAILS with `CS0117: 'CaptureOverlayGeometry' does not contain a definition for 'ResolveHoverTarget'`.
 
-- [ ] **Step 3: Extend the target record and add the hover mode**
+- [x] **Step 3: Extend the target record and add the hover mode**
 
 At the bottom of `src/GoatShot.App/Services/CaptureOverlayGeometry.cs`, replace the `CaptureOverlayTarget` record declaration with:
 
@@ -772,7 +772,7 @@ public enum CaptureOverlayHoverMode
 }
 ```
 
-- [ ] **Step 4: Add the hit-test**
+- [x] **Step 4: Add the hit-test**
 
 In the same file, add these two methods to `CaptureOverlayGeometry`, directly after `FindNearestChooserTarget`:
 
@@ -830,12 +830,12 @@ In the same file, add these two methods to `CaptureOverlayGeometry`, directly af
     }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `dotnet test GoatShot.slnx --filter "FullyQualifiedName~CaptureOverlayGeometryTests"`
 Expected: PASS, including the pre-existing snapping and lens tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GoatShot.App/Services/CaptureOverlayGeometry.cs src/GoatShot.Tests/CaptureOverlayGeometryTests.cs
@@ -855,7 +855,7 @@ git commit -m "feat(capture): resolve the hovered window or control under the cu
 
 This task is P/Invoke against the live desktop, so it has no unit test — `EnumWindows` results are not reproducible in CI. Task 5 covers the decision logic on synthetic targets; verification here is the build plus Task 7's manual check.
 
-- [ ] **Step 1: Record z-order, parent, and handle during enumeration**
+- [x] **Step 1: Record z-order, parent, and handle during enumeration**
 
 In `BuildLiveTargets`, the `EnumWindows` callback currently discards the enumeration index. Replace the callback body so the index becomes the z-order (`EnumWindows` walks front to back) and children learn their parent:
 
@@ -904,7 +904,7 @@ In `BuildLiveTargets`, the `EnumWindows` callback currently discards the enumera
         }, IntPtr.Zero);
 ```
 
-- [ ] **Step 2: Update the three target builders**
+- [x] **Step 2: Update the three target builders**
 
 `TryBuildWindowTarget` takes the z-order and stores the handle:
 
@@ -1004,7 +1004,7 @@ In `BuildLiveTargets`, the `EnumWindows` callback currently discards the enumera
     }
 ```
 
-- [ ] **Step 3: Add lazy per-window child enumeration**
+- [x] **Step 3: Add lazy per-window child enumeration**
 
 Add this public method after `BuildLiveTargets`:
 
@@ -1053,7 +1053,7 @@ Add this public method after `BuildLiveTargets`:
     }
 ```
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `dotnet build GoatShot.slnx -c Release`
 Expected: build succeeds. If the compiler reports an ambiguous or missing argument at a `TryBuildControlTarget` call, the caller is still passing `windowTarget.Bounds` instead of `windowTarget` — fix the call, not the signature.
@@ -1061,7 +1061,7 @@ Expected: build succeeds. If the compiler reports an ambiguous or missing argume
 Run: `dotnet test GoatShot.slnx -c Release --no-build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/GoatShot.App/Services/CaptureOverlayTargetCatalog.cs
@@ -1083,7 +1083,7 @@ git commit -m "feat(capture): record target z-order and enumerate window childre
 
 No unit test: this is mouse-driven WPF behavior. Verification is the build, the existing overlay renderer proof, and the manual check in Step 6.
 
-- [ ] **Step 1: Add the hover visuals to the XAML**
+- [x] **Step 1: Add the hover visuals to the XAML**
 
 In `src/GoatShot.App/Windows/RegionCaptureWindow.xaml`, add `KeyUp="Window_KeyUp"` to the `Window` element beside the existing `KeyDown="Window_KeyDown"`.
 
@@ -1105,7 +1105,7 @@ Update the hint text so the new gestures are discoverable — replace the existi
                        Text="Point at a window to highlight it and click to capture it, or drag a region. Ctrl targets a pane inside the window; Shift turns auto-select and snapping off. Arrows move the keyboard selection, Shift+arrows resize. Enter captures; Esc cancels." />
 ```
 
-- [ ] **Step 2: Add hover state to the code-behind**
+- [x] **Step 2: Add hover state to the code-behind**
 
 In `src/GoatShot.App/Windows/RegionCaptureWindow.xaml.cs`, extend the fields and constructor:
 
@@ -1140,7 +1140,7 @@ In `src/GoatShot.App/Windows/RegionCaptureWindow.xaml.cs`, extend the fields and
 
 The rest of the constructor is unchanged.
 
-- [ ] **Step 3: Resolve and draw the hover highlight**
+- [x] **Step 3: Resolve and draw the hover highlight**
 
 Replace `Root_MouseMove` and add the hover helpers below it:
 
@@ -1271,7 +1271,7 @@ Replace `Root_MouseMove` and add the hover helpers below it:
     }
 ```
 
-- [ ] **Step 4: Turn a click into a capture, and hide the hover while dragging**
+- [x] **Step 4: Turn a click into a capture, and hide the hover while dragging**
 
 In `Root_MouseLeftButtonDown`, hide the hover rectangle when the drag begins by adding one line after `LensBorder.Visibility = Visibility.Visible;`:
 
@@ -1316,7 +1316,7 @@ Then simplify `PreviewTarget` to reuse the shared helper — replace its body wi
     }
 ```
 
-- [ ] **Step 5: Refresh the highlight when modifiers change**
+- [x] **Step 5: Refresh the highlight when modifiers change**
 
 Add the modifier branch at the very top of `Window_KeyDown`, before the Escape check:
 
@@ -1351,7 +1351,7 @@ And add the new handler plus its helper next to it:
     }
 ```
 
-- [ ] **Step 6: Pass the setting through ScreenshotService**
+- [x] **Step 6: Pass the setting through ScreenshotService**
 
 In `src/GoatShot.App/Services/ScreenshotService.cs`, update the overlay construction inside `SelectRegionBounds`:
 
@@ -1362,7 +1362,7 @@ In `src/GoatShot.App/Services/ScreenshotService.cs`, update the overlay construc
             enableHoverAutoSelect: _settings.EnableCaptureHoverAutoSelect);
 ```
 
-- [ ] **Step 7: Build and run the full suite**
+- [x] **Step 7: Build and run the full suite**
 
 Run: `dotnet build GoatShot.slnx -c Release`
 Expected: build succeeds. `CaptureOverlayPreviewRenderer.cs:74` and the overlay tests use the original four parameters and must still compile unchanged.
@@ -1381,7 +1381,7 @@ Trigger a region capture and, without pressing the mouse button, move the cursor
 - moving over empty desktop highlights the whole monitor;
 - **Esc** still cancels.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/GoatShot.App/Windows/RegionCaptureWindow.xaml src/GoatShot.App/Windows/RegionCaptureWindow.xaml.cs src/GoatShot.App/Services/ScreenshotService.cs
@@ -1398,26 +1398,48 @@ git commit -m "feat(capture): highlight the hovered window and capture it on cli
 **Interfaces:**
 - Consumes: everything above. Produces nothing consumed by later tasks.
 
-- [ ] **Step 1: Find the capture section**
+- [x] **Step 1: Find the capture section**
 
 Run: `grep -n "PrintScreen\|Capture" README.md | head -20`
 Expected: the hotkey/capture documentation block. Read the surrounding 40 lines so the new text matches the file's voice and heading depth.
 
-- [ ] **Step 2: Document both behaviors**
+- [x] **Step 2: Document both behaviors**
 
 Add to the capture section, matching the surrounding formatting:
 
 - The default post-capture behavior is a quiet clipboard copy: the capture is saved to the workspace and copied, with no window. Settings → General → **After capture** switches to the capture actions window or straight into the editor.
 - On the capture overlay, pointing at a window highlights it and a click captures it. **Ctrl** targets a pane inside that window, **Shift** turns auto-select and snapping off, and dragging still selects a free region. Settings → General has a toggle to disable the highlight.
 
-- [ ] **Step 3: Run the full suite one last time**
+- [x] **Step 3: Run the full suite one last time**
 
 Run: `dotnet build GoatShot.slnx -c Release` then `dotnet test GoatShot.slnx -c Release --no-build`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
 git commit -m "docs: describe quiet capture defaults and hover auto-select"
 ```
+
+---
+
+## Status
+
+All 8 tasks implemented, merged to `main`, and pushed. 880 tests pass.
+
+**Three steps remain open**, all manual smoke checks that need a live run against the new binary
+(Task 3 Step 5, Task 4 Step 5, Task 7 Step 8). They are unticked above. The installed copy under
+`%LOCALAPPDATA%\Programs\Receipts` is still the pre-change build, and single-instance forwarding
+means a new launch hands off to it — exit the tray app first, then run the Release output directly.
+
+Task 4's check is partly covered: the settings renderer proof confirms layout, default selection,
+help text, and that loading does not mark the window dirty. Nothing has been clicked.
+
+## Follow-up beyond this plan
+
+`4aa399f` added a configurable auto-dismiss to the capture actions window after the plan was
+complete: it fades out after `CaptureActionsAutoDismissSeconds` (default 8, `0` disables), and any
+interaction cancels the countdown. Logic lives in `Services/CaptureTaskAutoDismiss.cs` with tests in
+`CaptureTaskAutoDismissTests.cs`. This only ever fires in `ShowActionsWindow` mode, so it is
+invisible under the shipped `CopyQuietly` default.
