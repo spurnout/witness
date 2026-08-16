@@ -288,6 +288,14 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14" />
+                <CheckBox x:Name="OcrIndexingBox"
+                          Content="Index new captures with local OCR in the background"
+                          AutomationProperties.Name="Index new captures with local OCR in the background" />
+                <TextBlock Text="Runs Windows OCR on saved captures so library search can find text inside them. Local only; existing captures are indexed gradually."
+                           Foreground="{StaticResource MutedInkBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,14" />
 
                 <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
 

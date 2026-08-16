@@ -85,6 +85,15 @@ public sealed class SettingsMigrationServiceTests
     }
 
     [TestMethod]
+    public void NewSettings_DefaultToBackgroundOcrIndexingOn()
+    {
+        var settings = new AppSettings();
+
+        Assert.IsTrue(settings.EnableOcrIndexing);
+        Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
+    }
+
+    [TestMethod]
     public void Migrate_LeavesDefaultReplayHotkeysOutOfTheStoredOverrides()
     {
         var settings = new AppSettings { SettingsSchemaVersion = 16 };

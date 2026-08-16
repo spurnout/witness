@@ -293,6 +293,7 @@ public partial class SettingsWindow : Window
         RefreshPersonalInstallStatus();
         ManagedPolicyStatusText.Text = ManagedPolicyService.LoadEffective(settings).Summary;
         OcrLanguageBox.Text = settings.OcrLanguageTag;
+        OcrIndexingBox.IsChecked = settings.EnableOcrIndexing;
         RefreshLegacyLibraryNotice();
         LoadKeybinds(settings);
         LoadRecordingSettings(settings.Recording ??= new RecordingSettings());
@@ -1449,6 +1450,7 @@ public partial class SettingsWindow : Window
         settings.PrivateCaptureMode = PrivateModeBox.IsChecked == true;
         settings.RunAtStartup = RunAtStartupBox.IsChecked == true;
         settings.OcrLanguageTag = OcrLanguageBox.Text.Trim();
+        settings.EnableOcrIndexing = OcrIndexingBox.IsChecked == true;
         ApplyKeybindSettings(settings);
         ApplyRecordingSettings(settings.Recording ??= new RecordingSettings());
         ApplyReplaySettings(settings);

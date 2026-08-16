@@ -110,6 +110,7 @@ public sealed class AppSettings
     public string AzureDevOpsTags { get; set; } = string.Empty;
     public string AzureDevOpsAssignedTo { get; set; } = string.Empty;
     public string OcrLanguageTag { get; set; } = string.Empty;
+    public bool EnableOcrIndexing { get; set; } = true;
     public RecordingSettings Recording { get; set; } = new();
     public ReplayBufferSettings Replay { get; set; } = new();
     public OAuthSettings OAuth { get; set; } = new();

@@ -328,6 +328,7 @@ public sealed class DiagnosticBundleService
             AzureDevOpsTags = RedactPotentialSecrets(_settings.AzureDevOpsTags),
             AzureDevOpsAssignedTo = RedactPotentialSecrets(_settings.AzureDevOpsAssignedTo),
             _settings.OcrLanguageTag,
+            _settings.EnableOcrIndexing,
             CustomScriptCommand = RedactedIfConfigured(_settings.CustomScriptCommand),
             CustomWebhookUrl = RedactedIfConfigured(_settings.CustomWebhookUrl),
             _settings.EnableWatchFolders,
