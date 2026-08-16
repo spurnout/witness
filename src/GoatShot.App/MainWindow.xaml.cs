@@ -2942,8 +2942,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        // The balloon is quiet mode's escape hatch: clicking it opens the full actions window for
+        // exactly this capture without turning the popup back on for every capture.
         _services.Tray?.ShowCaptureNotification(
-            CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard, item.FileName));
+            CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard, item.FileName),
+            () => ShowCaptureTaskWindow(item));
     }
 
     private void ShowCaptureTaskWindow(CaptureItem item)

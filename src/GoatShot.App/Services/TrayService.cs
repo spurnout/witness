@@ -8,6 +8,7 @@ public sealed class TrayService : IDisposable
     private readonly System.Drawing.Icon _trayIcon;
     private readonly Dictionary<TrayMenuActionKind, Forms.ToolStripItem> _actionItems = new();
     private readonly HotkeyService? _hotkeys;
+    private Action? _balloonClickAction;
 
     public TrayService(MainWindow window, HotkeyService? hotkeys = null)
     {
@@ -42,23 +43,34 @@ public sealed class TrayService : IDisposable
         };
 
         _notifyIcon.DoubleClick += (_, _) => window.Dispatcher.Invoke(window.ShowWorkspaceCommand);
+        _notifyIcon.BalloonTipClicked += (_, _) => window.Dispatcher.Invoke(RunBalloonClickAction);
     }
 
     /// <summary>
     /// Feedback for quiet capture mode. The workspace status line covers the case where the window
     /// is open, so this is the only signal a tray-only capture gets: short, non-blocking, no window.
+    /// Clicking the balloon runs <paramref name="onClick"/>. Each balloon replaces the previous
+    /// click action wholesale, so a late click can never act on an older capture.
     /// </summary>
-    public void ShowCaptureNotification(string message)
+    public void ShowCaptureNotification(string message, Action? onClick = null)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
             return;
         }
 
+        _balloonClickAction = onClick;
         _notifyIcon.BalloonTipTitle = BrandIdentity.ProductName;
         _notifyIcon.BalloonTipText = message;
         _notifyIcon.BalloonTipIcon = Forms.ToolTipIcon.Info;
         _notifyIcon.ShowBalloonTip(2000);
+    }
+
+    private void RunBalloonClickAction()
+    {
+        var action = _balloonClickAction;
+        _balloonClickAction = null;
+        action?.Invoke();
     }
 
     private void Hotkeys_RegistrationsChanged(object? sender, EventArgs e) => RefreshShortcutLabels();
