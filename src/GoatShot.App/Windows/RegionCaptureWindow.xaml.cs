@@ -24,7 +24,9 @@ public partial class RegionCaptureWindow : Window
     private readonly int _contextPadding;
     private readonly bool _hoverAutoSelectEnabled;
     private readonly Func<CaptureOverlayTarget, IReadOnlyList<CaptureOverlayTarget>> _childTargetProvider;
-    private readonly Dictionary<long, IReadOnlyList<CaptureOverlayTarget>> _childTargetCache = new();
+    // Keyed by target id, not native handle: synthetic targets all share handle zero, and ids are
+    // unique for live windows too.
+    private readonly Dictionary<string, IReadOnlyList<CaptureOverlayTarget>> _childTargetCache = new(StringComparer.Ordinal);
     private WpfPoint? _start;
     private WpfPoint _lastHoverPosition;
     private CaptureOverlaySelection? _lastSelection;
@@ -63,6 +65,11 @@ public partial class RegionCaptureWindow : Window
                 Math.Max(0d, (ActualHeight - height) / 2d),
                 width,
                 height);
+
+            // Seed the hover from the real cursor position so the window under it is highlighted
+            // the moment the overlay opens, and so a Ctrl/Shift press that arrives before the
+            // first mouse move refreshes against the true position instead of (0,0).
+            UpdateHover(Mouse.GetPosition(Root));
         };
     }
 
@@ -163,13 +170,13 @@ public partial class RegionCaptureWindow : Window
 
     private IReadOnlyList<CaptureOverlayTarget> GetChildTargets(CaptureOverlayTarget window)
     {
-        if (_childTargetCache.TryGetValue(window.NativeHandle, out var cached))
+        if (_childTargetCache.TryGetValue(window.Id, out var cached))
         {
             return cached;
         }
 
         var children = _childTargetProvider(window);
-        _childTargetCache[window.NativeHandle] = children;
+        _childTargetCache[window.Id] = children;
         return children;
     }
 
