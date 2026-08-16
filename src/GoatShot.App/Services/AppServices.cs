@@ -23,6 +23,7 @@ public sealed class AppServices : IDisposable
         ShareService sharing,
         UploadQueueService uploadQueue,
         UploadQueueWorkerService uploadQueueWorker,
+        OcrIndexWorkerService ocrIndexWorker,
         MetadataService metadata,
         FileInspectorService fileInspector,
         ClipboardImportService clipboardImports,
@@ -79,6 +80,7 @@ public sealed class AppServices : IDisposable
         Sharing = sharing;
         UploadQueue = uploadQueue;
         UploadQueueWorker = uploadQueueWorker;
+        OcrIndexWorker = ocrIndexWorker;
         Metadata = metadata;
         FileInspector = fileInspector;
         ClipboardImports = clipboardImports;
@@ -137,6 +139,7 @@ public sealed class AppServices : IDisposable
     public ShareService Sharing { get; }
     public UploadQueueService UploadQueue { get; }
     public UploadQueueWorkerService UploadQueueWorker { get; }
+    public OcrIndexWorkerService OcrIndexWorker { get; }
     public MetadataService Metadata { get; }
     public FileInspectorService FileInspector { get; }
     public ClipboardImportService ClipboardImports { get; }
@@ -268,6 +271,11 @@ public sealed class AppServices : IDisposable
             bugReports,
             workflowRunLogs);
         var watchFolders = new WatchFolderService(settings, paths, automation);
+        var ocrIndexWorker = new OcrIndexWorkerService(
+            settings,
+            workspaceStore,
+            (path, ct) => ocr.RecognizeFileAsync(path, cancellationToken: ct),
+            item => automation.ProcessOcrCompletedAsync(item));
         var oauthFlow = new OAuthFlowService();
         var oauthBrowserFlow = new OAuthBrowserFlowService(oauthFlow, new OAuthCallbackServerService());
         var gemini = new GeminiImageProvider(settings, paths, secretStore);
@@ -329,6 +337,7 @@ public sealed class AppServices : IDisposable
             sharing,
             uploadQueue,
             uploadQueueWorker,
+            ocrIndexWorker,
             metadata,
             fileInspector,
             clipboardImports,
@@ -576,6 +585,7 @@ public sealed class AppServices : IDisposable
     {
         Tray?.Dispose();
         UploadQueueWorker.Dispose();
+        OcrIndexWorker.Dispose();
         StepRecorder.Dispose();
         Replay.DisposeAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
         Recording.Dispose();

@@ -204,6 +204,9 @@ public partial class MainWindow : Window
         _services.WatchFolders.Restart();
         _services.UploadQueueWorker.StatusChanged += Service_StatusChanged;
         _services.UploadQueueWorker.Start();
+        _services.OcrIndexWorker.StatusChanged += Service_StatusChanged;
+        _services.OcrIndexWorker.ItemIndexed += OcrIndexWorker_ItemIndexed;
+        _services.OcrIndexWorker.Start();
         _services.StepRecorder.StatusChanged += Service_StatusChanged;
         _services.StepRecorder.StepCaptured += StepRecorder_StepCaptured;
         SubscribeReplayStatus();
@@ -698,6 +701,10 @@ public partial class MainWindow : Window
         var copiedToClipboard = _services.Settings.AutoCopyImageAfterCapture && TryCopyImageToClipboard(item);
 
         await _services.Automation.ProcessCaptureCreatedAsync(item);
+        if (!item.IsPrivate)
+        {
+            _services.OcrIndexWorker.Nudge();
+        }
 
         var status = item.IsPrivate
             ? $"Private capture saved temporarily: {item.FilePath}"
@@ -3189,6 +3196,7 @@ public partial class MainWindow : Window
         {
             _services.WatchFolders.Restart();
             _services.UploadQueueWorker.Restart();
+            _services.OcrIndexWorker.Restart();
             RefreshDiagnostics();
             RefreshWorkspaceSummary();
             QueueSettingsPrewarm();
@@ -3378,6 +3386,33 @@ public partial class MainWindow : Window
             _allCaptures.Insert(0, item);
             ApplyFilter();
             CaptureList.SelectedItem = item;
+        });
+    }
+
+    /// <summary>
+    /// Copies background OCR results onto the in-memory item. Unlike an import, indexing must
+    /// never steal the selection or reorder the list — the user did not ask for anything.
+    /// </summary>
+    private void OcrIndexWorker_ItemIndexed(object? sender, CaptureItem indexed)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var existing = _allCaptures.FirstOrDefault(item =>
+                item.Id.Equals(indexed.Id, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+            {
+                return;
+            }
+
+            existing.OcrText = indexed.OcrText;
+            existing.OcrLanguageTag = indexed.OcrLanguageTag;
+            existing.OcrRecognizedAt = indexed.OcrRecognizedAt;
+            existing.OcrWords = indexed.OcrWords;
+            existing.Notes = indexed.Notes;
+            if (ReferenceEquals(CaptureList.SelectedItem, existing))
+            {
+                UpdateCaptureDetails(existing);
+            }
         });
     }
 
