@@ -695,17 +695,20 @@ public partial class MainWindow : Window
             CaptureList.SelectedItem = item;
         }
 
-        if (_services.Settings.AutoCopyImageAfterCapture)
-        {
-            CopyImageToClipboard(item);
-        }
+        var copiedToClipboard = _services.Settings.AutoCopyImageAfterCapture && TryCopyImageToClipboard(item);
 
         await _services.Automation.ProcessCaptureCreatedAsync(item);
 
-        SetStatus(item.IsPrivate
+        var status = item.IsPrivate
             ? $"Private capture saved temporarily: {item.FilePath}"
-            : $"Captured {item.Kind}: {item.FileName}");
-        RunPostCaptureAction(item);
+            : $"Captured {item.Kind}: {item.FileName}";
+        if (_services.Settings.AutoCopyImageAfterCapture && !copiedToClipboard)
+        {
+            status += " The clipboard was busy, so the image was not copied.";
+        }
+
+        SetStatus(status);
+        RunPostCaptureAction(item, copiedToClipboard);
         return item;
     }
 
@@ -2830,6 +2833,26 @@ public partial class MainWindow : Window
         ClipboardInterop.SetImage(ImageInterop.LoadBitmapImage(item.FilePath));
     }
 
+    /// <summary>
+    /// The capture file is already saved by the time the copy runs, so a clipboard another process
+    /// is holding open (or an unreadable file) must downgrade the feedback rather than abort the
+    /// automation rules and post-capture action behind it.
+    /// </summary>
+    private bool TryCopyImageToClipboard(CaptureItem item)
+    {
+        try
+        {
+            CopyImageToClipboard(item);
+            return true;
+        }
+        catch (Exception ex) when (
+            ex is System.Runtime.InteropServices.ExternalException or IOException
+                or NotSupportedException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private async Task ShareSelectedAsync(ShareDestination destination)
     {
         var item = SelectedCapture();
@@ -2887,7 +2910,7 @@ public partial class MainWindow : Window
     /// What happens once a capture is saved. Quiet copy is the default so the fast path is
     /// hotkey to clipboard with nothing to dismiss; the other modes are opt-in from Settings.
     /// </summary>
-    private void RunPostCaptureAction(CaptureItem item)
+    private void RunPostCaptureAction(CaptureItem item, bool copiedToClipboard)
     {
         if (_auditMode)
         {
@@ -2903,7 +2926,7 @@ public partial class MainWindow : Window
                 OpenEditorForItem(item);
                 break;
             default:
-                NotifyQuietCapture(item);
+                NotifyQuietCapture(item, copiedToClipboard);
                 break;
         }
     }
@@ -2912,16 +2935,15 @@ public partial class MainWindow : Window
     /// Quiet mode shows nothing while the workspace is open, because the status line already said
     /// what happened. With the workspace hidden there would otherwise be no confirmation at all.
     /// </summary>
-    private void NotifyQuietCapture(CaptureItem item)
+    private void NotifyQuietCapture(CaptureItem item, bool copiedToClipboard)
     {
         if (!CaptureFeedbackPolicy.ShouldShowTrayNotification(IsVisible, WindowState == WindowState.Minimized))
         {
             return;
         }
 
-        _services.Tray?.ShowCaptureNotification(_services.Settings.AutoCopyImageAfterCapture
-            ? $"Copied to clipboard: {item.FileName}"
-            : $"Saved: {item.FileName}");
+        _services.Tray?.ShowCaptureNotification(
+            CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard, item.FileName));
     }
 
     private void ShowCaptureTaskWindow(CaptureItem item)

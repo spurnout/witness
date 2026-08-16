@@ -25,4 +25,22 @@ public sealed class CaptureFeedbackPolicyTests
         // The status line already reported the capture; a balloon on top of it is noise.
         Assert.IsFalse(CaptureFeedbackPolicy.ShouldShowTrayNotification(workspaceVisible: true, workspaceMinimized: false));
     }
+
+    [TestMethod]
+    public void DescribeQuietCapture_ReportsTheCopyWhenItActuallyLanded()
+    {
+        Assert.AreEqual(
+            "Copied to clipboard: shot.png",
+            CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard: true, fileName: "shot.png"));
+    }
+
+    [TestMethod]
+    public void DescribeQuietCapture_NeverClaimsACopyThatDidNotHappen()
+    {
+        // The copy can be disabled in settings or lost to a clipboard another process is holding
+        // open; either way the balloon must describe what actually happened.
+        Assert.AreEqual(
+            "Saved: shot.png",
+            CaptureFeedbackPolicy.DescribeQuietCapture(copiedToClipboard: false, fileName: "shot.png"));
+    }
 }

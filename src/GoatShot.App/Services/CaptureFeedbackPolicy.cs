@@ -12,4 +12,14 @@ public static class CaptureFeedbackPolicy
     {
         return !workspaceVisible || workspaceMinimized;
     }
+
+    /// <summary>
+    /// The balloon text for a quiet capture. Keyed off whether the clipboard copy actually landed —
+    /// not off the setting that requested it — so a copy lost to a busy clipboard is reported as a
+    /// plain save instead of a claim the user will disprove the moment they paste.
+    /// </summary>
+    public static string DescribeQuietCapture(bool copiedToClipboard, string fileName)
+    {
+        return copiedToClipboard ? $"Copied to clipboard: {fileName}" : $"Saved: {fileName}";
+    }
 }
