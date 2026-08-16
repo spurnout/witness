@@ -45,13 +45,17 @@ public sealed partial class WorkspaceMetadataIndex
                     is_original INTEGER NOT NULL DEFAULT 0,
                     source_available INTEGER NOT NULL DEFAULT 1,
                     integrity_status TEXT,
-                    notes TEXT
+                    notes TEXT,
+                    source_window_title TEXT,
+                    source_url TEXT
                 );
                 CREATE VIRTUAL TABLE IF NOT EXISTS captures_fts USING fts5(
                     id UNINDEXED,
                     file_name,
                     kind,
                     source_app,
+                    source_window_title,
+                    source_url,
                     hotkey_profile,
                     notes,
                     ocr_text,
@@ -66,6 +70,8 @@ public sealed partial class WorkspaceMetadataIndex
             EnsureColumn(connection, "captures", "is_original", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(connection, "captures", "source_available", "INTEGER NOT NULL DEFAULT 1");
             EnsureColumn(connection, "captures", "integrity_status", "TEXT");
+            EnsureColumn(connection, "captures", "source_window_title", "TEXT");
+            EnsureColumn(connection, "captures", "source_url", "TEXT");
             EnsureFtsSchema(connection);
         }
     }
@@ -214,15 +220,15 @@ public sealed partial class WorkspaceMetadataIndex
                 """
                 INSERT INTO captures (
                     id, kind, created_at, file_path, thumbnail_path, width, height, bytes,
-                    is_private, source_app, hotkey_profile, ocr_text, receipt_id,
-                    source_receipt_id, artifact_role, is_original, source_available,
-                    integrity_status, notes
+                    is_private, source_app, source_window_title, source_url, hotkey_profile,
+                    ocr_text, receipt_id, source_receipt_id, artifact_role, is_original,
+                    source_available, integrity_status, notes
                 )
                 VALUES (
                     $id, $kind, $created_at, $file_path, $thumbnail_path, $width, $height, $bytes,
-                    $is_private, $source_app, $hotkey_profile, $ocr_text, $receipt_id,
-                    $source_receipt_id, $artifact_role, $is_original, $source_available,
-                    $integrity_status, $notes
+                    $is_private, $source_app, $source_window_title, $source_url, $hotkey_profile,
+                    $ocr_text, $receipt_id, $source_receipt_id, $artifact_role, $is_original,
+                    $source_available, $integrity_status, $notes
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     kind = excluded.kind,
@@ -234,6 +240,8 @@ public sealed partial class WorkspaceMetadataIndex
                     bytes = excluded.bytes,
                     is_private = excluded.is_private,
                     source_app = excluded.source_app,
+                    source_window_title = excluded.source_window_title,
+                    source_url = excluded.source_url,
                     hotkey_profile = excluded.hotkey_profile,
                     ocr_text = excluded.ocr_text,
                     receipt_id = excluded.receipt_id,
@@ -254,13 +262,15 @@ public sealed partial class WorkspaceMetadataIndex
         ftsCommand.Transaction = transaction;
         ftsCommand.CommandText =
             """
-            INSERT INTO captures_fts (id, file_name, kind, source_app, hotkey_profile, notes, ocr_text, file_path)
-            VALUES ($id, $file_name, $kind, $source_app, $hotkey_profile, $notes, $ocr_text, $file_path);
+            INSERT INTO captures_fts (id, file_name, kind, source_app, source_window_title, source_url, hotkey_profile, notes, ocr_text, file_path)
+            VALUES ($id, $file_name, $kind, $source_app, $source_window_title, $source_url, $hotkey_profile, $notes, $ocr_text, $file_path);
             """;
         ftsCommand.Parameters.AddWithValue("$id", item.Id);
         ftsCommand.Parameters.AddWithValue("$file_name", item.FileName);
         ftsCommand.Parameters.AddWithValue("$kind", item.Kind.ToString());
         ftsCommand.Parameters.AddWithValue("$source_app", item.SourceApp ?? string.Empty);
+        ftsCommand.Parameters.AddWithValue("$source_window_title", item.SourceWindowTitle ?? string.Empty);
+        ftsCommand.Parameters.AddWithValue("$source_url", item.SourceUrl ?? string.Empty);
         ftsCommand.Parameters.AddWithValue("$hotkey_profile", item.HotkeyProfile ?? string.Empty);
         ftsCommand.Parameters.AddWithValue("$notes", item.Notes ?? string.Empty);
         ftsCommand.Parameters.AddWithValue("$ocr_text", item.OcrText ?? string.Empty);
@@ -291,6 +301,8 @@ public sealed partial class WorkspaceMetadataIndex
         command.Parameters.AddWithValue("$bytes", item.Bytes);
         command.Parameters.AddWithValue("$is_private", item.IsPrivate ? 1 : 0);
         command.Parameters.AddWithValue("$source_app", item.SourceApp ?? string.Empty);
+        command.Parameters.AddWithValue("$source_window_title", item.SourceWindowTitle ?? string.Empty);
+        command.Parameters.AddWithValue("$source_url", item.SourceUrl ?? string.Empty);
         command.Parameters.AddWithValue("$hotkey_profile", item.HotkeyProfile ?? string.Empty);
         command.Parameters.AddWithValue("$ocr_text", item.OcrText ?? string.Empty);
         command.Parameters.AddWithValue("$receipt_id", item.ReceiptId ?? string.Empty);
@@ -328,7 +340,10 @@ public sealed partial class WorkspaceMetadataIndex
 
     private static void EnsureFtsSchema(SqliteConnection connection)
     {
-        if (VirtualTableHasColumn(connection, "captures_fts", "hotkey_profile"))
+        // Sentinel column: the newest FTS column doubles as the schema marker. FTS5 has no
+        // ALTER TABLE, so an old table is dropped and recreated; the startup Rebuild that
+        // called into here repopulates it in the same pass.
+        if (VirtualTableHasColumn(connection, "captures_fts", "source_url"))
         {
             return;
         }
@@ -345,6 +360,8 @@ public sealed partial class WorkspaceMetadataIndex
                 file_name,
                 kind,
                 source_app,
+                source_window_title,
+                source_url,
                 hotkey_profile,
                 notes,
                 ocr_text,
