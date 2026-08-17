@@ -46,6 +46,8 @@ The release is self-contained. A separate .NET, FFmpeg, or segmentation installa
 - When the capture actions window is enabled it fades out on its own after 8 seconds, configurable in Settings → General. A thin bar along the bottom drains to show the remaining time. Moving the pointer onto it, pressing a key, or clicking an action cancels the countdown; `0` keeps it open until you close it.
 - On the capture overlay, pointing at a window highlights it and a click captures it. `Ctrl` targets a pane inside that window, `Shift` turns auto-select and snapping off, and dragging still selects a free region. Settings → General has a toggle to disable the highlight.
 - The overlay's pixel lens follows the cursor and shows the coordinates and hex color under it; `C` copies that color to the clipboard.
+- `Ctrl+Shift+O` (also in the tray as **Grab text from a region**) selects a region and copies the recognized text straight to the clipboard **without saving a capture**. Text that trips the sensitive-data scan is copied redacted. Automation rules keyed to the old OCR-region hotkey profile no longer fire, since no capture is created.
+- Captures record which app and window they came from; click-capturing a window on the overlay stamps that exact window rather than whichever was foreground before the overlay opened. Browser-extension captures also record the page URL (redacted when it carries token-like values). App, window title, and URL are all searchable.
 - GIF and MP4 recording with monitor, window, and region targets
 - Optional microphone, system-audio, webcam, cursor, timer, and keystroke overlays
 - Android screenshot, bounded recording, and preview support through an in-process Windows USB/ADB transport, with an external `adb.exe` override for troubleshooting
@@ -65,6 +67,9 @@ Recording offers **Record now** and **Replay** modes. Replay is opt-in; while ar
 ### Library and editing
 
 - Local searchable capture library with thumbnails. Favorites, collections, and trash are not available in `0.3.0`; Delete asks for confirmation and removes the local file.
+- Background OCR indexing, on by default: every new image capture is OCR'd locally shortly after it is saved, and existing captures are indexed gradually, so library search finds words that only appear inside a screenshot. Settings → General toggles it; everything runs on-device with Windows OCR.
+- Live Text on the preview: drag over the selected capture's preview to select the text under the cursor — it is copied on release and the matched words flash. Captures without stored OCR are recognized on first use.
+- Select exactly two image captures and press **Compare** (also in the command palette) for a side-by-side view: a *possible addition / edit / deletion* verdict, added and removed words highlighted on each image, and a coarse pixel-difference readout.
 - Rectangle, ellipse, line, arrow, freehand, text, callout, step-marker, highlight, spotlight, crop, blur, pixelate, and solid-redaction tools
 - Keyboard shortcuts, undo/redo, clipboard actions, and flattened edited exports
 - Local Windows OCR, QR/barcode decoding, metadata inspection/removal, hashing, image combine/split, and scrolling stitch tools

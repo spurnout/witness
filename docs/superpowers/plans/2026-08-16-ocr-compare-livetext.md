@@ -768,7 +768,20 @@ git commit -m "docs: describe OCR indexing, text grab, compare, and live text"
 
 ## Status
 
-Not started.
+All 13 tasks implemented and committed to `main` on 2026-08-16; 926 tests pass. Notable execution
+deviations from the plan text:
+
+- `PixelGridDiff.TryComputeFromFiles` absorbed the LockBits file loading (planned for
+  CompareWindow code-behind) so it lives beside `Compute` with a test.
+- `SourceUrl` stores the **redacted** page URL (`RedactForStorage` runs before import), so a
+  token-bearing URL lands as its redaction marker — same invariant as the sidecar JSON.
+- Compare-button enablement reads the live multi-selection inside `SetSelectionActionsEnabled`
+  rather than in `CaptureList_SelectionChanged`, so every refresh path stays consistent.
+- The main-window render verb is `--render-main` + `--render-main-output` (not
+  `--render-main-window`); re-run against fresh `RECEIPTS_*` roots verified the restructured
+  preview tree.
+
+The manual smoke checklist below remains open pending a live run of the new binary.
 
 ## Manual smoke checklist (after Task 13, new binary — exit the tray app first)
 
