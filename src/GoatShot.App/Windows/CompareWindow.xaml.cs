@@ -86,9 +86,11 @@ public partial class CompareWindow : Window
         {
             source = ImageInterop.LoadBitmapImage(item.FilePath);
         }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or UnauthorizedAccessException)
+        catch (Exception ex) when (
+            ex is IOException or NotSupportedException or UnauthorizedAccessException or FormatException)
         {
-            // The comparison text panel still stands on its own if a file went missing.
+            // The comparison text panel still stands on its own if a file went missing or is
+            // corrupt (WPF reports truncated images as FileFormatException, a FormatException).
         }
 
         if (source is null)

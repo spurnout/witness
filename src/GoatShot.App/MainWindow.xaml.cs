@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly bool _startHidden;
     private readonly HashSet<string> _previewOcrInFlight = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<System.Windows.Shapes.Rectangle> _previewFlashOverlays = new();
+    private CaptureItem? _previewSelectionItem;
     private System.Windows.Point? _previewSelectionStart;
     private System.Windows.Shapes.Rectangle? _previewSelectionRectangle;
     private DispatcherTimer? _previewFlashTimer;
@@ -1468,6 +1469,17 @@ public partial class MainWindow : Window
                 _services.Tray?.ShowCaptureNotification(payload.StatusMessage);
             }
         }
+        catch (Exception ex) when (CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(ex))
+        {
+            // A busy clipboard or unreadable temp frame must never escalate to the global
+            // error box this method exists to avoid — quiet feedback only.
+            var message = $"Text grab failed: {ex.Message}";
+            SetStatus(message);
+            if (!wasVisible)
+            {
+                _services.Tray?.ShowCaptureNotification(message);
+            }
+        }
         finally
         {
             if (tempPath is not null)
@@ -1476,7 +1488,7 @@ public partial class MainWindow : Window
                 {
                     File.Delete(tempPath);
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     // Temp cleanup is best-effort; the folder is purged on shutdown anyway.
                 }
@@ -2883,11 +2895,28 @@ public partial class MainWindow : Window
         }
 
         var ordered = selected.OrderBy(item => item.CreatedAt).ToList();
+        var ranOcr = false;
         foreach (var item in ordered)
         {
-            if (item.OcrWords.Count == 0 && !await RecognizeAndStoreOcrAsync(item, copyText: false))
+            if (item.OcrWords.Count == 0)
             {
-                return;
+                if (!await RecognizeAndStoreOcrAsync(item, copyText: false))
+                {
+                    return;
+                }
+
+                ranOcr = true;
+            }
+        }
+
+        if (ranOcr)
+        {
+            // RecognizeAndStoreOcrAsync's ApplyFilter collapses the multi-selection to a single
+            // anchor item; restore both so the compare context survives its own preparation.
+            CaptureList.SelectedItems.Clear();
+            foreach (var item in ordered)
+            {
+                CaptureList.SelectedItems.Add(item);
             }
         }
 
@@ -3496,6 +3525,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _previewSelectionItem = item;
         _previewSelectionStart = e.GetPosition(PreviewTextOverlay);
         ClearPreviewTextOverlay();
         _previewSelectionRectangle = CreatePreviewOverlayRectangle(
@@ -3532,7 +3562,13 @@ public partial class MainWindow : Window
         _previewSelectionStart = null;
         var end = e.GetPosition(PreviewTextOverlay);
         ClearPreviewTextOverlay();
-        if (CaptureList.SelectedItem is not CaptureItem item)
+        var item = _previewSelectionItem;
+        _previewSelectionItem = null;
+
+        // The drag's coordinates live in the pixel space of the item it started on. If arrow-key
+        // navigation switched the selection mid-drag, resolving against the new item would copy
+        // the wrong text — abandon the gesture instead.
+        if (item is null || !ReferenceEquals(CaptureList.SelectedItem, item))
         {
             return;
         }
@@ -3615,10 +3651,13 @@ public partial class MainWindow : Window
         var fill = new System.Windows.Media.SolidColorBrush(tone) { Opacity = 0.18 };
         stroke.Freeze();
         fill.Freeze();
+        var surfaceWidth = PreviewSurface.Width;
         var rectangle = new System.Windows.Shapes.Rectangle
         {
             Stroke = stroke,
-            StrokeThickness = Math.Max(2d, PreviewSurface.Width / 800d),
+            // Width is NaN when no bitmap is displayed; Math.Max would propagate it into the
+            // stroke and silently hide the rectangle.
+            StrokeThickness = double.IsNaN(surfaceWidth) ? 2d : Math.Max(2d, surfaceWidth / 800d),
             StrokeDashArray = [4d, 3d],
             Fill = fill,
             IsHitTestVisible = false

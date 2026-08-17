@@ -158,17 +158,23 @@ public sealed class WorkspaceStore
     /// <summary>
     /// Batched metadata write: one JSON rewrite regardless of how many items changed. The
     /// background OCR worker persists whole chunks through this so a large backfill stays
-    /// O(chunks), not O(items), on the index file.
+    /// O(chunks), not O(items), on the index file. Callers that hold their snapshot open across
+    /// real work pass <paramref name="insertMissing"/> false: an item that vanished from the
+    /// store in the meantime was deleted by the user and must not be resurrected. Returns the
+    /// items that were actually written.
     /// </summary>
-    public async Task UpdateItemsAsync(IReadOnlyList<CaptureItem> items)
+    public async Task<IReadOnlyList<CaptureItem>> UpdateItemsAsync(
+        IReadOnlyList<CaptureItem> items,
+        bool insertMissing = true)
     {
         if (items.Count == 0)
         {
-            return;
+            return [];
         }
 
-        await Task.Run(() =>
+        return await Task.Run(() =>
         {
+            var applied = new List<CaptureItem>();
             lock (_gate)
             {
                 var existingItems = Load().ToList();
@@ -182,10 +188,21 @@ public sealed class WorkspaceStore
                     {
                         existingItems[index] = item;
                     }
-                    else
+                    else if (insertMissing)
                     {
                         existingItems.Insert(0, item);
                     }
+                    else
+                    {
+                        continue;
+                    }
+
+                    applied.Add(item);
+                }
+
+                if (applied.Count == 0)
+                {
+                    return (IReadOnlyList<CaptureItem>)applied;
                 }
 
                 var json = JsonSerializer.Serialize(
@@ -195,10 +212,12 @@ public sealed class WorkspaceStore
                 File.WriteAllText(_paths.IndexPath, json);
             }
 
-            foreach (var item in items)
+            foreach (var item in applied)
             {
                 _metadataIndex?.Upsert(item);
             }
+
+            return (IReadOnlyList<CaptureItem>)applied;
         });
     }
 

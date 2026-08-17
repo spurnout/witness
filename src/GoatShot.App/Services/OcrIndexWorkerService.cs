@@ -151,7 +151,14 @@ public sealed class OcrIndexWorkerService : IDisposable
     /// </summary>
     public void Nudge()
     {
-        _timer?.Change(NudgeDue, Period);
+        try
+        {
+            _timer?.Change(NudgeDue, Period);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Stop/Dispose raced the nudge; the worker is going away and owes nothing.
+        }
     }
 
     public async Task<OcrIndexPassResult> ProcessOnceAsync(CancellationToken cancellationToken = default)
@@ -212,10 +219,13 @@ public sealed class OcrIndexWorkerService : IDisposable
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<CaptureItem> applied = [];
             if (indexed.Count > 0)
             {
-                await _workspaceStore.UpdateItemsAsync(indexed);
-                foreach (var item in indexed)
+                // insertMissing: false — an item deleted while this pass held its snapshot must
+                // stay deleted, not come back OCR'd and searchable with its file already gone.
+                applied = await _workspaceStore.UpdateItemsAsync(indexed, insertMissing: false);
+                foreach (var item in applied)
                 {
                     ItemIndexed?.Invoke(this, item);
                     if (_onOcrCompletedAsync is not null &&
@@ -226,14 +236,14 @@ public sealed class OcrIndexWorkerService : IDisposable
                 }
             }
 
-            TrackPassHealth(indexed.Count, failed);
-            var message = $"OCR indexed {indexed.Count} capture(s); {failed} failed.";
-            if (indexed.Count > 0)
+            TrackPassHealth(applied.Count, failed);
+            var message = $"OCR indexed {applied.Count} capture(s); {failed} failed.";
+            if (applied.Count > 0)
             {
                 SetStatus(message);
             }
 
-            return new OcrIndexPassResult(batch.Count, indexed.Count, failed, message);
+            return new OcrIndexPassResult(batch.Count, applied.Count, failed, message);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

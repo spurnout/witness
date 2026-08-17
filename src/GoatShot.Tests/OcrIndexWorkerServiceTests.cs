@@ -131,6 +131,37 @@ public sealed class OcrIndexWorkerServiceTests
     }
 
     [TestMethod]
+    public void ProcessOnceAsync_DoesNotResurrectItemsDeletedDuringThePass()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var victim = store.AddImageFileAsync(WritePng(paths, "victim.png"), CaptureKind.Imported).Result;
+            Thread.Sleep(20);
+            var trigger = store.AddImageFileAsync(WritePng(paths, "trigger.png"), CaptureKind.Imported).Result;
+
+            // The recognizer deletes the OTHER batch item mid-pass, simulating the user removing
+            // a capture while the worker holds a stale snapshot of it.
+            using var worker = CreateWorker(store, recognize: (path, _) =>
+            {
+                if (path.Contains("trigger", StringComparison.OrdinalIgnoreCase))
+                {
+                    store.DeleteItemAsync(victim, deleteFile: false).Wait();
+                }
+
+                return Task.FromResult(SuccessResult("text"));
+            });
+            var indexedIds = new List<string>();
+            worker.ItemIndexed += (_, item) => indexedIds.Add(item.Id);
+
+            var result = worker.ProcessOnceAsync().Result;
+
+            Assert.AreEqual(1, result.Indexed);
+            CollectionAssert.AreEqual(new[] { trigger.Id }, indexedIds.ToArray());
+            Assert.AreEqual(trigger.Id, store.Load().Single().Id);
+        });
+    }
+
+    [TestMethod]
     public void ProcessOnceAsync_DoesNothingWhenIndexingDisabled()
     {
         WithTempStore((store, paths) =>

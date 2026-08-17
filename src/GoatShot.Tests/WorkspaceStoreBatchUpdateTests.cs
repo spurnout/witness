@@ -61,6 +61,28 @@ public sealed class WorkspaceStoreBatchUpdateTests
     }
 
     [TestMethod]
+    public void UpdateItemsAsync_WithoutInsertMissing_SkipsItemsDeletedMidFlight()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var index = new WorkspaceMetadataIndex(paths);
+            store.AttachMetadataIndex(index);
+            var keep = store.AddImageFileAsync(WritePng(paths, "keep.png"), CaptureKind.Imported).Result;
+            var deleted = store.AddImageFileAsync(WritePng(paths, "deleted.png"), CaptureKind.Imported).Result;
+            store.DeleteItemAsync(deleted, deleteFile: false).Wait();
+
+            keep.OcrText = "kept";
+            deleted.OcrText = "resurrected";
+            var applied = store.UpdateItemsAsync([keep, deleted], insertMissing: false).Result;
+
+            // A batch writer holding a stale snapshot must not bring a deleted item back to life.
+            CollectionAssert.AreEqual(new[] { keep.Id }, applied.Select(item => item.Id).ToArray());
+            Assert.AreEqual(keep.Id, store.Load().Single().Id);
+            Assert.AreEqual(0, index.SearchIds("resurrected").Count);
+        });
+    }
+
+    [TestMethod]
     public void UpdateItemsAsync_UpsertsEachItemIntoTheMetadataIndex()
     {
         WithTempStore((store, paths) =>
