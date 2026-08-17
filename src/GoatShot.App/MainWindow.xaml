@@ -608,10 +608,21 @@
                                 Padding="14">
                             <Grid>
                                 <Viewbox Stretch="Uniform" StretchDirection="Both">
-                                    <Image x:Name="PreviewImage"
-                                           AutomationProperties.Name="Selected capture preview"
-                                           Stretch="Uniform"
-                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <!-- PreviewSurface is sized to the bitmap's pixel dimensions, so the Viewbox
+                                         owns all scaling and mouse coordinates on the overlay canvas land directly
+                                         in image-pixel space for live-text hit testing. -->
+                                    <Grid x:Name="PreviewSurface">
+                                        <Image x:Name="PreviewImage"
+                                               AutomationProperties.Name="Selected capture preview"
+                                               Stretch="Fill"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <Canvas x:Name="PreviewTextOverlay"
+                                                Background="Transparent"
+                                                AutomationProperties.Name="Live text selection overlay"
+                                                MouseLeftButtonDown="PreviewTextOverlay_MouseLeftButtonDown"
+                                                MouseMove="PreviewTextOverlay_MouseMove"
+                                                MouseLeftButtonUp="PreviewTextOverlay_MouseLeftButtonUp" />
+                                    </Grid>
                                 </Viewbox>
 
                                 <Border x:Name="EmptyState"

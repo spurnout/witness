@@ -30,6 +30,12 @@ public partial class MainWindow : Window
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
     private readonly bool _startHidden;
+    private readonly HashSet<string> _previewOcrInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<System.Windows.Shapes.Rectangle> _previewFlashOverlays = new();
+    private System.Windows.Point? _previewSelectionStart;
+    private System.Windows.Shapes.Rectangle? _previewSelectionRectangle;
+    private DispatcherTimer? _previewFlashTimer;
+    private bool _previewLiveTextEnabled;
     private const string SensitiveScanNotePrefix = "Sensitive scan:";
     private const string AiAnalysisNotePrefix = "AI analysis:";
 
@@ -2748,6 +2754,10 @@ public partial class MainWindow : Window
         {
             SetSelectionActionsEnabled(false);
             PreviewImage.Source = null;
+            PreviewSurface.Width = double.NaN;
+            PreviewSurface.Height = double.NaN;
+            ClearPreviewTextOverlay();
+            _previewLiveTextEnabled = false;
             DetailsText.Text = "No capture selected.";
             PreviewHint.Text = "Select a capture";
             SelectedFileNameText.Text = "No capture selected";
@@ -2775,6 +2785,7 @@ public partial class MainWindow : Window
     {
         SetSelectionActionsEnabled(true, item);
         PreviewImage.Source = LoadPreviewImage(item);
+        ConfigurePreviewLiveText(item);
         PreviewHint.Text = item.FileName;
         EmptyState.Visibility = Visibility.Collapsed;
         SelectedFileNameText.Text = item.FileName;
@@ -3442,6 +3453,187 @@ public partial class MainWindow : Window
                 ? ImageInterop.LoadBitmapImage(item.ThumbnailPath)
                 : null;
         }
+    }
+
+    /// <summary>
+    /// Sizes the preview surface to the displayed bitmap's pixels and decides whether live text
+    /// is safe. LoadPreviewImage can silently fall back to the thumbnail, whose pixels no longer
+    /// line up with the stored OCR word boxes — the dimension check catches exactly that.
+    /// </summary>
+    private void ConfigurePreviewLiveText(CaptureItem item)
+    {
+        ClearPreviewTextOverlay();
+        if (PreviewImage.Source is BitmapSource source)
+        {
+            PreviewSurface.Width = source.PixelWidth;
+            PreviewSurface.Height = source.PixelHeight;
+            _previewLiveTextEnabled = source.PixelWidth == item.Width &&
+                source.PixelHeight == item.Height &&
+                IsImageFile(item.FilePath);
+        }
+        else
+        {
+            PreviewSurface.Width = double.NaN;
+            PreviewSurface.Height = double.NaN;
+            _previewLiveTextEnabled = false;
+        }
+
+        PreviewTextOverlay.Cursor = _previewLiveTextEnabled
+            ? System.Windows.Input.Cursors.IBeam
+            : System.Windows.Input.Cursors.Arrow;
+    }
+
+    private void PreviewTextOverlay_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (!_previewLiveTextEnabled || CaptureList.SelectedItem is not CaptureItem item)
+        {
+            return;
+        }
+
+        if (item.OcrWords.Count == 0)
+        {
+            EnsurePreviewOcr(item);
+            return;
+        }
+
+        _previewSelectionStart = e.GetPosition(PreviewTextOverlay);
+        ClearPreviewTextOverlay();
+        _previewSelectionRectangle = CreatePreviewOverlayRectangle(
+            System.Windows.Media.Color.FromRgb(0x7F, 0xE0, 0xFF),
+            "Live text selection");
+        PreviewTextOverlay.Children.Add(_previewSelectionRectangle);
+        PreviewTextOverlay.CaptureMouse();
+    }
+
+    private void PreviewTextOverlay_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_previewSelectionStart is not { } start ||
+            _previewSelectionRectangle is null ||
+            e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(PreviewTextOverlay);
+        System.Windows.Controls.Canvas.SetLeft(_previewSelectionRectangle, Math.Min(start.X, current.X));
+        System.Windows.Controls.Canvas.SetTop(_previewSelectionRectangle, Math.Min(start.Y, current.Y));
+        _previewSelectionRectangle.Width = Math.Abs(current.X - start.X);
+        _previewSelectionRectangle.Height = Math.Abs(current.Y - start.Y);
+    }
+
+    private void PreviewTextOverlay_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_previewSelectionStart is not { } start)
+        {
+            return;
+        }
+
+        PreviewTextOverlay.ReleaseMouseCapture();
+        _previewSelectionStart = null;
+        var end = e.GetPosition(PreviewTextOverlay);
+        ClearPreviewTextOverlay();
+        if (CaptureList.SelectedItem is not CaptureItem item)
+        {
+            return;
+        }
+
+        var selection = OcrWordSelectionService.Resolve(
+            item.OcrWords,
+            Math.Min(start.X, end.X),
+            Math.Min(start.Y, end.Y),
+            Math.Abs(end.X - start.X),
+            Math.Abs(end.Y - start.Y));
+        if (selection.Words.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            ClipboardInterop.SetText(selection.Text);
+            SetStatus($"Copied {selection.Words.Count} word(s) from the preview.");
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            SetStatus("The clipboard was busy; the selected text was not copied.");
+            return;
+        }
+
+        FlashPreviewWords(selection.Words);
+    }
+
+    /// <summary>One background OCR pass for a not-yet-indexed item the user tried to select in.</summary>
+    private async void EnsurePreviewOcr(CaptureItem item)
+    {
+        if (!_previewOcrInFlight.Add(item.Id))
+        {
+            return;
+        }
+
+        try
+        {
+            SetStatus("Recognizing text in the capture...");
+            if (await RecognizeAndStoreOcrAsync(item, copyText: false))
+            {
+                ConfigurePreviewLiveText(item);
+                SetStatus(item.OcrWords.Count > 0
+                    ? "Text recognized. Drag over the preview to copy it."
+                    : "No text was recognized in this capture.");
+            }
+        }
+        finally
+        {
+            _previewOcrInFlight.Remove(item.Id);
+        }
+    }
+
+    private void FlashPreviewWords(IReadOnlyList<OcrRecognizedWord> words)
+    {
+        var tone = System.Windows.Media.Color.FromRgb(0xFF, 0xBE, 0x5C);
+        foreach (var word in words)
+        {
+            var overlay = CreatePreviewOverlayRectangle(tone, $"Copied text: {word.Text}");
+            overlay.Width = Math.Max(1, word.Width + 4);
+            overlay.Height = Math.Max(1, word.Height + 4);
+            System.Windows.Controls.Canvas.SetLeft(overlay, word.X - 2);
+            System.Windows.Controls.Canvas.SetTop(overlay, word.Y - 2);
+            PreviewTextOverlay.Children.Add(overlay);
+            _previewFlashOverlays.Add(overlay);
+        }
+
+        _previewFlashTimer?.Stop();
+        _previewFlashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        _previewFlashTimer.Tick += (_, _) => ClearPreviewTextOverlay();
+        _previewFlashTimer.Start();
+    }
+
+    private System.Windows.Shapes.Rectangle CreatePreviewOverlayRectangle(
+        System.Windows.Media.Color tone,
+        string automationName)
+    {
+        var stroke = new System.Windows.Media.SolidColorBrush(tone);
+        var fill = new System.Windows.Media.SolidColorBrush(tone) { Opacity = 0.18 };
+        stroke.Freeze();
+        fill.Freeze();
+        var rectangle = new System.Windows.Shapes.Rectangle
+        {
+            Stroke = stroke,
+            StrokeThickness = Math.Max(2d, PreviewSurface.Width / 800d),
+            StrokeDashArray = [4d, 3d],
+            Fill = fill,
+            IsHitTestVisible = false
+        };
+        System.Windows.Automation.AutomationProperties.SetName(rectangle, automationName);
+        return rectangle;
+    }
+
+    private void ClearPreviewTextOverlay()
+    {
+        _previewFlashTimer?.Stop();
+        _previewFlashTimer = null;
+        _previewFlashOverlays.Clear();
+        _previewSelectionRectangle = null;
+        PreviewTextOverlay.Children.Clear();
     }
 
     private static string MergeSensitiveScanNote(string? notes, string scanNote)
