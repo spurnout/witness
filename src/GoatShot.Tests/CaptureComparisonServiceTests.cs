@@ -131,6 +131,34 @@ public sealed class CaptureComparisonServiceTests
         Assert.IsNull(result.DifferencePercent);
     }
 
+    [TestMethod]
+    public void PixelGridDiff_ComputesFromImageFilesAndAbsorbsLoadFailures()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "Receipts.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var left = Path.Combine(root, "left.png");
+            var right = Path.Combine(root, "right.png");
+            using (var bitmap = new System.Drawing.Bitmap(8, 8))
+            {
+                bitmap.Save(left, System.Drawing.Imaging.ImageFormat.Png);
+                bitmap.Save(right, System.Drawing.Imaging.ImageFormat.Png);
+            }
+
+            var identical = PixelGridDiff.TryComputeFromFiles(left, right);
+            Assert.IsNotNull(identical);
+            Assert.AreEqual(0, identical.CellsChanged);
+
+            // Unreadable inputs degrade to "no pixel layer" instead of failing the comparison.
+            Assert.IsNull(PixelGridDiff.TryComputeFromFiles(left, Path.Combine(root, "missing.png")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static List<OcrRecognizedWord> Words(params (string Text, double X)[] entries)
     {
         return entries

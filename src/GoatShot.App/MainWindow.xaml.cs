@@ -1925,6 +1925,7 @@ public partial class MainWindow : Window
             E("Open editor", "Workspace", () => OpenEditor_Click(this, empty)),
             E("Quick actions", "Workspace", () => CaptureTask_Click(this, empty)),
             E("Combine selected captures", "Workspace", () => CombineSelected_Click(this, empty)),
+            E("Compare selected captures", "Workspace", () => CompareSelected_Click(this, empty)),
             E("Pin capture to screen", "Workspace", () => PinCapture_Click(this, empty)),
             E("Copy image", "Clipboard", () => CopyImage_Click(this, empty)),
             E("Copy file", "Clipboard", () => CopyFile_Click(this, empty)),
@@ -2841,10 +2842,56 @@ public partial class MainWindow : Window
             ExtractTextButton.IsEnabled = hasLocalImage;
         }
 
+        if (CompareButton is not null)
+        {
+            // Compare is the one selection action that needs exactly two image captures, so it
+            // reads the live multi-selection instead of the single anchor item.
+            CompareButton.IsEnabled = enabled && SelectedImageCaptures().Count == 2;
+        }
+
         if (PrivacyReviewButton is not null)
         {
             PrivacyReviewButton.IsEnabled = hasLocalImage;
         }
+    }
+
+    private List<CaptureItem> SelectedImageCaptures()
+    {
+        return CaptureList?.SelectedItems.OfType<CaptureItem>()
+            .Where(item => IsImageFile(item.FilePath))
+            .ToList() ?? [];
+    }
+
+    private async void CompareSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = SelectedImageCaptures();
+        if (selected.Count != 2)
+        {
+            SetStatus("Select exactly two image captures to compare.");
+            return;
+        }
+
+        var ordered = selected.OrderBy(item => item.CreatedAt).ToList();
+        foreach (var item in ordered)
+        {
+            if (item.OcrWords.Count == 0 && !await RecognizeAndStoreOcrAsync(item, copyText: false))
+            {
+                return;
+            }
+        }
+
+        var before = ordered[0];
+        var after = ordered[1];
+        SetStatus("Comparing captures...");
+        var pixelDiff = await Task.Run(() => PixelGridDiff.TryComputeFromFiles(before.FilePath, after.FilePath));
+        var comparison = CaptureComparisonService.Compare(
+            before.OcrText,
+            before.OcrWords,
+            after.OcrText,
+            after.OcrWords,
+            pixelDiff);
+        new CompareWindow(before, after, comparison) { Owner = this }.Show();
+        SetStatus($"Compared {before.FileName} with {after.FileName}.");
     }
 
     private CaptureItem? SelectedCapture()

@@ -1,3 +1,6 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using GoatShot.App.Models;
 
 namespace GoatShot.App.Services;
@@ -65,6 +68,54 @@ public static class PixelGridDiff
             cellsChanged,
             cellsTotal,
             cellsChanged * 100d / cellsTotal);
+    }
+
+    /// <summary>
+    /// File-based convenience over <see cref="Compute"/>. Null when either image cannot be
+    /// loaded — the OCR comparison still stands on its own without a pixel layer.
+    /// </summary>
+    public static PixelGridDiffResult? TryComputeFromFiles(string beforePath, string afterPath)
+    {
+        try
+        {
+            var (beforePixels, beforeWidth, beforeHeight) = LoadBgra(beforePath);
+            var (afterPixels, afterWidth, afterHeight) = LoadBgra(afterPath);
+            return Compute(beforePixels, beforeWidth, beforeHeight, afterPixels, afterWidth, afterHeight);
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException or ExternalException)
+        {
+            // GDI+ reports unreadable/corrupt images as ArgumentException or OutOfMemoryException.
+            return null;
+        }
+    }
+
+    private static (byte[] Pixels, int Width, int Height) LoadBgra(string path)
+    {
+        using var bitmap = new Bitmap(path);
+        var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixels = new byte[data.Stride * data.Height];
+            Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            if (data.Stride == bitmap.Width * 4)
+            {
+                return (pixels, bitmap.Width, bitmap.Height);
+            }
+
+            // Compact away stride padding so Compute can treat the buffer as densely packed.
+            var packed = new byte[bitmap.Width * bitmap.Height * 4];
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                Buffer.BlockCopy(pixels, y * data.Stride, packed, y * bitmap.Width * 4, bitmap.Width * 4);
+            }
+
+            return (packed, bitmap.Width, bitmap.Height);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
     }
 
     private static bool IsCellChanged(

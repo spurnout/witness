@@ -676,6 +676,7 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -692,8 +693,12 @@
                                     Margin="12,0,0,0" AutomationProperties.Name="Share selected capture" />
                             <Button x:Name="ExtractTextButton" Grid.Column="3" Content="Extract text" Click="RunOcr_Click" Style="{StaticResource WorkspaceButton}"
                                     Margin="12,0,0,0" AutomationProperties.Name="Extract text from selected capture" />
+                            <Button x:Name="CompareButton" Grid.Column="4" Content="Compare" Click="CompareSelected_Click" Style="{StaticResource WorkspaceButton}"
+                                    Margin="12,0,0,0" IsEnabled="False"
+                                    ToolTip="Select exactly two image captures to compare them"
+                                    AutomationProperties.Name="Compare the two selected captures" />
                             <Button x:Name="OpenReceiptButton"
-                                    Grid.Column="4"
+                                    Grid.Column="5"
                                     Content="Open Frame Explorer"
                                     Click="OpenReceipt_Click"
                                     Style="{StaticResource WorkspaceButton}"
@@ -701,7 +706,7 @@
                                     HorizontalAlignment="Left"
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="Open selected replay receipt in Frame Explorer" />
-                            <Button Grid.Column="5" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}"
+                            <Button Grid.Column="6" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}"
                                     AutomationProperties.Name="Delete selected local capture" />
                         </Grid>
 
