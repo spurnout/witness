@@ -6,8 +6,9 @@
         Title="Receipts"
         Width="1440"
         Height="900"
-        MinWidth="1080"
-        MinHeight="680"
+        MinWidth="960"
+        MinHeight="640"
+        SizeChanged="Workspace_SizeChanged"
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         controls:AppWindowChrome.IsEnabled="True"
@@ -43,6 +44,7 @@
             <Setter Property="MinHeight" Value="42" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -69,6 +71,7 @@
                                 <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
                                 <Setter TargetName="Chrome" Property="Background" Value="#11191C" />
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#26343A" />
                                 <Setter Property="Foreground" Value="#718287" />
@@ -81,9 +84,10 @@
         </Style>
 
         <Style x:Key="CaptureModeButton" TargetType="Button" BasedOn="{StaticResource WorkspaceButton}">
-            <Setter Property="MinWidth" Value="116" />
-            <Setter Property="Height" Value="46" />
-            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Margin" Value="0,4,8,4" />
+            <Setter Property="Padding" Value="10,8" />
             <Setter Property="FontSize" Value="15" />
         </Style>
 
@@ -252,9 +256,10 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0"
-                            Width="500"
+                            MaxWidth="500"
                             Height="40"
-                            HorizontalAlignment="Center"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,12,0"
                             Background="#0C1316"
                             BorderBrush="{StaticResource WorkspaceBorderBrush}"
                             BorderThickness="1"
@@ -308,6 +313,9 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="DetailsToggleButton" Content="Details" Click="ToggleDetails_Click"
+                                Style="{StaticResource WorkspaceButton}" Margin="0,0,8,0"
+                                MinHeight="36" Padding="10,6" AutomationProperties.Name="Show capture details" />
                         <Button Click="Diagnostics_Click"
                                 Style="{StaticResource HeaderIconButton}"
                                 ToolTip="Diagnostics"
@@ -340,7 +348,7 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="68" />
+                <RowDefinition Height="Auto" MinHeight="68" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="36" />
             </Grid.RowDefinitions>
@@ -355,10 +363,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ScrollViewer Grid.Column="0"
-                                  HorizontalScrollBarVisibility="Hidden"
-                                  VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal">
+                        <WrapPanel Grid.Column="0">
                             <Button Click="PrimaryRegionCapture_Click"
                                     Style="{StaticResource PrimaryCaptureModeButton}"
                                     AutomationProperties.Name="Capture a screen region">
@@ -406,6 +411,8 @@
                                     Click="Recording_Click"
                                     Style="{StaticResource CaptureModeButton}"
                                     AutomationProperties.Name="Start or stop GIF recording" />
+                        </WrapPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <ComboBox x:Name="DelayModeBox"
                                       Width="126"
                                       Height="46"
@@ -416,7 +423,7 @@
                                 <ComboBoxItem Content="No delay" Tag="None" />
                                 <ComboBoxItem Content="3 seconds" Tag="ThreeSeconds" />
                             </ComboBox>
-                            <Button Margin="12,0,0,0"
+                            <Button x:Name="AllCommandsButton" Margin="8,0,0,0"
                                     Command="{x:Static local:MainWindow.OpenCommandPaletteCommand}"
                                     Style="{StaticResource WorkspaceButton}"
                                     AutomationProperties.Name="Open all capture and workspace commands"
@@ -426,9 +433,9 @@
                                            FontSize="15" />
                             </Button>
                         </StackPanel>
-                    </ScrollViewer>
                     <TextBlock x:Name="InstantCaptureHintText"
                                Grid.Column="1"
+                               Visibility="Collapsed"
                                Text="PrtScn = instant region capture"
                                Foreground="{StaticResource WorkspaceMutedTextBrush}"
                                FontSize="12"
@@ -439,9 +446,9 @@
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition x:Name="LibrarySidebarColumn" Width="220" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition x:Name="InspectorColumn" Width="300" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
@@ -508,6 +515,7 @@
                                 </Grid>
                             </RadioButton>
                             <Button Style="{StaticResource UnavailableNavButton}"
+                                    Visibility="Collapsed"
                                     AutomationProperties.Name="Favorites unavailable"
                                     AutomationProperties.HelpText="Favorites are not available in this release.">
                                 <DockPanel>
@@ -516,6 +524,7 @@
                                 </DockPanel>
                             </Button>
                             <Button Style="{StaticResource UnavailableNavButton}"
+                                    Visibility="Collapsed"
                                     AutomationProperties.Name="Trash unavailable"
                                     AutomationProperties.HelpText="Trash is not available. Delete asks for confirmation and removes the local file.">
                                 <DockPanel>
@@ -537,7 +546,7 @@
                                            Margin="0,0,8,0" />
                                 <TextBlock Text="Captures stored locally"
                                            Foreground="{StaticResource WorkspaceMutedTextBrush}"
-                                           FontSize="12"
+                                           FontSize="11"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
@@ -549,7 +558,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="54" />
                             <RowDefinition Height="*" />
-                            <RowDefinition Height="64" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="116" />
                         </Grid.RowDefinitions>
 
@@ -681,16 +690,12 @@
                             </Grid>
                         </Border>
 
-                        <Grid x:Name="SelectionActionBar" Grid.Row="2" Margin="0,12,0,0" IsEnabled="False">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                            <TextBlock x:Name="SelectionHelpText" Text="Select a capture to copy, share, or edit."
+                                       Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="12"
+                                       TextWrapping="Wrap" Margin="0,0,0,6" AutomationProperties.LiveSetting="Polite"
+                                       AutomationProperties.Name="Selection actions help" />
+                        <WrapPanel x:Name="SelectionActionBar" IsEnabled="False">
                             <Button x:Name="CopySelectedButton" Grid.Column="0" Click="CopyImage_Click" Style="{StaticResource PrimaryActionButton}"
                                     AutomationProperties.Name="Copy selected capture" ToolTip="Copy the selected image">
                                 <StackPanel Orientation="Horizontal">
@@ -699,13 +704,13 @@
                                 </StackPanel>
                             </Button>
                             <Button x:Name="SaveCopyButton" Grid.Column="1" Content="Save copy" Click="SaveCopy_Click" Style="{StaticResource WorkspaceButton}"
-                                    Margin="12,0,0,0" AutomationProperties.Name="Save a copy of the selected capture" />
+                                    Margin="8,0,0,6" AutomationProperties.Name="Save a copy of the selected capture" />
                             <Button x:Name="QuickShareButton" Grid.Column="2" Content="Share" Click="QuickShare_Click" Style="{StaticResource WorkspaceButton}"
-                                    Margin="12,0,0,0" AutomationProperties.Name="Share selected capture" />
+                                    Margin="8,0,0,6" AutomationProperties.Name="Share selected capture" />
                             <Button x:Name="ExtractTextButton" Grid.Column="3" Content="Extract text" Click="RunOcr_Click" Style="{StaticResource WorkspaceButton}"
-                                    Margin="12,0,0,0" AutomationProperties.Name="Extract text from selected capture" />
+                                    Margin="8,0,0,6" AutomationProperties.Name="Extract text from selected capture" />
                             <Button x:Name="CompareButton" Grid.Column="4" Content="Compare" Click="CompareSelected_Click" Style="{StaticResource WorkspaceButton}"
-                                    Margin="12,0,0,0" IsEnabled="False"
+                                    Margin="8,0,0,6" IsEnabled="False"
                                     ToolTip="Select exactly two image captures to compare them"
                                     AutomationProperties.Name="Compare the two selected captures" />
                             <Button x:Name="OpenReceiptButton"
@@ -713,13 +718,14 @@
                                     Content="Open Frame Explorer"
                                     Click="OpenReceipt_Click"
                                     Style="{StaticResource WorkspaceButton}"
-                                    Margin="12,0,0,0"
+                                    Margin="8,0,0,6"
                                     HorizontalAlignment="Left"
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="Open selected replay receipt in Frame Explorer" />
-                            <Button Grid.Column="6" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}"
+                            <Button x:Name="DeleteCaptureButton" Grid.Column="6" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}" Margin="8,0,0,6"
                                     AutomationProperties.Name="Delete selected local capture" />
-                        </Grid>
+                        </WrapPanel>
+                        </StackPanel>
 
                         <Grid Grid.Row="3" Margin="0,8,0,0">
                             <Grid.RowDefinitions>
@@ -762,7 +768,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="2"
+                <Border x:Name="InspectorPanel" Grid.Column="2"
                         Background="{StaticResource WorkspaceSidebarBrush}"
                         BorderBrush="{StaticResource WorkspaceBorderBrush}"
                         BorderThickness="1,0,0,0"
@@ -805,13 +811,17 @@
                                                    Foreground="{StaticResource WorkspaceAccentBrush}"
                                                    FontSize="19"
                                                    Margin="0,0,10,0" />
-                                        <TextBlock Text="Private by default" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock Text="Privacy and transfers" FontSize="15" FontWeight="SemiBold" />
                                     </StackPanel>
-                                    <TextBlock Text="No network upload occurs until you choose a share or AI action."
+                                    <TextBlock Text="Captures stay on this device unless you share them, use an AI provider, or enable an automation that sends them."
                                                Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
                                                FontSize="12"
                                                TextWrapping="Wrap"
                                                Margin="0,10,0,14" />
+                                    <TextBlock x:Name="TransferPrivacyText" Foreground="{StaticResource WorkspaceSecondaryTextBrush}"
+                                               FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               AutomationProperties.Name="Unattended transfer configuration"
+                                               AutomationProperties.LiveSetting="Polite" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -973,7 +983,7 @@
                                    AutomationProperties.Name="Replay status"
                                    AutomationProperties.LiveSetting="Polite" />
                         <TextBlock x:Name="FooterSummaryText"
-                                   Text="Local-only mode · AI off · 0 captures"
+                                   Text="Stored locally · AI off · 0 captures"
                                    Foreground="{StaticResource WorkspaceMutedTextBrush}"
                                    FontSize="11"
                                    AutomationProperties.Name="Workspace summary" />

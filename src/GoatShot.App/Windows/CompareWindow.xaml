@@ -31,6 +31,15 @@
                            Margin="0,4,0,0"
                            FontSize="12"
                            Foreground="{StaticResource MutedInkBrush}" />
+                <WrapPanel Margin="0,10,0,0">
+                    <Button Content="Fit" Click="FitImages_Click" Style="{StaticResource SecondaryButton}" AutomationProperties.Name="Fit comparison images" />
+                    <Button Content="100%" Click="ActualSize_Click" Style="{StaticResource SecondaryButton}" AutomationProperties.Name="Show comparison at 100 percent" />
+                    <Button Content="−" Click="ZoomOut_Click" Style="{StaticResource SecondaryButton}" AutomationProperties.Name="Zoom out comparison" />
+                    <Button Content="+" Click="ZoomIn_Click" Style="{StaticResource SecondaryButton}" AutomationProperties.Name="Zoom in comparison" />
+                    <TextBlock x:Name="ImageZoomText" Margin="8,0,16,8" VerticalAlignment="Center" AutomationProperties.Name="Comparison zoom level" />
+                    <CheckBox x:Name="SyncViewportsBox" Content="Sync zoom and pan" IsChecked="True" Checked="SyncViewports_Changed" Margin="0,0,16,8" VerticalAlignment="Center" />
+                    <TextBlock Text="Drag to pan · Ctrl+wheel to zoom" VerticalAlignment="Center" Foreground="{StaticResource MutedInkBrush}" Margin="0,0,0,8" />
+                </WrapPanel>
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -51,7 +60,8 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="8">
-                        <Viewbox Stretch="Uniform" StretchDirection="Both">
+                        <ScrollViewer x:Name="BeforeViewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Earlier image viewport">
+                            <Grid x:Name="BeforeZoomContainer" Width="{Binding ElementName=BeforeSurface, Path=Width}" Height="{Binding ElementName=BeforeSurface, Path=Height}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Grid x:Name="BeforeSurface">
                                 <Image x:Name="BeforeImage"
                                        Stretch="Fill"
@@ -60,7 +70,8 @@
                                         Background="Transparent"
                                         IsHitTestVisible="False" />
                             </Grid>
-                        </Viewbox>
+                            </Grid>
+                        </ScrollViewer>
                     </Border>
                 </DockPanel>
 
@@ -75,7 +86,8 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="8">
-                        <Viewbox Stretch="Uniform" StretchDirection="Both">
+                        <ScrollViewer x:Name="AfterViewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Later image viewport">
+                            <Grid x:Name="AfterZoomContainer" Width="{Binding ElementName=AfterSurface, Path=Width}" Height="{Binding ElementName=AfterSurface, Path=Height}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Grid x:Name="AfterSurface">
                                 <Image x:Name="AfterImage"
                                        Stretch="Fill"
@@ -84,7 +96,8 @@
                                         Background="Transparent"
                                         IsHitTestVisible="False" />
                             </Grid>
-                        </Viewbox>
+                            </Grid>
+                        </ScrollViewer>
                     </Border>
                 </DockPanel>
             </Grid>

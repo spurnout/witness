@@ -15,6 +15,7 @@ public sealed class UploadQueueService : IUploadQueue
     private readonly AppPaths _paths;
     private readonly UploadQueueSettings _settings;
     private readonly object _gate = new();
+    private readonly HashSet<string> _activeIds = new(StringComparer.OrdinalIgnoreCase);
 
     public UploadQueueService(AppPaths paths, UploadQueueSettings settings)
     {
@@ -114,7 +115,17 @@ public sealed class UploadQueueService : IUploadQueue
                 return Task.FromResult<UploadQueueItem?>(null);
             }
 
+            if (_activeIds.Contains(item.Id) || !UploadQueuePresentation.CanRetry(item))
+            {
+                return Task.FromResult<UploadQueueItem?>(Clone(item));
+            }
+
             var now = DateTimeOffset.Now;
+            if (item.Attempts >= item.MaxAttempts)
+            {
+                // Keep the attempt history while granting an explicit operator retry a fresh budget.
+                item.MaxAttempts = checked(item.Attempts + Math.Max(1, _settings.MaxAttempts));
+            }
             item.Status = "Queued";
             item.UpdatedAt = now;
             item.CompletedAt = null;
@@ -133,17 +144,28 @@ public sealed class UploadQueueService : IUploadQueue
         cancellationToken.ThrowIfCancellationRequested();
 
         var reserved = ReserveDueItems(maxItems);
-        cancellationToken.ThrowIfCancellationRequested();
-        var processed = await Task.WhenAll(reserved.Select(item => ProcessOneAsync(item, sharing, cancellationToken)));
-
-        return new UploadQueueProcessResult
+        try
         {
-            Processed = processed.Length,
-            Succeeded = processed.Count(item => item.Status.Equals("Succeeded", StringComparison.OrdinalIgnoreCase)),
-            Failed = processed.Count(item => item.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase)),
-            WaitingRetry = processed.Count(item => item.Status.Equals("WaitingRetry", StringComparison.OrdinalIgnoreCase)),
-            Items = processed
-        };
+            var processed = await Task.WhenAll(reserved.Select(item => ProcessOneAsync(item, sharing, cancellationToken)));
+            return new UploadQueueProcessResult
+            {
+                Processed = processed.Length,
+                Succeeded = processed.Count(item => item.Status.Equals("Succeeded", StringComparison.OrdinalIgnoreCase)),
+                Failed = processed.Count(item => item.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase)),
+                WaitingRetry = processed.Count(item => item.Status.Equals("WaitingRetry", StringComparison.OrdinalIgnoreCase)),
+                Items = processed
+            };
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                foreach (var item in reserved)
+                {
+                    _activeIds.Remove(item.Id);
+                }
+            }
+        }
     }
 
     public string GetStatusSummary()
@@ -196,6 +218,10 @@ public sealed class UploadQueueService : IUploadQueue
             if (due.Count > 0)
             {
                 SaveCore(items);
+                foreach (var item in due)
+                {
+                    _activeIds.Add(item.Id);
+                }
             }
 
             return due.Select(Clone).ToList();
@@ -220,10 +246,13 @@ public sealed class UploadQueueService : IUploadQueue
         ShareResult result;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             result = await sharing.ShareAsync(ToCaptureItem(reserved), reserved.Destination, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            UpdateProcessedItem(reserved, "Canceled", "Upload processing was canceled; retry manually if needed.",
+                completed: true, nextAttemptAt: null);
             throw;
         }
         catch (Exception ex)
@@ -364,33 +393,38 @@ public sealed class UploadQueueService : IUploadQueue
 
     private List<UploadQueueItem> LoadCore()
     {
-        try
+        if (!File.Exists(_paths.UploadQueuePath))
         {
-            if (!File.Exists(_paths.UploadQueuePath))
-            {
-                return new List<UploadQueueItem>();
-            }
+            return [];
+        }
 
-            var json = File.ReadAllText(_paths.UploadQueuePath);
-            return JsonSerializer.Deserialize<List<UploadQueueItem>>(json, JsonOptions) ?? new List<UploadQueueItem>();
-        }
-        catch
+        using var stream = new FileStream(_paths.UploadQueuePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        var items = JsonSerializer.Deserialize<List<UploadQueueItem>>(stream, JsonOptions)
+            ?? throw new JsonException("The upload queue must contain an item list.");
+        if (items.Any(item => item is null || string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.Status)))
         {
-            return new List<UploadQueueItem>();
+            throw new JsonException("The upload queue contains an invalid item.");
         }
+
+        return items;
     }
 
     private void SaveCore(List<UploadQueueItem> items)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_paths.UploadQueuePath)!);
-        File.WriteAllText(_paths.UploadQueuePath, JsonSerializer.Serialize(items, JsonOptions));
+        AtomicJsonFile.Write(_paths.UploadQueuePath, Trim(items), JsonOptions);
     }
 
     private List<UploadQueueItem> Trim(List<UploadQueueItem> items)
     {
-        return items
+        var pending = items.Where(item => _activeIds.Contains(item.Id) ||
+            (!IsTerminal(item.Status) && !item.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase))).ToList();
+        var historySlots = Math.Max(0, Math.Clamp(_settings.HistoryLimit, 1, 5_000) - pending.Count);
+        return pending.Concat(items
+                .Where(item => !_activeIds.Contains(item.Id) &&
+                    (IsTerminal(item.Status) || item.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(item => item.CreatedAt)
+                .Take(historySlots))
             .OrderByDescending(item => item.CreatedAt)
-            .Take(Math.Clamp(_settings.HistoryLimit, 1, 5_000))
             .ToList();
     }
 }

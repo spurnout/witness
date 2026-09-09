@@ -54,6 +54,7 @@ public partial class FrameExplorerWindow : Window
         _deviceKeyPath = Path.Combine(services.Paths.SecretsRoot, ReceiptDeviceKeyService.DefaultKeyFileName);
         _tempRoot = Path.GetFullPath(services.Paths.TempRoot);
         InitializeComponent();
+        ApplyExplorerView();
         EscapeKeyCloseBehavior.Attach(this);
         SceneList.ItemsSource = _scenes;
         ChangeList.ItemsSource = _changes;
@@ -81,6 +82,7 @@ public partial class FrameExplorerWindow : Window
     internal async Task PrepareRenderProofAsync(string previewFramePath)
     {
         _isSyntheticRenderProof = true;
+        IntegrityStatusText.Text = "Synthetic preview · verification not run";
         await LoadReceiptAsync(skipVerification: true, preparePlayback: false);
         _receiptIsVerified = true;
         Player.Stop();
@@ -100,6 +102,31 @@ public partial class FrameExplorerWindow : Window
         }
 
         SetStatus("Synthetic render preview · two replay tracks · local scene index · one unconfirmed possible edit.");
+    }
+
+    private void ExplorerView_Changed(object sender, SelectionChangedEventArgs e) => ApplyExplorerView();
+
+    private void ApplyExplorerView()
+    {
+        if (PlaybackPanel is null || ComparisonPanel is null || TrackExportOptionsExpander is null) return;
+        var mode = (ExplorerViewBox.SelectedItem as ComboBoxItem)?.Tag as string;
+        var compare = mode == "Compare";
+        PlaybackPanel.Visibility = compare ? Visibility.Collapsed : Visibility.Visible;
+        ComparisonPanel.Visibility = compare ? Visibility.Visible : Visibility.Collapsed;
+        ExportActionsPanel.Visibility = mode == "Export" ? Visibility.Visible : Visibility.Collapsed;
+        TrackExportOptionsExpander.Visibility = mode == "Export" ? Visibility.Visible : Visibility.Collapsed;
+        if (compare)
+        {
+            Player.Pause();
+            _timelineTimer?.Stop();
+            _isPlaying = false;
+            PlayButton.Content = "Play";
+            TextChangesTab.IsSelected = true;
+        }
+        else
+        {
+            ScenesTab.IsSelected = true;
+        }
     }
 
     internal void ShowRenderTimelineHoverPreview()
@@ -239,6 +266,7 @@ public partial class FrameExplorerWindow : Window
         }
         else
         {
+            if ((ExplorerViewBox.SelectedItem as ComboBoxItem)?.Tag as string == "Compare") ExplorerViewBox.SelectedIndex = 0;
             Player.Play();
             _timelineTimer.Start();
             _isPlaying = true;
@@ -581,6 +609,8 @@ public partial class FrameExplorerWindow : Window
             return;
         }
 
+        if (!_isSyntheticRenderProof) ExplorerViewBox.SelectedIndex = 1;
+
         var before = _receipt.Analysis.Frames.FirstOrDefault(frame => frame.FrameId == change.BeforeFrameId);
         var after = _receipt.Analysis.Frames.FirstOrDefault(frame => frame.FrameId == change.AfterFrameId);
         BeforeText.Text = change.BeforeText;
@@ -765,6 +795,8 @@ public partial class FrameExplorerWindow : Window
         await _verificationGate.WaitAsync();
         try
         {
+            IntegrityStatusText.Text = "Checking original receipt…";
+            IntegrityStatusText.Foreground = (System.Windows.Media.Brush)FindResource("WarnBrush");
             ReceiptVerificationResult result;
             try
             {
@@ -780,6 +812,9 @@ public partial class FrameExplorerWindow : Window
             }
 
             _item.IntegrityStatus = VerificationLabel(result.Status);
+            IntegrityStatusText.Text = $"Last check: {_item.IntegrityStatus}";
+            IntegrityStatusText.Foreground = (System.Windows.Media.Brush)FindResource(result.IsIntact ? "AccentBrush" : "WarnBrush");
+            IntegrityStatusText.ToolTip = $"Checked {DateTime.Now:t}. {string.Join(" ", result.Issues)}";
             try
             {
                 await _workspaceStore.UpdateItemAsync(_item);
@@ -787,6 +822,8 @@ public partial class FrameExplorerWindow : Window
             }
             catch (Exception ex)
             {
+                IntegrityStatusText.Text += " · library update failed";
+                IntegrityStatusText.Foreground = (System.Windows.Media.Brush)FindResource("WarnBrush");
                 return new ReceiptVerificationCheck(result, ex.Message);
             }
         }

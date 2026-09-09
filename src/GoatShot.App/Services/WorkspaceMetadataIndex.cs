@@ -8,6 +8,7 @@ public sealed partial class WorkspaceMetadataIndex
 {
     private readonly AppPaths _paths;
     private readonly object _gate = new();
+    private bool _schemaInitialized;
 
     public WorkspaceMetadataIndex(AppPaths paths)
     {
@@ -20,6 +21,11 @@ public sealed partial class WorkspaceMetadataIndex
     {
         lock (_gate)
         {
+            if (_schemaInitialized && File.Exists(DatabasePath))
+            {
+                return;
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
@@ -61,6 +67,7 @@ public sealed partial class WorkspaceMetadataIndex
                     ocr_text,
                     file_path
                 );
+                CREATE INDEX IF NOT EXISTS captures_file_path ON captures(file_path COLLATE NOCASE);
                 """;
             command.ExecuteNonQuery();
             EnsureColumn(connection, "captures", "hotkey_profile", "TEXT");
@@ -73,6 +80,7 @@ public sealed partial class WorkspaceMetadataIndex
             EnsureColumn(connection, "captures", "source_window_title", "TEXT");
             EnsureColumn(connection, "captures", "source_url", "TEXT");
             EnsureFtsSchema(connection);
+            _schemaInitialized = true;
         }
     }
 
@@ -94,9 +102,11 @@ public sealed partial class WorkspaceMetadataIndex
         }
     }
 
-    public void Upsert(CaptureItem item)
+    public void Upsert(CaptureItem item) => UpsertBatch([item]);
+
+    public void UpsertBatch(IReadOnlyList<CaptureItem> items)
     {
-        if (item.IsPrivate)
+        if (items.Count == 0)
         {
             return;
         }
@@ -106,7 +116,13 @@ public sealed partial class WorkspaceMetadataIndex
             EnsureCreated();
             using var connection = OpenConnection();
             using var transaction = connection.BeginTransaction();
-            UpsertCore(connection, transaction, item);
+            foreach (var item in items)
+            {
+                if (!item.IsPrivate)
+                {
+                    UpsertCore(connection, transaction, item);
+                }
+            }
             transaction.Commit();
         }
     }
@@ -213,6 +229,14 @@ public sealed partial class WorkspaceMetadataIndex
 
     private void UpsertCore(SqliteConnection connection, SqliteTransaction transaction, CaptureItem item)
     {
+        // Reimporting a path replaces its capture ID in JSON. Remove its old search row too.
+        ExecuteNonQuery(connection, transaction,
+            "DELETE FROM captures_fts WHERE id = $id OR id IN (SELECT id FROM captures WHERE file_path = $file_path COLLATE NOCASE);",
+            ("$id", item.Id), ("$file_path", item.FilePath));
+        ExecuteNonQuery(connection, transaction,
+            "DELETE FROM captures WHERE file_path = $file_path COLLATE NOCASE AND id <> $id;",
+            ("$id", item.Id), ("$file_path", item.FilePath));
+
         using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -255,8 +279,6 @@ public sealed partial class WorkspaceMetadataIndex
             AddCaptureParameters(command, item);
             command.ExecuteNonQuery();
         }
-
-        ExecuteNonQuery(connection, transaction, "DELETE FROM captures_fts WHERE id = $id;", ("$id", item.Id));
 
         using var ftsCommand = connection.CreateCommand();
         ftsCommand.Transaction = transaction;

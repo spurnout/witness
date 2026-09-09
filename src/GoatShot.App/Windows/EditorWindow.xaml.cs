@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
+using GoatShot.App.Controls;
 using Microsoft.Win32;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfButton = System.Windows.Controls.Button;
@@ -20,6 +21,7 @@ using WpfPoint = System.Windows.Point;
 using WpfPolyline = System.Windows.Shapes.Polyline;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
 using WpfSize = System.Windows.Size;
+using Cursors = System.Windows.Input.Cursors;
 
 namespace GoatShot.App.Windows;
 
@@ -36,6 +38,7 @@ public partial class EditorWindow : Window
     private Rect? _cropRect;
     private int _step = 1;
     private readonly List<UIElement> _sensitiveReviewOverlays = new();
+    private readonly ImageViewportController _imageViewport;
 
     public EditorWindow(CaptureItem item, AppServices services)
     {
@@ -44,6 +47,8 @@ public partial class EditorWindow : Window
         InitializeComponent();
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         LoadImage();
+        _imageViewport = new ImageViewportController(EditorViewport, EditorZoomContainer);
+        _imageViewport.ViewChanged += (_, _) => ImageZoomText.Text = $"{_imageViewport.Scale:P0}";
         InitializeToolShortcutHints();
         SetActiveToolFeedback();
     }
@@ -82,6 +87,17 @@ public partial class EditorWindow : Window
     }
 
     public event EventHandler<CaptureItem>? CaptureSaved;
+
+    private void FitImage_Click(object sender, RoutedEventArgs e) => _imageViewport.Fit();
+    private void ActualSize_Click(object sender, RoutedEventArgs e) => _imageViewport.Zoom(1);
+    private void ZoomIn_Click(object sender, RoutedEventArgs e) => _imageViewport.Zoom(_imageViewport.Scale * 1.25);
+    private void ZoomOut_Click(object sender, RoutedEventArgs e) => _imageViewport.Zoom(_imageViewport.Scale / 1.25);
+    private void PanImage_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_imageViewport is null) return;
+        _imageViewport.PanEnabled = PanImageBox.IsChecked == true;
+        EditorViewport.Cursor = _imageViewport.PanEnabled ? Cursors.Hand : null;
+    }
 
     public void SelectTool(AnnotationMode mode)
     {

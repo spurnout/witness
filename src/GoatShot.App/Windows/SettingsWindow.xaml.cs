@@ -190,6 +190,7 @@ public partial class SettingsWindow : Window
         if (ProviderJumpBox.SelectedItem is ComboBoxItem { Tag: string anchorName } &&
             FindName(anchorName) is FrameworkElement anchor)
         {
+            ExpandSettingsAncestors(anchor);
             anchor.BringIntoView();
             anchor.Focus();
         }
@@ -476,8 +477,14 @@ public partial class SettingsWindow : Window
 
     private void RefreshProviderSetupSummary()
     {
+        var diagnostics = _services.ProviderDiagnostics.GetDiagnostics();
         var summary = new ProviderSetupSummaryService()
-            .Create(_services.ProviderDiagnostics.GetDiagnostics());
+            .Create(diagnostics);
+        var ready = diagnostics.Where(item => item.ReadyForLocalAttempt)
+            .Select(item => item.ProviderName).Distinct().ToArray();
+        ReadyDestinationsText.Text = ready.Length == 0
+            ? "No configured destinations. Choose a destination above to get started."
+            : $"Available to try: {string.Join(", ", ready)}. External services are checked when you share.";
         ProviderSetupHeadlineText.Text = summary.Headline;
         ProviderSetupDetailText.Text = summary.Detail;
         ProviderSetupSummaryGrid.Children.Clear();
@@ -1928,6 +1935,7 @@ public partial class SettingsWindow : Window
             bounds.Y,
             bounds.Width,
             bounds.Height);
+        UpdateReplaySourceHelp();
         ReplaySourceHelpText.Text =
             $"Selected {bounds.Width} × {bounds.Height} at ({bounds.X}, {bounds.Y}). " +
             "Saving settings restarts an armed buffer so the new region takes effect.";
@@ -1966,7 +1974,8 @@ public partial class SettingsWindow : Window
         ReplaySourcePickerBox.IsEnabled = targets.Length > 0;
         ReplayPickRegionButton.IsEnabled = false;
         ReplaySourcePickerBox.SelectedItem = targets.FirstOrDefault(target =>
-            target.Id.Equals(selectedSourceId, StringComparison.OrdinalIgnoreCase));
+            target.Id.Equals(selectedSourceId, StringComparison.OrdinalIgnoreCase) ||
+            target.Id.Equals($"monitor:{selectedSourceId}", StringComparison.OrdinalIgnoreCase));
     }
 
     private void UpdateReplaySourceHelp()
@@ -1989,6 +1998,7 @@ public partial class SettingsWindow : Window
             "FixedRegion" => "Use Pick region to draw fixed screen bounds. The same coordinates are retained until you edit them.",
             _ => string.Empty
         };
+        UpdateReplaySourcePreview(source);
     }
 
     private static ReplayCaptureBounds? ParseReplayBounds(string value)

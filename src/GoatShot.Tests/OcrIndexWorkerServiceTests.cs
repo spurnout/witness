@@ -11,6 +11,98 @@ namespace GoatShot.Tests;
 public sealed class OcrIndexWorkerServiceTests
 {
     [TestMethod]
+    public void Restart_RetriesItemsAfterRecognitionIsRepaired()
+    {
+        WithTempStore((store, paths) =>
+        {
+            _ = store.AddImageFileAsync(WritePng(paths, "retry-ocr.png"), CaptureKind.Imported).Result;
+            var repaired = false;
+            using var worker = CreateWorker(store, recognize: (_, _) => Task.FromResult(repaired
+                ? SuccessResult("repaired recognition")
+                : new OcrRecognitionResult { Succeeded = false, Message = "Language pack unavailable." }));
+            Assert.AreEqual(1, worker.ProcessOnceAsync().GetAwaiter().GetResult().Failed);
+            repaired = true;
+
+            worker.Restart();
+
+            Assert.AreEqual(1, worker.ProcessOnceAsync().GetAwaiter().GetResult().Indexed);
+            Assert.AreEqual("repaired recognition", store.Load().Single().OcrText);
+        });
+    }
+
+    [TestMethod]
+    public void ProcessOnceAsync_PreservesMetadataChangedDuringRecognition()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var index = new WorkspaceMetadataIndex(paths);
+            store.AttachMetadataIndex(index);
+            var capture = store.AddImageFileAsync(WritePng(paths, "edited.png"), CaptureKind.Imported).Result;
+            using var worker = CreateWorker(store, recognize: (_, _) =>
+            {
+                var current = store.Load().Single();
+                current.Notes = "Operator annotation";
+                current.SourceAvailable = false;
+                current.ArtifactRole = "reviewed-derivative";
+                store.UpdateItemAsync(current).GetAwaiter().GetResult();
+                return Task.FromResult(SuccessResult("newly recognized"));
+            });
+
+            var result = worker.ProcessOnceAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual(1, result.Indexed);
+            var saved = store.Load().Single();
+            StringAssert.StartsWith(saved.Notes!, "Operator annotation");
+            Assert.IsFalse(saved.SourceAvailable);
+            Assert.AreEqual("reviewed-derivative", saved.ArtifactRole);
+            Assert.AreEqual("newly recognized", saved.OcrText);
+            CollectionAssert.AreEqual(new[] { capture.Id }, index.SearchIds("annotation").ToArray());
+        });
+    }
+
+    [TestMethod]
+    public void ProcessOnceAsync_DoesNotReplaceNewerManualOcr()
+    {
+        WithTempStore((store, paths) =>
+        {
+            _ = store.AddImageFileAsync(WritePng(paths, "manual.png"), CaptureKind.Imported).Result;
+            using var worker = CreateWorker(store, recognize: (_, _) =>
+            {
+                var current = store.Load().Single();
+                current.OcrRecognizedAt = DateTimeOffset.Now;
+                current.OcrText = "Manual recognition";
+                store.UpdateItemAsync(current).GetAwaiter().GetResult();
+                return Task.FromResult(SuccessResult("stale background recognition"));
+            });
+
+            var result = worker.ProcessOnceAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual(0, result.Indexed);
+            Assert.AreEqual("Manual recognition", store.Load().Single().OcrText);
+        });
+    }
+
+    [TestMethod]
+    public void ProcessOnceAsync_RecognizerExceptionDoesNotStarveTheRestOfTheBatch()
+    {
+        WithTempStore((store, paths) =>
+        {
+            _ = store.AddImageFileAsync(WritePng(paths, "healthy.png"), CaptureKind.Imported).Result;
+            _ = store.AddImageFileAsync(WritePng(paths, "broken.png"), CaptureKind.Imported).Result;
+            using var worker = CreateWorker(store, recognize: (path, _) =>
+                path.EndsWith("broken.png", StringComparison.Ordinal)
+                    ? throw new IOException("Cannot decode this image.")
+                    : Task.FromResult(SuccessResult("healthy text")));
+
+            var result = worker.ProcessOnceAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual(1, result.Indexed);
+            Assert.AreEqual(1, result.Failed);
+            Assert.AreEqual(0, worker.ProcessOnceAsync().GetAwaiter().GetResult().Scanned);
+        });
+    }
+
+    [TestMethod]
     public void IsIndexable_SkipsPrivateVideoAndAlreadyIndexedItems()
     {
         Assert.IsFalse(OcrIndexPolicy.IsIndexable(new CaptureItem { FilePath = "a.png", IsPrivate = true }));

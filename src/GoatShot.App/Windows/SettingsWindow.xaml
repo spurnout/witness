@@ -175,37 +175,6 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
-                <TextBlock Text="Library root" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="LibraryRootBox" Margin="0,6,0,6" />
-                <Border x:Name="LegacyLibraryNotice"
-                        Background="#101B23"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="12,10"
-                        Margin="0,0,0,14"
-                        Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock x:Name="LegacyLibraryNoticeText"
-                                   Foreground="{StaticResource MutedInkBrush}"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   AutomationProperties.Name="Legacy library folder notice" />
-                        <Button x:Name="MoveLegacyLibraryButton"
-                                Content="Move library"
-                                Click="MoveLegacyLibrary_Click"
-                                Style="{StaticResource SecondaryButton}"
-                                HorizontalAlignment="Left"
-                                Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
-                <TextBlock Text="Filename template" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="FileNameTemplateBox" Margin="0,6,0,6" />
-                <TextBlock Text="{}{date}, {time}, {datetime}, {capture_type}, {app}, {process}, {window_title}, {monitor}, {width}, {height}, {counter}, {project}"
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,14" />
                 <TextBlock Text="After capture" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="PostCaptureActionBox"
                           Margin="0,6,0,6"
@@ -217,77 +186,13 @@
                            FontSize="12"
                            TextWrapping="Wrap"
                            Margin="0,0,0,10" />
-                <TextBlock Text="Capture actions auto-dismiss seconds" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="CaptureActionsAutoDismissBox"
-                         Margin="0,6,0,6"
-                         AutomationProperties.Name="Capture actions auto-dismiss seconds" />
-                <TextBlock Text="The capture actions window fades out after this many seconds. Interacting with it cancels the countdown. Use 0 to leave it open until you close it."
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,10" />
                 <CheckBox x:Name="CopyAfterCaptureBox" Content="Copy image to clipboard after capture" />
                 <CheckBox x:Name="IncludeCursorBox" Content="Include cursor in captures" />
                 <CheckBox x:Name="HoverAutoSelectBox"
                           Content="Highlight the window under the cursor while selecting"
                           AutomationProperties.Name="Highlight the window under the cursor while selecting" />
-                <TextBlock Text="Region capture context padding" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
-                <TextBox x:Name="CaptureContextPaddingBox"
-                         Margin="0,6,0,6"
-                         AutomationProperties.Name="Region capture context padding" />
-                <TextBlock Text="Adds pixels around region selections after snapping. Use 0-200."
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,10" />
                 <CheckBox x:Name="PrivateModeBox" Content="Private capture mode: save temporary files but do not index workspace history" />
                 <CheckBox x:Name="RunAtStartupBox" Content="Run Receipts when I sign in to Windows" />
-                <Border Background="#101B23"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="12"
-                        Margin="0,10,0,8">
-                    <StackPanel>
-                        <TextBlock Text="Personal installation" FontWeight="SemiBold" />
-                        <Grid x:Name="PersonalInstallStatusGrid"
-                              Margin="0,8,0,10"
-                              AutomationProperties.Name="Personal installation and runtime status"
-                              AutomationProperties.LiveSetting="Polite">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" MinWidth="132" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                        </Grid>
-                        <WrapPanel>
-                            <Button Content="Install or repair"
-                                    Click="InstallOrRepair_Click"
-                                    AutomationProperties.Name="Install or repair Receipts for this user" />
-                            <Button Content="Disable startup"
-                                    Click="DisableStartup_Click"
-                                    Style="{StaticResource SecondaryButton}"
-                                    AutomationProperties.Name="Disable Receipts startup" />
-                            <Button Content="Uninstall"
-                                    Click="Uninstall_Click"
-                                    Style="{StaticResource DangerButton}"
-                                    AutomationProperties.Name="Uninstall Receipts but preserve captures and settings" />
-                        </WrapPanel>
-                    </StackPanel>
-                </Border>
-                <TextBlock Text="Effective managed policy" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
-                <TextBlock x:Name="ManagedPolicyStatusText"
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,4,0,10"
-                           AutomationProperties.Name="Effective managed policy status" />
-                <TextBlock Text="OCR language tag" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
-                <TextBox x:Name="OcrLanguageBox" Margin="0,6,0,6" />
-                <TextBlock Text="Leave blank to use Windows profile languages, or enter a tag such as en-US."
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,14" />
                 <CheckBox x:Name="OcrIndexingBox"
                           Content="Index new captures with local OCR in the background"
                           AutomationProperties.Name="Index new captures with local OCR in the background" />
@@ -297,6 +202,113 @@
                            TextWrapping="Wrap"
                            Margin="0,2,0,14" />
 
+                <Expander Header="Storage and filenames" IsExpanded="False" Margin="0,10,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Library root" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="LibraryRootBox" Margin="0,6,0,6" />
+                        <Border x:Name="LegacyLibraryNotice"
+                                Background="#101B23"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12,10"
+                                Margin="0,0,0,14"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock x:Name="LegacyLibraryNoticeText"
+                                           Foreground="{StaticResource MutedInkBrush}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           AutomationProperties.Name="Legacy library folder notice" />
+                                <Button x:Name="MoveLegacyLibraryButton"
+                                        Content="Move library"
+                                        Click="MoveLegacyLibrary_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="Filename template" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="FileNameTemplateBox" Margin="0,6,0,6" />
+                        <TextBlock Text="{}{date}, {time}, {datetime}, {capture_type}, {app}, {process}, {window_title}, {monitor}, {width}, {height}, {counter}, {project}"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+                    </StackPanel>
+                </Expander>
+                <Expander Header="Advanced capture options" IsExpanded="False" Margin="0,10,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Capture actions auto-dismiss seconds" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="CaptureActionsAutoDismissBox"
+                                 Margin="0,6,0,6"
+                                 AutomationProperties.Name="Capture actions auto-dismiss seconds" />
+                        <TextBlock Text="The capture actions window fades out after this many seconds. Interacting with it cancels the countdown. Use 0 to leave it open until you close it."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="Region capture context padding" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                        <TextBox x:Name="CaptureContextPaddingBox"
+                                 Margin="0,6,0,6"
+                                 AutomationProperties.Name="Region capture context padding" />
+                        <TextBlock Text="Adds pixels around region selections after snapping. Use 0-200."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="OCR language tag" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                        <TextBox x:Name="OcrLanguageBox" Margin="0,6,0,6" />
+                        <TextBlock Text="Leave blank to use Windows profile languages, or enter a tag such as en-US."
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+                    </StackPanel>
+                </Expander>
+                <Expander Header="Installation and managed policy" IsExpanded="False" Margin="0,10,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <Border Background="#101B23"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12"
+                                Margin="0,10,0,8">
+                            <StackPanel>
+                                <TextBlock Text="Personal installation" FontWeight="SemiBold" />
+                                <Grid x:Name="PersonalInstallStatusGrid"
+                                      Margin="0,8,0,10"
+                                      AutomationProperties.Name="Personal installation and runtime status"
+                                      AutomationProperties.LiveSetting="Polite">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" MinWidth="132" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                </Grid>
+                                <WrapPanel>
+                                    <Button Content="Install or repair"
+                                            Click="InstallOrRepair_Click"
+                                            AutomationProperties.Name="Install or repair Receipts for this user" />
+                                    <Button Content="Disable startup"
+                                            Click="DisableStartup_Click"
+                                            Style="{StaticResource SecondaryButton}"
+                                            AutomationProperties.Name="Disable Receipts startup" />
+                                    <Button Content="Uninstall"
+                                            Click="Uninstall_Click"
+                                            Style="{StaticResource DangerButton}"
+                                            AutomationProperties.Name="Uninstall Receipts but preserve captures and settings" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="Effective managed policy" Foreground="{StaticResource MutedInkBrush}" Margin="0,10,0,0" />
+                        <TextBlock x:Name="ManagedPolicyStatusText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,10"
+                                   AutomationProperties.Name="Effective managed policy status" />
+                    </StackPanel>
+                </Expander>
                 <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}" />
 
                 <TextBlock x:Name="KeybindsSettingsSection"
@@ -599,16 +611,6 @@
                                    FontSize="12"
                                    TextWrapping="Wrap"
                                    Margin="0,5,0,10" />
-                        <CheckBox x:Name="ReplayConsentBox"
-                                  Content="I understand Replay continuously captures the configured source while armed"
-                                  AutomationProperties.Name="Consent to arm Replay" />
-                        <!-- Auto-arm is ignored unless consent is granted, so it follows consent. -->
-                        <Border Style="{StaticResource DependentGroup}"
-                                Margin="18,6,0,10"
-                                IsEnabled="{Binding ElementName=ReplayConsentBox, Path=IsChecked}">
-                            <CheckBox x:Name="ReplayAutoArmBox"
-                                      Content="Automatically arm Replay at Windows sign-in for this profile" />
-                        </Border>
                         <TextBlock Text="Capture strategy" Foreground="{StaticResource MutedInkBrush}" />
                         <ComboBox x:Name="ReplaySourceKindBox"
                                   Margin="0,6,0,8"
@@ -623,31 +625,51 @@
                             <ComboBoxItem Content="Selected region" Tag="SelectedRegion" />
                             <ComboBoxItem Content="Fixed region" Tag="FixedRegion" />
                         </ComboBox>
-                        <TextBlock Text="Chosen source ID or monitor device name" Foreground="{StaticResource MutedInkBrush}" />
-                        <TextBox x:Name="ReplaySourceIdBox" Margin="0,6,0,8" />
-                        <TextBlock Text="Available chosen sources" Foreground="{StaticResource MutedInkBrush}" />
-                        <ComboBox x:Name="ReplaySourcePickerBox"
-                                  Margin="0,6,0,8"
-                                  Style="{StaticResource GoatComboBox}"
-                                  DisplayMemberPath="DisplayName"
-                                  AutomationProperties.Name="Choose an available Replay monitor or window"
-                                  SelectionChanged="ReplaySourcePicker_Changed" />
-                        <TextBlock Text="Region bounds (X,Y,WIDTH,HEIGHT)" Foreground="{StaticResource MutedInkBrush}" />
-                        <Grid Margin="0,6,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="ReplayBoundsBox"
-                                     AutomationProperties.Name="Replay capture region bounds" />
-                            <Button x:Name="ReplayPickRegionButton"
-                                    Grid.Column="1"
-                                    Content="Pick region…"
-                                    Margin="8,0,0,0"
-                                    Style="{StaticResource SecondaryButton}"
-                                    Click="ReplayPickRegion_Click"
+                        <StackPanel x:Name="ReplayChosenSourcePanel" Visibility="Collapsed">
+                            <TextBlock Text="Choose a source" Foreground="{StaticResource MutedInkBrush}" />
+                            <ComboBox x:Name="ReplaySourcePickerBox" Margin="0,6,0,8"
+                                      Style="{StaticResource GoatComboBox}" DisplayMemberPath="DisplayName"
+                                      AutomationProperties.Name="Choose an available Replay monitor or window"
+                                      SelectionChanged="ReplaySourcePicker_Changed" />
+                            <Button Content="Refresh available sources" HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}" Click="RefreshReplaySources_Click" />
+                            <Expander Header="Advanced source identifier" Margin="0,8,0,8">
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock Text="Source ID or monitor device name" Foreground="{StaticResource MutedInkBrush}" />
+                                    <TextBox x:Name="ReplaySourceIdBox" Margin="0,6,0,8" TextChanged="ReplaySourceId_Changed" AutomationProperties.Name="Replay source identifier" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                        <StackPanel x:Name="ReplayRegionPanel" Visibility="Collapsed">
+                            <Button x:Name="ReplayPickRegionButton" Content="Choose region on screen…"
+                                    HorizontalAlignment="Left" Click="ReplayPickRegion_Click"
                                     AutomationProperties.Name="Choose Replay region on screen" />
-                        </Grid>
+                            <Expander Header="Edit region coordinates" Margin="0,8,0,8">
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock Text="X, Y, width, height (screen pixels)" Foreground="{StaticResource MutedInkBrush}" />
+                                    <TextBox x:Name="ReplayBoundsBox" Margin="0,6,0,8" TextChanged="ReplayBounds_Changed" AutomationProperties.Name="Replay capture region bounds" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,4,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Source preview · display layout" FontWeight="SemiBold" />
+                                <Viewbox Height="90" Stretch="Uniform" HorizontalAlignment="Left" Margin="0,8,0,8">
+                                    <Canvas x:Name="ReplaySourcePreviewCanvas" Width="300" Height="90" ClipToBounds="True" IsHitTestVisible="False" />
+                                </Viewbox>
+                                <TextBlock x:Name="ReplaySourcePreviewText" TextWrapping="Wrap" FontSize="12" AutomationProperties.Name="Replay source preview" AutomationProperties.LiveSetting="Polite" />
+                                <TextBlock Text="Layout preview only; screen content is not captured here." Foreground="{StaticResource MutedInkBrush}" FontSize="12" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <CheckBox x:Name="ReplayConsentBox"
+                                  Content="I understand Replay continuously captures the configured source while armed"
+                                  AutomationProperties.Name="Consent to arm Replay" />
+                        <!-- Auto-arm is ignored unless consent is granted, so it follows consent. -->
+                        <Border Style="{StaticResource DependentGroup}"
+                                Margin="18,6,0,10"
+                                IsEnabled="{Binding ElementName=ReplayConsentBox, Path=IsChecked}">
+                            <CheckBox x:Name="ReplayAutoArmBox"
+                                      Content="Automatically arm Replay at Windows sign-in for this profile" />
+                        </Border>
                         <UniformGrid Columns="2">
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Text="Buffer duration (seconds)" Foreground="{StaticResource MutedInkBrush}" />
@@ -707,28 +729,6 @@
                            FontSize="18"
                            FontWeight="Bold"
                            Margin="0,0,0,12" />
-                <TextBlock Text="Provider readiness"
-                           Foreground="{StaticResource MutedInkBrush}" />
-                <TextBlock x:Name="ProviderSetupHeadlineText"
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           TextWrapping="Wrap"
-                           Margin="0,4,0,8"
-                           AutomationProperties.Name="Provider readiness summary" />
-                <UniformGrid x:Name="ProviderSetupSummaryGrid"
-                             Columns="2"
-                             Margin="0,0,0,8" />
-                <TextBlock x:Name="ProviderSetupDetailText"
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,6"
-                           AutomationProperties.Name="Provider readiness detail" />
-                <TextBlock Text="For a full per-destination breakdown, run: receipts providers --not-ready --json"
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,14" />
                 <TextBlock Text="Default share destination" Foreground="{StaticResource MutedInkBrush}" />
                 <ComboBox x:Name="DefaultShareBox"
                           Margin="0,6,0,14"
@@ -763,14 +763,43 @@
                 </ComboBox>
                 <CheckBox x:Name="ConfirmUploadBox" Content="Ask before upload or external share" />
                 <CheckBox x:Name="QueueBackgroundProcessingBox" Content="Process queued uploads in the background while Receipts is running" />
-                <TextBlock Text="Queue poll interval seconds" Foreground="{StaticResource MutedInkBrush}" />
-                <TextBox x:Name="QueuePollSecondsBox" Margin="0,6,0,6" />
-                <TextBlock Text="Background processing only runs for items explicitly queued by the operator."
-                           Foreground="{StaticResource MutedInkBrush}"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,14" />
-                <Expander Header="Advanced provider configuration" IsExpanded="False" Margin="0,0,0,10">
+                <TextBlock Text="Queued items can be sent without another prompt. Automation rules and watched imports can also share automatically when enabled."
+                           Foreground="{StaticResource MutedInkBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,12" />
+                <Button Content="Configure a destination" Click="ConfigureProviders_Click" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" />
+                <TextBlock x:Name="ReadyDestinationsText" TextWrapping="Wrap" Margin="0,8,0,10" AutomationProperties.Name="Configured sharing destinations" />
+                <Expander Header="All destinations and diagnostics" IsExpanded="False" Margin="0,10,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Provider readiness"
+                                   Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBlock x:Name="ProviderSetupHeadlineText"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,8"
+                                   AutomationProperties.Name="Provider readiness summary" />
+                        <UniformGrid x:Name="ProviderSetupSummaryGrid"
+                                     Columns="2"
+                                     Margin="0,0,0,8" />
+                        <TextBlock x:Name="ProviderSetupDetailText"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,6"
+                                   AutomationProperties.Name="Provider readiness detail" />
+                        <TextBlock Text="For a full per-destination breakdown, run: receipts providers --not-ready --json"
+                                   Foreground="{StaticResource MutedInkBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+                    </StackPanel>
+                </Expander>
+                <Expander Header="Advanced queue settings" IsExpanded="False" Margin="0,10,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Queue poll interval seconds" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBox x:Name="QueuePollSecondsBox" Margin="0,6,0,6" />
+                    </StackPanel>
+                </Expander>
+                <Expander x:Name="ProviderConfigurationExpander" Header="Advanced provider configuration" IsExpanded="False" Margin="0,0,0,10">
                     <StackPanel Margin="0,10,0,0">
                 <TextBlock Text="Jump to provider"
                            Foreground="{StaticResource MutedInkBrush}"

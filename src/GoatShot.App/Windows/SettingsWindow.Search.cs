@@ -130,7 +130,7 @@ public partial class SettingsWindow
         BuildSettingsSearchIndex();
         var query = SettingsSearchBox.Text;
         var matches = SettingsSearchIndex.Match(
-            _searchIndex.Select(item => item.Entry),
+            _searchIndex.Where(item => IsSearchTargetAvailable(item.Target)).Select(item => item.Entry),
             query,
             MaxSearchResults);
 
@@ -204,6 +204,7 @@ public partial class SettingsWindow
         Dispatcher.BeginInvoke(
             () =>
             {
+                ExpandSettingsAncestors(target);
                 target.BringIntoView();
                 target.UpdateLayout();
                 var top = target.TransformToAncestor(SettingsScroll).Transform(new Point(0, 0)).Y +
@@ -222,5 +223,16 @@ public partial class SettingsWindow
         SettingsSearchPopup.IsOpen = false;
         SettingsSearchHintText.Text = "Search settings";
         SettingsSearchBox.Focus();
+    }
+
+    private static bool IsSearchTargetAvailable(FrameworkElement target)
+    {
+        // A collapsed Expander can be opened by search. Controls explicitly hidden for
+        // another source mode cannot, and choosing a search result must not change that mode.
+        for (DependencyObject? parent = target; parent is not null; parent = LogicalTreeHelper.GetParent(parent))
+        {
+            if (parent is FrameworkElement { Visibility: not Visibility.Visible }) return false;
+        }
+        return true;
     }
 }

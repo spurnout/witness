@@ -72,25 +72,17 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1,1,1,0"
                 Padding="14,9">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="5*" />
-                    <ColumnDefinition Width="7*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="StatusText"
-                           Text="Loading signed replay…"
-                           Margin="0,0,18,0"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"
-                           AutomationProperties.LiveSetting="Polite"
-                           AutomationProperties.Name="Frame Explorer status" />
-                <TextBlock Grid.Column="1"
-                           TextAlignment="Right"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource MutedInkBrush}"
-                           Text="Integrity since local signing is verifiable for the manifest, original segments, and listed artifacts; local analysis previews and derivatives are unsigned and rebuildable. Device time, remote service state, operator identity, and legal authenticity are not independently attested." />
-            </Grid>
+            <StackPanel>
+                <TextBlock x:Name="StatusText" Text="Loading signed replay…" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="Frame Explorer status" />
+                <Expander Header="Receipt details and verification limits" Margin="0,6,0,0">
+                    <StackPanel Margin="0,6,0,0">
+                        <TextBlock x:Name="ReceiptSummaryText" Foreground="{StaticResource MutedInkBrush}" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedInkBrush}"
+                                   Text="Integrity since local signing is verifiable for the manifest, original segments, and listed artifacts; local analysis previews and derivatives are unsigned and rebuildable. Device time, remote service state, operator identity, and legal authenticity are not independently attested." />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
         </Border>
 
         <Grid Margin="16">
@@ -100,33 +92,32 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="0,0,0,12">
-                <StackPanel DockPanel.Dock="Left">
-                    <TextBlock Text="Frame Explorer" FontSize="24" FontWeight="SemiBold" />
-                    <TextBlock x:Name="ReceiptSummaryText"
-                               Margin="0,4,0,0"
-                               Foreground="{StaticResource MutedInkBrush}" />
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                <WrapPanel>
+                    <TextBlock Text="Frame Explorer" FontSize="24" FontWeight="SemiBold" Margin="0,0,18,4" />
+                    <TextBlock x:Name="IntegrityStatusText" Text="Integrity not checked yet" VerticalAlignment="Center"
+                               Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap" Margin="0,0,12,4"
+                               AutomationProperties.Name="Original receipt integrity" AutomationProperties.LiveSetting="Polite" />
+                    <Button Content="Verify" Style="{StaticResource SecondaryButton}" Click="Verify_Click" AutomationProperties.Name="Verify original receipt" />
+                </WrapPanel>
+                <WrapPanel>
+                    <TextBlock Text="View" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox x:Name="ExplorerViewBox" Width="150" Margin="0,0,18,0" SelectedIndex="0"
+                              SelectionChanged="ExplorerView_Changed" AutomationProperties.Name="Frame Explorer view">
+                        <ComboBoxItem Content="Playback" Tag="Playback" />
+                        <ComboBoxItem Content="Compare changes" Tag="Compare" />
+                        <ComboBoxItem Content="Export" Tag="Export" />
+                    </ComboBox>
                     <TextBlock Text="Track" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <ComboBox x:Name="TrackBox"
-                              Width="240"
-                              SelectedValuePath="TrackId"
-                              SelectionChanged="TrackBox_SelectionChanged"
-                              AutomationProperties.Name="Replay source or track">
+                    <ComboBox x:Name="TrackBox" Width="260" SelectedValuePath="TrackId"
+                              SelectionChanged="TrackBox_SelectionChanged" AutomationProperties.Name="Replay source or track">
                         <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}" />
-                            </DataTemplate>
+                            <DataTemplate><TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" /></DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <Button Content="Verify"
-                            Margin="10,0,0,0"
-                            Style="{StaticResource SecondaryButton}"
-                            Click="Verify_Click"
-                            AutomationProperties.Name="Verify original receipt" />
-                </StackPanel>
-            </DockPanel>
+                    <TextBlock Text="Originals signed · analysis and exports unsigned" FontSize="12" Foreground="{StaticResource MutedInkBrush}" VerticalAlignment="Center" Margin="14,4,0,4" />
+                </WrapPanel>
+            </StackPanel>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -136,12 +127,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="3*" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="2*" />
-                    </Grid.RowDefinitions>
-                    <Border Background="Black"
+                    <Border x:Name="PlaybackPanel" Background="Black"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -162,7 +148,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2"
+                    <Border x:Name="ComparisonPanel" Visibility="Collapsed"
                             Background="{StaticResource PanelBrush}"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
@@ -174,28 +160,30 @@
                                 <ColumnDefinition Width="10" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
+                            <Grid Grid.Column="0">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                 <TextBlock Text="Before" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                <Image x:Name="BeforeImage" Stretch="Uniform" />
-                                <TextBox x:Name="BeforeText"
+                                <Image Grid.Row="1" x:Name="BeforeImage" Stretch="Uniform" />
+                                <TextBox Grid.Row="2" x:Name="BeforeText"
                                          Margin="0,8,0,0"
                                          Height="70"
                                          IsReadOnly="True"
                                          TextWrapping="Wrap"
                                          VerticalScrollBarVisibility="Auto"
                                          AutomationProperties.Name="OCR text before the possible change" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2">
+                            </Grid>
+                            <Grid Grid.Column="2">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                 <TextBlock Text="After" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                <Image x:Name="AfterImage" Stretch="Uniform" />
-                                <TextBox x:Name="AfterText"
+                                <Image Grid.Row="1" x:Name="AfterImage" Stretch="Uniform" />
+                                <TextBox Grid.Row="2" x:Name="AfterText"
                                          Margin="0,8,0,0"
                                          Height="70"
                                          IsReadOnly="True"
                                          TextWrapping="Wrap"
                                          VerticalScrollBarVisibility="Auto"
                                          AutomationProperties.Name="OCR text after the possible change" />
-                            </StackPanel>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>
@@ -207,6 +195,7 @@
                              Header="Scenes"
                              AutomationProperties.Name="Scenes">
                         <ListBox x:Name="SceneList"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
                                  SelectionChanged="SceneList_SelectionChanged"
                                  Background="Transparent"
                                  BorderThickness="0"
@@ -242,6 +231,7 @@
                                         Click="DismissChange_Click" />
                             </StackPanel>
                             <ListBox x:Name="ChangeList"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
                                      SelectionChanged="ChangeList_SelectionChanged"
                                      Background="Transparent"
                                      BorderThickness="0"
@@ -323,8 +313,11 @@
                     </Canvas>
                     <TextBlock x:Name="TimeText" Grid.Column="2" VerticalAlignment="Center" Text="00:00 / 00:00" />
                 </Grid>
-                <WrapPanel Grid.Row="1" Margin="0,10,0,0">
-                    <Button Content="Save current frame" Style="{StaticResource PrimaryButton}" Click="SaveFrame_Click" />
+                <StackPanel Grid.Row="1" Margin="0,8,0,0">
+                    <WrapPanel>
+                        <Button Content="Save current frame" Style="{StaticResource PrimaryButton}" Click="SaveFrame_Click" />
+                        <Expander Header="Local analysis options" Margin="12,4,0,4" AutomationProperties.Name="Local analysis options">
+                            <WrapPanel Margin="0,8,0,0">
                     <CheckBox x:Name="AnalyzeScenesBox"
                               Content="Scene index"
                               Margin="12,0,0,0"
@@ -336,6 +329,10 @@
                               VerticalAlignment="Center"
                               AutomationProperties.Name="Enable local OCR comparison for this analysis" />
                     <Button Content="Analyze locally" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="Analyze_Click" />
+                            </WrapPanel>
+                        </Expander>
+                    </WrapPanel>
+                    <WrapPanel x:Name="ExportActionsPanel" Visibility="Collapsed" Margin="0,4,0,0">
                     <Button Content="Mark range start" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="MarkRangeStart_Click" />
                     <Button Content="Mark range end" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="MarkRangeEnd_Click" />
                     <Button Content="Clear range" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="ClearRange_Click" />
@@ -348,8 +345,9 @@
                     <Button Content="Extract unique frames" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="ExtractUnique_Click" />
                     <Button Content="Contact sheet" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="ContactSheet_Click" />
                     <Button Content="Create step guide" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="StepGuide_Click" />
-                </WrapPanel>
-                <Expander x:Name="TrackExportOptionsExpander"
+                    </WrapPanel>
+                </StackPanel>
+                <Expander x:Name="TrackExportOptionsExpander" Visibility="Collapsed"
                           Grid.Row="2"
                           Margin="0,8,0,0"
                           Header="Track export options"

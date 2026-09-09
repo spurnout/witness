@@ -87,6 +87,7 @@ public sealed class OcrIndexWorkerService : IDisposable
     private readonly DateTimeOffset _startedAt = DateTimeOffset.Now;
     private System.Threading.Timer? _timer;
     private int _consecutiveFailedPasses;
+    private int _retryFailedItems;
     private bool _disposed;
 
     public OcrIndexWorkerService(
@@ -133,7 +134,7 @@ public sealed class OcrIndexWorkerService : IDisposable
     public void Restart()
     {
         Stop(_settings.EnableOcrIndexing ? "Restarting OCR indexing." : "OCR indexing is disabled.");
-        _consecutiveFailedPasses = 0;
+        Interlocked.Exchange(ref _retryFailedItems, 1);
         Start();
     }
 
@@ -183,6 +184,13 @@ public sealed class OcrIndexWorkerService : IDisposable
 
             entered = true;
             cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Exchange(ref _retryFailedItems, 0) != 0)
+            {
+                // Settings may have repaired recognition. Clear failures under the pass gate so
+                // restarting cannot race a running pass's HashSet access.
+                _failedIds.Clear();
+                _consecutiveFailedPasses = 0;
+            }
 
             var batch = OcrIndexPolicy.SelectNextBatch(_workspaceStore.Load(), BatchSize, _failedIds);
             if (batch.Count == 0)
@@ -202,7 +210,22 @@ public sealed class OcrIndexWorkerService : IDisposable
                     continue;
                 }
 
-                var result = await _recognizeAsync(item.FilePath, cancellationToken);
+                OcrRecognitionResult result;
+                try
+                {
+                    result = await _recognizeAsync(item.FilePath, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    StartupTrace.Write($"Background OCR failed for capture {item.Id}: {ex.Message}");
+                    _failedIds.Add(item.Id);
+                    failed++;
+                    continue;
+                }
                 if (!result.Succeeded)
                 {
                     _failedIds.Add(item.Id);
@@ -214,7 +237,6 @@ public sealed class OcrIndexWorkerService : IDisposable
                 item.OcrLanguageTag = result.LanguageTag;
                 item.OcrRecognizedAt = DateTimeOffset.Now;
                 item.OcrWords = result.Words.ToList();
-                item.Notes = OcrIndexPolicy.MergeScanNote(item.Notes, SensitiveTextDetector.Scan(result.Text).Summary);
                 indexed.Add(item);
             }
 
@@ -222,9 +244,9 @@ public sealed class OcrIndexWorkerService : IDisposable
             IReadOnlyList<CaptureItem> applied = [];
             if (indexed.Count > 0)
             {
-                // insertMissing: false — an item deleted while this pass held its snapshot must
-                // stay deleted, not come back OCR'd and searchable with its file already gone.
-                applied = await _workspaceStore.UpdateItemsAsync(indexed, insertMissing: false);
+                // Recognition owns only OCR fields. Reload current metadata and skip deleted,
+                // replaced, private, or manually recognized items before publishing results.
+                applied = await _workspaceStore.UpdateOcrItemsAsync(indexed);
                 foreach (var item in applied)
                 {
                     ItemIndexed?.Invoke(this, item);

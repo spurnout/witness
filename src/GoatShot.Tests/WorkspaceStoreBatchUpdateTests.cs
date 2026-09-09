@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Text.Json;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 using Microsoft.Data.Sqlite;
@@ -10,6 +11,117 @@ namespace GoatShot.Tests;
 [DoNotParallelize]
 public sealed class WorkspaceStoreBatchUpdateTests
 {
+    [TestMethod]
+    public void ImportFileCopyAsync_ConcurrentSameNameImportsPreserveEveryFile()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var inputs = Enumerable.Range(0, 16).Select(i =>
+            {
+                var directory = Path.Combine(paths.TempRoot, $"source-{i}");
+                Directory.CreateDirectory(directory);
+                var path = Path.Combine(directory, "same.dat");
+                File.WriteAllBytes(path, Enumerable.Repeat((byte)i, 64 * 1024).ToArray());
+                return path;
+            }).ToArray();
+
+            var imported = Task.WhenAll(inputs.Select(path => store.ImportFileCopyAsync(path))).GetAwaiter().GetResult();
+
+            Assert.AreEqual(inputs.Length, imported.Select(item => item.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.AreEqual(inputs.Length, store.Load().Count);
+            for (var i = 0; i < imported.Length; i++)
+            {
+                CollectionAssert.AreEqual(File.ReadAllBytes(inputs[i]), File.ReadAllBytes(imported[i].FilePath));
+            }
+        });
+    }
+
+    [TestMethod]
+    public void UpdateItemsAsync_FailedSerializationLeavesPreviousIndexIntact()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var item = store.AddImageFileAsync(WritePng(paths, "unchanged.png"), CaptureKind.Imported).Result;
+            var original = File.ReadAllBytes(paths.IndexPath);
+            item.OcrWords = [new OcrRecognizedWord { X = double.NaN }];
+
+            Assert.Throws<ArgumentException>(() => store.UpdateItemAsync(item).GetAwaiter().GetResult());
+
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(paths.IndexPath));
+            Assert.AreEqual(0, Directory.GetFiles(paths.LocalRoot, "workspace-index.json.*.tmp").Length);
+        });
+    }
+
+    [TestMethod]
+    public void UpdateItemsAsync_DoesNotOverwriteAnUnreadableIndex()
+    {
+        WithTempStore((store, paths) =>
+        {
+            const string damagedIndex = "[{\"id\":\"preserve-me\",";
+            File.WriteAllText(paths.IndexPath, damagedIndex);
+
+            Assert.ThrowsExactly<JsonException>(() => store.UpdateItemAsync(new CaptureItem
+            {
+                FilePath = Path.Combine(paths.ImagesRoot, "new.png")
+            }).GetAwaiter().GetResult());
+
+            Assert.AreEqual(damagedIndex, File.ReadAllText(paths.IndexPath));
+        });
+    }
+
+    [TestMethod]
+    public void DeleteItemAsync_DoesNotDeleteTheFileWhenTheIndexIsUnreadable()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var item = store.AddImageFileAsync(WritePng(paths, "keep.png"), CaptureKind.Imported).Result;
+            File.WriteAllText(paths.IndexPath, "null");
+
+            Assert.ThrowsExactly<JsonException>(() => store.DeleteItemAsync(item, deleteFile: true).GetAwaiter().GetResult());
+
+            Assert.IsTrue(File.Exists(item.FilePath));
+            Assert.AreEqual("null", File.ReadAllText(paths.IndexPath));
+        });
+    }
+
+    [TestMethod]
+    public void AddImageFileAsync_ReimportDoesNotLeaveStaleSearchResults()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var index = new WorkspaceMetadataIndex(paths);
+            store.AttachMetadataIndex(index);
+            var path = WritePng(paths, "reimport.png");
+            var original = store.AddImageFileAsync(path, CaptureKind.Imported, "obsoleteword").Result;
+            var replacement = store.AddImageFileAsync(path, CaptureKind.Imported, "replacementword").Result;
+
+            Assert.AreEqual(replacement.Id, store.Load().Single().Id);
+            Assert.AreEqual(0, index.SearchIds("obsoleteword").Count);
+            CollectionAssert.AreEqual(new[] { replacement.Id }, index.SearchIds("replacementword").ToArray());
+        });
+    }
+
+    [TestMethod]
+    public void AddImageFileAsync_SameStemFilesHaveIndependentThumbnails()
+    {
+        WithTempStore((store, paths) =>
+        {
+            var first = store.AddImageFileAsync(WritePng(paths, "same.png"), CaptureKind.Imported).Result;
+            var before = File.ReadAllBytes(first.ThumbnailPath);
+            var otherPath = Path.Combine(paths.TempRoot, "same.bmp");
+            using (var bitmap = new Bitmap(1, 1))
+            {
+                bitmap.SetPixel(0, 0, Color.Red);
+                bitmap.Save(otherPath, ImageFormat.Bmp);
+            }
+
+            var second = store.AddImageFileAsync(otherPath, CaptureKind.Imported).Result;
+
+            Assert.AreNotEqual(first.ThumbnailPath, second.ThumbnailPath);
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(first.ThumbnailPath));
+        });
+    }
+
     [TestMethod]
     public void UpdateItemsAsync_PersistsEveryItemInOneCall()
     {

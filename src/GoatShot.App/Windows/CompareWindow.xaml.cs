@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
+using GoatShot.App.Controls;
 using Color = System.Windows.Media.Color;
 using Image = System.Windows.Controls.Image;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
@@ -16,6 +17,11 @@ public partial class CompareWindow : Window
 {
     private static readonly Color DeletedTone = Color.FromRgb(0xFF, 0x6B, 0x81);
     private static readonly Color AddedTone = Color.FromRgb(0x30, 0xE6, 0xC3);
+    private readonly ImageViewportController _beforeViewport;
+    private readonly ImageViewportController _afterViewport;
+    private bool _syncingViewports;
+    private bool _viewSyncQueued;
+    private ImageViewportController? _pendingViewSource;
 
     public CompareWindow(CaptureItem before, CaptureItem after, CaptureComparisonResult comparison)
     {
@@ -30,6 +36,57 @@ public partial class CompareWindow : Window
 
         LoadSide(before, BeforeImage, BeforeSurface, BeforeCanvas, comparison.BeforeHighlights, DeletedTone, "Removed text");
         LoadSide(after, AfterImage, AfterSurface, AfterCanvas, comparison.AfterHighlights, AddedTone, "Added text");
+        _beforeViewport = new ImageViewportController(BeforeViewport, BeforeZoomContainer) { PanEnabled = true };
+        _afterViewport = new ImageViewportController(AfterViewport, AfterZoomContainer) { PanEnabled = true };
+        _beforeViewport.ViewChanged += (_, _) => SyncView(_beforeViewport);
+        _afterViewport.ViewChanged += (_, _) => SyncView(_afterViewport);
+    }
+
+    private void FitImages_Click(object sender, RoutedEventArgs e)
+    {
+        _beforeViewport.Fit();
+        _afterViewport.Fit();
+    }
+
+    private void ActualSize_Click(object sender, RoutedEventArgs e) => ZoomImages(1);
+    private void ZoomIn_Click(object sender, RoutedEventArgs e) => ZoomImages(_beforeViewport.Scale * 1.25);
+    private void ZoomOut_Click(object sender, RoutedEventArgs e) => ZoomImages(_beforeViewport.Scale / 1.25);
+
+    private void ZoomImages(double scale)
+    {
+        _beforeViewport.Zoom(scale);
+        if (SyncViewportsBox.IsChecked != true) _afterViewport.Zoom(scale);
+    }
+
+    private void SyncViewports_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_beforeViewport is not null && _afterViewport is not null) SyncView(_beforeViewport);
+    }
+
+    private void SyncView(ImageViewportController source)
+    {
+        if (_syncingViewports) return;
+        ImageZoomText.Text = $"Before {_beforeViewport.Scale:P0} · After {_afterViewport.Scale:P0}";
+        if (SyncViewportsBox.IsChecked != true) return;
+        _pendingViewSource = source;
+        if (_viewSyncQueued) return;
+        _viewSyncQueued = true;
+        // ScrollChanged runs during layout. Applying another viewport's offsets there can
+        // lose its queued scroll commands; coalesce and apply after that layout completes.
+        Dispatcher.BeginInvoke(() =>
+        {
+            _viewSyncQueued = false;
+            if (SyncViewportsBox.IsChecked != true || _pendingViewSource is not { } pending) return;
+            var destination = ReferenceEquals(pending, _beforeViewport) ? _afterViewport : _beforeViewport;
+            _syncingViewports = true;
+            try
+            {
+                if (pending.IsFit) destination.Fit();
+                else destination.ApplyView(pending.Scale, pending.RelativeCenter);
+                ImageZoomText.Text = $"Before {_beforeViewport.Scale:P0} · After {_afterViewport.Scale:P0}";
+            }
+            finally { _syncingViewports = false; }
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     internal static string DescribeVerdict(CaptureComparisonVerdict verdict)
@@ -69,7 +126,7 @@ public partial class CompareWindow : Window
     }
 
     /// <summary>
-    /// Sizes the pixel-space surface and draws the highlight boxes. The Viewbox owns all the
+    /// Sizes the pixel-space surface and draws the highlight boxes. The outer zoom container owns all the
     /// scaling, so word rectangles land at raw OCR coordinates — same trick as the editor canvas.
     /// </summary>
     private static void LoadSide(

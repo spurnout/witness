@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using GoatShot.App.Models;
 
@@ -57,23 +59,41 @@ public sealed class WorkspaceStore
 
     public IReadOnlyList<CaptureItem> Load()
     {
+        lock (_gate)
+        {
+            try
+            {
+                return LoadCore().OrderByDescending(item => item.CreatedAt).ToList();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                StartupTrace.Write($"Workspace index could not be read: {ex.Message}");
+                return [];
+            }
+        }
+    }
+
+    private List<CaptureItem> LoadCore()
+    {
         if (!File.Exists(_paths.IndexPath))
         {
-            return Array.Empty<CaptureItem>();
+            return [];
         }
 
-        try
+        using var stream = new FileStream(_paths.IndexPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        var items = JsonSerializer.Deserialize<List<CaptureItem>>(stream, JsonOptions)
+            ?? throw new JsonException("The workspace index must contain a capture list.");
+        if (items.Any(item => item is null || string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.FilePath)))
         {
-            var json = File.ReadAllText(_paths.IndexPath);
-            var items = JsonSerializer.Deserialize<List<CaptureItem>>(json, JsonOptions) ?? new List<CaptureItem>();
-            return items
-                .OrderByDescending(item => item.CreatedAt)
-                .ToList();
+            throw new JsonException("The workspace index contains an invalid capture record.");
         }
-        catch
-        {
-            return Array.Empty<CaptureItem>();
-        }
+
+        return items;
+    }
+
+    private void SaveCore(List<CaptureItem> items)
+    {
+        AtomicJsonFile.Write(_paths.IndexPath, items.OrderByDescending(item => item.CreatedAt), JsonOptions);
     }
 
     public async Task<CaptureItem> SaveCaptureAsync(
@@ -83,13 +103,16 @@ public sealed class WorkspaceStore
     {
         return await Task.Run(() =>
         {
-            var now = DateTimeOffset.Now;
             var id = FileNameTemplateService.Render(_settings.FileNameTemplate, captured, NextCounter());
             var root = privateCapture ? _paths.TempRoot : _paths.ImagesRoot;
             Directory.CreateDirectory(root);
 
-            var path = MakeUniquePath(Path.Combine(root, $"{id}.png"));
-            captured.Bitmap.Save(path, ImageFormat.Png);
+            string path;
+            using (var output = CreateUniqueFile(Path.Combine(root, $"{id}.png")))
+            {
+                path = output.Name;
+                captured.Bitmap.Save(output, ImageFormat.Png);
+            }
 
             var item = BuildItem(path, captured.Kind, captured.Bounds, privateCapture, captured.Source, hotkeyProfile);
             if (!privateCapture)
@@ -138,10 +161,11 @@ public sealed class WorkspaceStore
                 _ => _paths.DocumentsRoot
             };
             Directory.CreateDirectory(root);
-            var target = MakeUniquePath(Path.Combine(root, Path.GetFileName(sourcePath)));
+            string target;
             await using (var input = File.OpenRead(sourcePath))
-            await using (var output = File.Create(target))
+            await using (var output = CreateUniqueFile(Path.Combine(root, Path.GetFileName(sourcePath))))
             {
+                target = output.Name;
                 await input.CopyToAsync(output);
             }
 
@@ -163,9 +187,18 @@ public sealed class WorkspaceStore
     /// store in the meantime was deleted by the user and must not be resurrected. Returns the
     /// items that were actually written.
     /// </summary>
-    public async Task<IReadOnlyList<CaptureItem>> UpdateItemsAsync(
+    public Task<IReadOnlyList<CaptureItem>> UpdateItemsAsync(
         IReadOnlyList<CaptureItem> items,
-        bool insertMissing = true)
+        bool insertMissing = true) => UpdateItemsCoreAsync(items, insertMissing, ocrOnly: false);
+
+    /// <summary>Merge background recognition into current records without replacing operator edits.</summary>
+    public Task<IReadOnlyList<CaptureItem>> UpdateOcrItemsAsync(IReadOnlyList<CaptureItem> items) =>
+        UpdateItemsCoreAsync(items, insertMissing: false, ocrOnly: true);
+
+    private async Task<IReadOnlyList<CaptureItem>> UpdateItemsCoreAsync(
+        IReadOnlyList<CaptureItem> items,
+        bool insertMissing,
+        bool ocrOnly)
     {
         if (items.Count == 0)
         {
@@ -177,7 +210,7 @@ public sealed class WorkspaceStore
             var applied = new List<CaptureItem>();
             lock (_gate)
             {
-                var existingItems = Load().ToList();
+                var existingItems = LoadCore();
                 foreach (var item in items)
                 {
                     var index = existingItems.FindIndex(existing =>
@@ -186,18 +219,38 @@ public sealed class WorkspaceStore
 
                     if (index >= 0)
                     {
-                        existingItems[index] = item;
+                        if (ocrOnly)
+                        {
+                            var current = existingItems[index];
+                            if (current.IsPrivate || current.OcrRecognizedAt is not null ||
+                                !current.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
+                                !current.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            current.OcrText = item.OcrText;
+                            current.OcrLanguageTag = item.OcrLanguageTag;
+                            current.OcrRecognizedAt = item.OcrRecognizedAt;
+                            current.OcrWords = item.OcrWords;
+                            current.Notes = OcrIndexPolicy.MergeScanNote(current.Notes, SensitiveTextDetector.Scan(item.OcrText).Summary);
+                        }
+                        else
+                        {
+                            existingItems[index] = item;
+                        }
                     }
                     else if (insertMissing)
                     {
-                        existingItems.Insert(0, item);
+                        index = existingItems.Count;
+                        existingItems.Add(item);
                     }
                     else
                     {
                         continue;
                     }
 
-                    applied.Add(item);
+                    applied.Add(existingItems[index]);
                 }
 
                 if (applied.Count == 0)
@@ -205,16 +258,9 @@ public sealed class WorkspaceStore
                     return (IReadOnlyList<CaptureItem>)applied;
                 }
 
-                var json = JsonSerializer.Serialize(
-                    existingItems.OrderByDescending(existing => existing.CreatedAt).ToList(),
-                    JsonOptions);
-                Directory.CreateDirectory(Path.GetDirectoryName(_paths.IndexPath)!);
-                File.WriteAllText(_paths.IndexPath, json);
-            }
-
-            foreach (var item in applied)
-            {
-                _metadataIndex?.Upsert(item);
+                SaveCore(existingItems);
+                // Keep JSON and search mutations ordered, including against deletes and imports.
+                _metadataIndex?.UpsertBatch(applied);
             }
 
             return (IReadOnlyList<CaptureItem>)applied;
@@ -283,19 +329,14 @@ public sealed class WorkspaceStore
         {
             lock (_gate)
             {
-                var items = Load().ToList();
+                var items = LoadCore();
                 items.RemoveAll(existing =>
                     existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
                     existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
 
-                var json = JsonSerializer.Serialize(
-                    items.OrderByDescending(existing => existing.CreatedAt).ToList(),
-                    JsonOptions);
-                Directory.CreateDirectory(Path.GetDirectoryName(_paths.IndexPath)!);
-                File.WriteAllText(_paths.IndexPath, json);
+                SaveCore(items);
+                _metadataIndex?.Delete(item);
             }
-
-            _metadataIndex?.Delete(item);
 
             if (deleteFile && File.Exists(item.FilePath))
             {
@@ -327,7 +368,7 @@ public sealed class WorkspaceStore
         catch
         {
             thumbnailPath = TryCreateVideoThumbnail(path, out width, out height)
-                ? Path.Combine(_paths.ThumbnailRoot, $"{Path.GetFileNameWithoutExtension(path)}.jpg")
+                ? GetThumbnailPath(path)
                 : CreatePlaceholderThumbnail(path, kind);
         }
 
@@ -386,8 +427,7 @@ public sealed class WorkspaceStore
 
     private string CreateThumbnail(string imagePath, Image image)
     {
-        var id = Path.GetFileNameWithoutExtension(imagePath);
-        var thumbnailPath = Path.Combine(_paths.ThumbnailRoot, $"{id}.jpg");
+        var thumbnailPath = GetThumbnailPath(imagePath);
         Directory.CreateDirectory(_paths.ThumbnailRoot);
 
         const int maxSide = 320;
@@ -499,8 +539,7 @@ public sealed class WorkspaceStore
 
     private string CreatePlaceholderThumbnail(string filePath, CaptureKind kind)
     {
-        var id = Path.GetFileNameWithoutExtension(filePath);
-        var thumbnailPath = Path.Combine(_paths.ThumbnailRoot, $"{id}.jpg");
+        var thumbnailPath = GetThumbnailPath(filePath);
         Directory.CreateDirectory(_paths.ThumbnailRoot);
 
         using var thumbnail = new Bitmap(320, 180);
@@ -524,15 +563,19 @@ public sealed class WorkspaceStore
     {
         lock (_gate)
         {
-            var items = Load().ToList();
+            var items = LoadCore();
             items.RemoveAll(existing => existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
             items.Insert(0, item);
-            var json = JsonSerializer.Serialize(items, JsonOptions);
-            Directory.CreateDirectory(Path.GetDirectoryName(_paths.IndexPath)!);
-            File.WriteAllText(_paths.IndexPath, json);
+            SaveCore(items);
+            _metadataIndex?.Upsert(item);
         }
+    }
 
-        _metadataIndex?.Upsert(item);
+    private string GetThumbnailPath(string filePath)
+    {
+        var canonicalPath = Path.GetFullPath(filePath).ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalPath)));
+        return Path.Combine(_paths.ThumbnailRoot, $"{hash}.jpg");
     }
 
     private int NextCounter()
@@ -540,26 +583,25 @@ public sealed class WorkspaceStore
         return Load().Count + 1;
     }
 
-    private static string MakeUniquePath(string path)
+    private static FileStream CreateUniqueFile(string path)
     {
-        if (!File.Exists(path))
-        {
-            return path;
-        }
-
         var directory = Path.GetDirectoryName(path)!;
         var name = Path.GetFileNameWithoutExtension(path);
         var extension = Path.GetExtension(path);
-
-        for (var i = 2; i < 10_000; i++)
+        for (var i = 1; ; i++)
         {
-            var candidate = Path.Combine(directory, $"{name}-{i}{extension}");
-            if (!File.Exists(candidate))
+            var candidate = i == 1 ? path
+                : i < 10_000 ? Path.Combine(directory, $"{name}-{i}{extension}")
+                : Path.Combine(directory, $"{name}-{Guid.NewGuid():N}{extension}");
+            try
             {
-                return candidate;
+                // Reserve the name atomically: parallel captures/imports must never overwrite it.
+                return new FileStream(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            }
+            catch (IOException ex) when ((ex.HResult & 0xffff) is 80 or 183)
+            {
+                // Windows ERROR_FILE_EXISTS / ERROR_ALREADY_EXISTS. Other I/O errors propagate.
             }
         }
-
-        return Path.Combine(directory, $"{name}-{Guid.NewGuid():N}{extension}");
     }
 }

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
     private System.Windows.Shapes.Rectangle? _previewSelectionRectangle;
     private DispatcherTimer? _previewFlashTimer;
     private bool _previewLiveTextEnabled;
+    private bool? _inspectorVisibleOverride;
     private const string SensitiveScanNotePrefix = "Sensitive scan:";
     private const string AiAnalysisNotePrefix = "AI analysis:";
 
@@ -46,11 +48,41 @@ public partial class MainWindow : Window
         _auditMode = auditMode;
         _startHidden = startHidden;
         InitializeComponent();
-        SaveReplayButton.ToolTip = $"Save the configured preceding interval{DescribeHotkey(HotkeyAction.SaveReplay)}";
+        RefreshReplaySaveHint();
         ReplayStateButton.ToolTip = $"Replay keeps only a bounded local rolling buffer until you save it.{DescribeHotkey(HotkeyAction.ToggleReplay, " Arm/pause: {0}")}";
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         CaptureList.ItemsSource = _captures;
         QueueList.ItemsSource = _uploadQueueItems;
+        UpdateWorkspaceLayout();
+    }
+
+    private void Workspace_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateWorkspaceLayout();
+
+    private void RefreshReplaySaveHint() => SaveReplayButton.ToolTip = SaveReplayButton.IsEnabled
+        ? $"Save the configured preceding interval{DescribeHotkey(HotkeyAction.SaveReplay)}"
+        : "Arm Replay and let it buffer before saving. Choose Replay off to set it up.";
+
+    private void ToggleDetails_Click(object sender, RoutedEventArgs e)
+    {
+        _inspectorVisibleOverride = InspectorPanel.Visibility != Visibility.Visible;
+        UpdateWorkspaceLayout();
+    }
+
+    private void UpdateWorkspaceLayout()
+    {
+        if (InspectorPanel is null || LibrarySidebarColumn is null || DetailsToggleButton is null)
+        {
+            return;
+        }
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var showDetails = _inspectorVisibleOverride ?? width >= 1280;
+        LibrarySidebarColumn.Width = new GridLength(width < 1280 ? 184 : 220);
+        InspectorColumn.Width = new GridLength(showDetails ? 300 : 0);
+        InspectorPanel.Visibility = showDetails ? Visibility.Visible : Visibility.Collapsed;
+        DetailsToggleButton.Content = showDetails ? "Hide details" : "Details";
+        DetailsToggleButton.ToolTip = showDetails ? "Hide capture details to give the image more room" : "Show capture details, privacy, and sharing status";
+        AutomationProperties.SetName(DetailsToggleButton, showDetails ? "Hide capture details" : "Show capture details");
     }
 
     // Settings being reset or a secret being dropped is exactly the kind of thing that must not pass
@@ -93,7 +125,7 @@ public partial class MainWindow : Window
         InstantCaptureHintText.Text = instantCapture.Length == 0
             ? "Set an instant capture shortcut in Settings"
             : $"{instantCapture} = instant region capture";
-        SaveReplayButton.ToolTip = $"Save the configured preceding interval{DescribeHotkey(HotkeyAction.SaveReplay)}";
+        RefreshReplaySaveHint();
         ReplayStateButton.ToolTip = "Replay keeps only a bounded local rolling buffer until you save it." +
             DescribeHotkey(HotkeyAction.ToggleReplay, " Arm/pause: {0}");
     }
@@ -489,6 +521,7 @@ public partial class MainWindow : Window
             _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(82, 102, 107))
         };
         SaveReplayButton.IsEnabled = status.State is ReplayBufferState.Armed or ReplayBufferState.Paused;
+        RefreshReplaySaveHint();
         var visibleState = isSystemSuspended ? "Suspended by Windows" : status.State.ToString();
         ReplayFooterText.Text = $"Replay: {visibleState} · {status.BufferedDuration:mm\\:ss} · {status.TotalBytes / 1024d / 1024d:0.#} MB";
         ReplayStateButton.ToolTip = isSystemSuspended
@@ -583,7 +616,11 @@ public partial class MainWindow : Window
             ? $"{totalBytes / 1024d:0.#} KB"
             : $"{totalBytes / 1024d / 1024d:0.#} MB";
         var aiLabel = _services.Settings.AiEnabled ? "on" : "off";
-        FooterSummaryText.Text = $"Local-only mode · AI {aiLabel} · {_allCaptures.Count} captures ({totalLabel})";
+        var privacy = SharingPrivacyPresenter.Build(_services.Settings);
+        FooterSummaryText.Text = $"Stored locally · {(privacy.UnattendedTransfersEnabled ? "Unattended transfers enabled · " : string.Empty)}AI {aiLabel} · {_allCaptures.Count} captures ({totalLabel})";
+        FooterSummaryText.ToolTip = privacy.Summary;
+        TransferPrivacyText.Text = privacy.Summary;
+        TransferPrivacyText.Foreground = (System.Windows.Media.Brush)FindResource(privacy.UnattendedTransfersEnabled ? "WarnBrush" : "WorkspaceSecondaryTextBrush");
 
         if (AiStateText is not null)
         {
@@ -2870,6 +2907,15 @@ public partial class MainWindow : Window
             // Compare is the one selection action that needs exactly two image captures, so it
             // reads the live multi-selection instead of the single anchor item.
             CompareButton.IsEnabled = enabled && SelectedImageCaptures().Count == 2;
+            SelectionHelpText.Text = !enabled
+                ? "Select a capture to copy, share, or edit."
+                : item?.Kind == CaptureKind.ReplayReceipt
+                    ? "Open Frame Explorer to inspect and export this receipt."
+                    : CompareButton.IsEnabled
+                        ? "Two screenshots selected · Compare is ready."
+                        : hasLocalImage
+                            ? "Ctrl+click a second screenshot to compare."
+                            : "Comparison requires two screenshots. Select screenshots from Recent.";
         }
 
         if (PrivacyReviewButton is not null)

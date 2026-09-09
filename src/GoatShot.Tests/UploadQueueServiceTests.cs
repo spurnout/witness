@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 
@@ -9,6 +10,22 @@ namespace GoatShot.Tests;
 [TestClass]
 public sealed class UploadQueueServiceTests
 {
+    [TestMethod]
+    public async Task Queue_DoesNotOverwriteUnreadableState()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            const string damagedQueue = "[{\"id\":\"keep-this\",";
+            File.WriteAllText(paths.UploadQueuePath, damagedQueue);
+            var queue = new UploadQueueService(paths, new UploadQueueSettings());
+
+            await Assert.ThrowsExactlyAsync<JsonException>(() => queue.EnqueueAsync(
+                CreateCaptureItem(paths, "new.png", 1), ShareDestination.LocalFolder, CancellationToken.None));
+
+            Assert.AreEqual(damagedQueue, File.ReadAllText(paths.UploadQueuePath));
+        });
+    }
+
     private static readonly string[] UploadSessionSecretValues =
     [
         "one-token-secret",
@@ -73,14 +90,135 @@ public sealed class UploadQueueServiceTests
                     HistoryLimit = 2
                 });
 
-            await service.EnqueueAsync(CreateCaptureItem(paths, "one.png", 1), ShareDestination.Dropbox, CancellationToken.None);
-            await service.EnqueueAsync(CreateCaptureItem(paths, "two.png", 2), ShareDestination.Dropbox, CancellationToken.None);
+            var one = await service.EnqueueAsync(CreateCaptureItem(paths, "one.png", 1), ShareDestination.Dropbox, CancellationToken.None);
+            var two = await service.EnqueueAsync(CreateCaptureItem(paths, "two.png", 2), ShareDestination.Dropbox, CancellationToken.None);
+            await service.CancelAsync(one.Id, CancellationToken.None);
+            await service.CancelAsync(two.Id, CancellationToken.None);
             await service.EnqueueAsync(CreateCaptureItem(paths, "three.png", 3), ShareDestination.Dropbox, CancellationToken.None);
 
             var loaded = await service.ListAsync(CancellationToken.None);
 
             Assert.AreEqual(2, loaded.Count);
             CollectionAssert.DoesNotContain(loaded.Select(item => item.FileName).ToList(), "one.png");
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_HistoryLimitNeverDropsPendingUploads()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var queue = new UploadQueueService(paths, new UploadQueueSettings { HistoryLimit = 1 });
+            for (var i = 0; i < 3; i++)
+            {
+                await queue.EnqueueAsync(CreateCaptureItem(paths, $"pending-{i}.png", 1), ShareDestination.LocalFolder, CancellationToken.None);
+            }
+
+            Assert.AreEqual(3, (await queue.ListAsync(CancellationToken.None)).Count);
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_CanceledProcessingLeavesNoUploadingReservations()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var provider = new BlockingShareProvider(targetStartCount: 2);
+            var settings = new AppSettings();
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(paths, settings, new SecretStore(paths), [provider]);
+            for (var i = 0; i < 2; i++)
+            {
+                await queue.EnqueueAsync(CreateCaptureItem(paths, $"cancel-{i}.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+            }
+            using var cancellation = new CancellationTokenSource();
+            var processing = queue.ProcessDueAsync(sharing, 2, cancellation.Token);
+            await WaitWithTimeoutAsync(provider.AllStarted, "uploads to start");
+            cancellation.Cancel();
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => processing);
+
+            var items = await queue.ListAsync(CancellationToken.None);
+            Assert.IsTrue(items.All(item => item.Status == "Canceled"));
+            Assert.IsTrue(items.All(item => item.CompletedAt is not null && item.NextAttemptAt is null));
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_ManualRetryWorksAfterAttemptsAreExhausted()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var settings = new AppSettings();
+            settings.UploadQueue.MaxAttempts = 1;
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(paths, settings, new SecretStore(paths));
+            var queued = await queue.EnqueueAsync(CreateCaptureItem(paths, "retry.png", 32), ShareDestination.CustomWebhook, CancellationToken.None);
+            Assert.AreEqual(1, (await queue.ProcessDueAsync(sharing, 1, CancellationToken.None)).Failed);
+
+            await queue.RetryAsync(queued.Id, CancellationToken.None);
+
+            Assert.AreEqual(1, (await queue.ProcessDueAsync(sharing, 1, CancellationToken.None)).Processed);
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_RetryCannotReserveAnActiveUploadAgain()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var provider = new BlockingShareProvider();
+            var settings = new AppSettings();
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(paths, settings, new SecretStore(paths), [provider]);
+            var queued = await queue.EnqueueAsync(CreateCaptureItem(paths, "active.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+            var processing = queue.ProcessDueAsync(sharing, 1, CancellationToken.None);
+            try
+            {
+                await WaitWithTimeoutAsync(provider.AllStarted, "the upload to start");
+                var retried = await queue.RetryAsync(queued.Id, CancellationToken.None);
+                Assert.AreEqual("Uploading", retried!.Status);
+                Assert.AreEqual(0, (await queue.ProcessDueAsync(sharing, 1, CancellationToken.None)).Processed);
+            }
+            finally
+            {
+                provider.Release();
+                await processing;
+            }
+            Assert.AreEqual(1, provider.UploadCount);
+        });
+    }
+
+    [TestMethod]
+    public async Task Queue_CanceledActiveUploadSurvivesTrimmingAndCannotBeRetriedUntilItStops()
+    {
+        await WithTempPathsAsync(async paths =>
+        {
+            var provider = new BlockingShareProvider();
+            var settings = new AppSettings();
+            settings.UploadQueue.HistoryLimit = 1;
+            var queue = new UploadQueueService(paths, settings.UploadQueue);
+            var sharing = new ShareService(paths, settings, new SecretStore(paths), [provider]);
+            var queued = await queue.EnqueueAsync(CreateCaptureItem(paths, "cancel-active.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+            var processing = queue.ProcessDueAsync(sharing, 1, CancellationToken.None);
+            try
+            {
+                await WaitWithTimeoutAsync(provider.AllStarted, "the upload to start");
+                await queue.CancelAsync(queued.Id, CancellationToken.None);
+                await queue.EnqueueAsync(CreateCaptureItem(paths, "new-pending.png", 32), ShareDestination.LocalFolder, CancellationToken.None);
+
+                var retried = await queue.RetryAsync(queued.Id, CancellationToken.None);
+                Assert.IsNotNull(retried);
+                Assert.AreEqual("Canceled", retried.Status);
+            }
+            finally
+            {
+                provider.Release();
+            }
+
+            var result = await processing;
+            Assert.AreEqual("Canceled", result.Items.Single().Status);
+            Assert.AreEqual(1, provider.UploadCount);
         });
     }
 
