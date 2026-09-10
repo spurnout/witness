@@ -16,10 +16,13 @@ public sealed record PostCaptureActionOption(PostCaptureAction Action, string La
 /// </summary>
 public static class PostCaptureActionCatalog
 {
-    public const PostCaptureAction Default = PostCaptureAction.CopyQuietly;
+    public const PostCaptureAction Default = PostCaptureAction.ShowGallery;
 
     public static IReadOnlyList<PostCaptureActionOption> Options { get; } =
     [
+        new(PostCaptureAction.ShowGallery,
+            "Show capture gallery",
+            "Shows your screenshots without image controls. Hover to keep the gallery open; double-click an image for actions."),
         new(PostCaptureAction.CopyQuietly,
             "Copy quietly",
             "Copies to the clipboard and saves to the library without opening anything."),

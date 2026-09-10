@@ -12,24 +12,25 @@ public sealed class PostCaptureActionCatalogTests
         Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse("CopyQuietly"));
         Assert.AreEqual(PostCaptureAction.ShowActionsWindow, PostCaptureActionCatalog.Parse("showactionswindow"));
         Assert.AreEqual(PostCaptureAction.OpenEditor, PostCaptureActionCatalog.Parse("  OpenEditor  "));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse(" showgallery "));
     }
 
     [TestMethod]
-    public void Parse_FallsBackToQuietCopyForAnythingUnrecognized()
+    public void Parse_FallsBackToGalleryForAnythingUnrecognized()
     {
         // settings.json is hand-editable, so garbage must degrade to the default rather than throw.
-        Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse(null));
-        Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse(string.Empty));
-        Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse("   "));
-        Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse("OpenTheThing"));
-        Assert.AreEqual(PostCaptureAction.CopyQuietly, PostCaptureActionCatalog.Parse("7"));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse(null));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse(string.Empty));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse("   "));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse("OpenTheThing"));
+        Assert.AreEqual(PostCaptureAction.ShowGallery, PostCaptureActionCatalog.Parse("7"));
     }
 
     [TestMethod]
     public void Normalize_RewritesLooseInputToTheCanonicalStoredValue()
     {
         Assert.AreEqual("OpenEditor", PostCaptureActionCatalog.Normalize("openeditor"));
-        Assert.AreEqual("CopyQuietly", PostCaptureActionCatalog.Normalize("nonsense"));
+        Assert.AreEqual("ShowGallery", PostCaptureActionCatalog.Normalize("nonsense"));
     }
 
     [TestMethod]

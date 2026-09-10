@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private SettingsWindow? _prewarmedSettingsWindow;
     private ShareHistoryWindow? _shareHistoryWindow;
     private AiHistoryWindow? _aiHistoryWindow;
+    private CaptureGalleryWindow? _captureGalleryWindow;
     private CancellationTokenSource? _webcamPreviewCts;
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
@@ -200,6 +201,7 @@ public partial class MainWindow : Window
     public async void OpenSettingsCommand(string? sectionKey = null) => await OpenSettingsAsync(sectionKey);
     public void ShowWorkspaceCommand()
     {
+        _captureGalleryWindow?.Close();
         Show();
         WindowState = WindowState.Normal;
         Activate();
@@ -676,6 +678,7 @@ public partial class MainWindow : Window
     private async Task<CaptureItem?> CaptureRegionAsync(string? hotkeyProfile = null)
     {
         var wasVisible = IsVisible;
+        CaptureItem? item = null;
         if (wasVisible)
         {
             Hide();
@@ -684,11 +687,12 @@ public partial class MainWindow : Window
 
         try
         {
-            return await CaptureAndStoreAsync(() => _services.Screenshots.CaptureRegionAsync(this), hotkeyProfile);
+            item = await CaptureAndStoreAsync(() => _services.Screenshots.CaptureRegionAsync(this), hotkeyProfile);
+            return item;
         }
         finally
         {
-            if (wasVisible)
+            if (wasVisible && ShouldRestoreWorkspaceAfterCapture(item))
             {
                 ShowWorkspaceCommand();
             }
@@ -698,6 +702,7 @@ public partial class MainWindow : Window
     private async Task<CaptureItem?> CaptureActiveWindowAsync(string? hotkeyProfile = null)
     {
         var wasVisible = IsVisible;
+        CaptureItem? item = null;
         if (wasVisible)
         {
             SetStatus("Hiding Receipts before active-window capture...");
@@ -707,13 +712,14 @@ public partial class MainWindow : Window
 
         try
         {
-            return await CaptureAndStoreAsync(
+            item = await CaptureAndStoreAsync(
                 async () => await _services.Screenshots.CaptureActiveWindowAsync(),
                 hotkeyProfile);
+            return item;
         }
         finally
         {
-            if (wasVisible)
+            if (wasVisible && ShouldRestoreWorkspaceAfterCapture(item))
             {
                 ShowWorkspaceCommand();
             }
@@ -725,6 +731,13 @@ public partial class MainWindow : Window
         string? hotkeyProfile = null)
     {
         SetStatus("Capturing...");
+        if (_captureGalleryWindow is not null)
+        {
+            // Remove the previous popup before even the region overlay takes its background image.
+            _captureGalleryWindow.Close();
+            await Task.Delay(120);
+        }
+
         using var captured = await capture();
         if (captured is null)
         {
@@ -798,6 +811,7 @@ public partial class MainWindow : Window
         var options = ScrollingCaptureProfiles.For(axis == ScrollingCaptureAxis.Horizontal ? "table" : "browser");
         options.Axis = axis;
         var wasVisible = IsVisible;
+        CaptureItem? item = null;
         if (wasVisible)
         {
             Hide();
@@ -809,11 +823,12 @@ public partial class MainWindow : Window
 
         try
         {
-            return await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureScrollingActiveWindowAsync(options));
+            item = await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureScrollingActiveWindowAsync(options));
+            return item;
         }
         finally
         {
-            if (wasVisible)
+            if (wasVisible && ShouldRestoreWorkspaceAfterCapture(item))
             {
                 ShowWorkspaceCommand();
             }
@@ -3099,8 +3114,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// What happens once a capture is saved. Quiet copy is the default so the fast path is
-    /// hotkey to clipboard with nothing to dismiss; the other modes are opt-in from Settings.
+    /// What happens once a capture is saved. The gallery shows history first; image controls
+    /// appear only after an explicit choice. Existing post-capture preferences remain available.
     /// </summary>
     private void RunPostCaptureAction(CaptureItem item, bool copiedToClipboard)
     {
@@ -3111,6 +3126,9 @@ public partial class MainWindow : Window
 
         switch (PostCaptureActionCatalog.Parse(_services.Settings.PostCaptureAction))
         {
+            case PostCaptureAction.ShowGallery:
+                ShowCaptureGallery(item);
+                break;
             case PostCaptureAction.ShowActionsWindow:
                 ShowCaptureTaskWindow(item);
                 break;
@@ -3121,6 +3139,30 @@ public partial class MainWindow : Window
                 NotifyQuietCapture(item, copiedToClipboard);
                 break;
         }
+    }
+
+    private bool ShouldRestoreWorkspaceAfterCapture(CaptureItem? item) =>
+        item is null || PostCaptureActionCatalog.Parse(_services.Settings.PostCaptureAction) != PostCaptureAction.ShowGallery;
+
+    private void ShowCaptureGallery(CaptureItem item)
+    {
+        if (_captureGalleryWindow is null)
+        {
+            var window = new CaptureGalleryWindow(_services.Settings.CaptureActionsAutoDismissSeconds);
+            _captureGalleryWindow = window;
+            window.CaptureRequested += (_, selected) => ShowCaptureTaskWindow(selected);
+            window.LibraryRequested += (_, _) => ShowWorkspaceCommand();
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_captureGalleryWindow, window))
+                {
+                    _captureGalleryWindow = null;
+                }
+            };
+        }
+
+        _captureGalleryWindow.UpdateCaptures(_allCaptures, item);
+        _captureGalleryWindow.ShowNearPointer();
     }
 
     /// <summary>

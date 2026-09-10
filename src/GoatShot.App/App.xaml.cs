@@ -286,6 +286,24 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (startupOptions.RenderCaptureGallery)
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                try
+                {
+                    await CaptureGalleryWindowRenderer.RenderAsync(startupOptions.RenderCaptureGalleryOutputPath);
+                    Shutdown(0);
+                }
+                catch (Exception exception)
+                {
+                    WriteProofFailure(startupOptions.RenderCaptureGalleryOutputPath, exception);
+                    Shutdown(1);
+                }
+            }, DispatcherPriority.ApplicationIdle);
+            return;
+        }
+
         if (startupOptions.RenderCaptureTask)
         {
             Dispatcher.BeginInvoke(async () =>

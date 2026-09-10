@@ -42,6 +42,8 @@ public sealed record AppStartupOptions(
     public IReadOnlyList<string> RuntimeArguments { get; init; } = Array.Empty<string>();
     public bool RenderFrameExplorer { get; init; }
     public string RenderFrameExplorerOutputPath { get; init; } = string.Empty;
+    public bool RenderCaptureGallery { get; init; }
+    public string RenderCaptureGalleryOutputPath { get; init; } = string.Empty;
 
     public static AppStartupOptions Parse(
         IEnumerable<string> args,
@@ -126,6 +128,8 @@ public sealed record AppStartupOptions(
         var auditWpfOutputPath = auditWpfOutputEnvironment?.Trim() ?? string.Empty;
         var renderFrameExplorer = false;
         var renderFrameExplorerOutputPath = string.Empty;
+        var renderCaptureGallery = false;
+        var renderCaptureGalleryOutputPath = string.Empty;
         var list = args.ToList();
 
         for (var index = 0; index < list.Count; index++)
@@ -457,6 +461,14 @@ public sealed record AppStartupOptions(
                 continue;
             }
 
+            if (arg.Equals("--render-capture-gallery-output", StringComparison.OrdinalIgnoreCase) &&
+                index + 1 < list.Count && !list[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                renderCaptureGallery = true;
+                renderCaptureGalleryOutputPath = list[++index].Trim();
+                continue;
+            }
+
             if (arg.Equals("--render-capture-task", StringComparison.OrdinalIgnoreCase))
             {
                 renderCaptureTask = true;
@@ -652,7 +664,9 @@ public sealed record AppStartupOptions(
             RuntimeVerb = runtimeVerb,
             RuntimeArguments = list,
             RenderFrameExplorer = renderFrameExplorer,
-            RenderFrameExplorerOutputPath = renderFrameExplorerOutputPath
+            RenderFrameExplorerOutputPath = renderFrameExplorerOutputPath,
+            RenderCaptureGallery = renderCaptureGallery,
+            RenderCaptureGalleryOutputPath = renderCaptureGalleryOutputPath
         };
     }
 

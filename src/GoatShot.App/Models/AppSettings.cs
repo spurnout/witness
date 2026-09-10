@@ -5,7 +5,7 @@ public sealed class AppSettings
     public int SettingsSchemaVersion { get; set; } = 18;
     public string LibraryRoot { get; set; } = string.Empty;
     public bool AutoCopyImageAfterCapture { get; set; } = true;
-    public string PostCaptureAction { get; set; } = "CopyQuietly";
+    public string PostCaptureAction { get; set; } = "ShowGallery";
     public int CaptureActionsAutoDismissSeconds { get; set; } = 8;
     public bool EnableCaptureHoverAutoSelect { get; set; } = true;
     public bool IncludeCursor { get; set; } = true;

@@ -46,7 +46,7 @@ public sealed class SettingsMigrationServiceTests
     }
 
     [TestMethod]
-    public void Migrate_NormalizesAnUnusablePostCaptureActionToQuietCopy()
+    public void Migrate_NormalizesAnUnusablePostCaptureActionToGallery()
     {
         var settings = new AppSettings
         {
@@ -56,7 +56,7 @@ public sealed class SettingsMigrationServiceTests
 
         SettingsMigrationService.Migrate(settings);
 
-        Assert.AreEqual("CopyQuietly", settings.PostCaptureAction);
+        Assert.AreEqual("ShowGallery", settings.PostCaptureAction);
         Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
     }
 
@@ -75,11 +75,11 @@ public sealed class SettingsMigrationServiceTests
     }
 
     [TestMethod]
-    public void NewSettings_DefaultToQuietCopyWithHoverAutoSelectOn()
+    public void NewSettings_DefaultToGalleryWithHoverAutoSelectOn()
     {
         var settings = new AppSettings();
 
-        Assert.AreEqual("CopyQuietly", settings.PostCaptureAction);
+        Assert.AreEqual("ShowGallery", settings.PostCaptureAction);
         Assert.IsTrue(settings.EnableCaptureHoverAutoSelect);
         Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
     }
@@ -91,6 +91,18 @@ public sealed class SettingsMigrationServiceTests
 
         Assert.IsTrue(settings.EnableOcrIndexing);
         Assert.AreEqual(SettingsMigrationService.CurrentSchemaVersion, settings.SettingsSchemaVersion);
+    }
+
+    [TestMethod]
+    [DataRow("CopyQuietly")]
+    [DataRow("ShowActionsWindow")]
+    [DataRow("OpenEditor")]
+    [DataRow("ShowGallery")]
+    public void Migrate_PreservesExistingPostCapturePreferences(string preference)
+    {
+        var settings = new AppSettings { SettingsSchemaVersion = 17, PostCaptureAction = preference };
+        SettingsMigrationService.Migrate(settings);
+        Assert.AreEqual(preference, settings.PostCaptureAction);
     }
 
     [TestMethod]

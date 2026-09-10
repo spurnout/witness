@@ -239,11 +239,11 @@
                 </Expander>
                 <Expander Header="Advanced capture options" IsExpanded="False" Margin="0,10,0,10">
                     <StackPanel Margin="0,10,0,0">
-                        <TextBlock Text="Capture actions auto-dismiss seconds" Foreground="{StaticResource MutedInkBrush}" />
+                        <TextBlock Text="Capture popup auto-dismiss seconds" Foreground="{StaticResource MutedInkBrush}" />
                         <TextBox x:Name="CaptureActionsAutoDismissBox"
                                  Margin="0,6,0,6"
-                                 AutomationProperties.Name="Capture actions auto-dismiss seconds" />
-                        <TextBlock Text="The capture actions window fades out after this many seconds. Interacting with it cancels the countdown. Use 0 to leave it open until you close it."
+                                 AutomationProperties.Name="Capture popup auto-dismiss seconds" />
+                        <TextBlock Text="The capture gallery fades out after this many seconds away from the pointer. Hovering pauses it; leaving restarts the countdown. Keyboard use keeps it open until you switch away. This delay also applies to the actions window, where interacting cancels dismissal. Use 0 to keep either popup open."
                                    Foreground="{StaticResource MutedInkBrush}"
                                    FontSize="12"
                                    TextWrapping="Wrap"
