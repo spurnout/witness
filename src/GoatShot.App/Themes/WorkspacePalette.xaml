@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Merged by App.xaml and by popups that must also load on their own (tests, render proofs). -->
+    <SolidColorBrush x:Key="WorkspaceTextBrush" Color="#F4FAFF" />
+    <SolidColorBrush x:Key="WorkspaceShellBrush" Color="#0D1215" />
+    <SolidColorBrush x:Key="WorkspaceHeaderBrush" Color="#12191C" />
+    <SolidColorBrush x:Key="WorkspaceSidebarBrush" Color="#10171A" />
+    <SolidColorBrush x:Key="WorkspaceSurfaceBrush" Color="#151E22" />
+    <SolidColorBrush x:Key="WorkspaceElevatedBrush" Color="#19252A" />
+    <SolidColorBrush x:Key="WorkspaceCanvasBrush" Color="#090E11" />
+    <SolidColorBrush x:Key="WorkspaceBorderBrush" Color="#2B3A40" />
+    <SolidColorBrush x:Key="WorkspaceAccentBrush" Color="#31D2C4" />
+    <SolidColorBrush x:Key="WorkspaceAccentDarkBrush" Color="#082A27" />
+    <SolidColorBrush x:Key="WorkspaceSecondaryTextBrush" Color="#A9B7BC" />
+    <SolidColorBrush x:Key="WorkspaceMutedTextBrush" Color="#899A9F" />
+    <SolidColorBrush x:Key="WorkspaceDangerBrush" Color="#E48686" />
+</ResourceDictionary>

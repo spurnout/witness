@@ -5,13 +5,17 @@
         xmlns:local="clr-namespace:GoatShot.App.Windows"
         Title="Receipts capture gallery"
         Width="820" Height="540" MinWidth="480" MinHeight="320"
-        Background="{StaticResource WorkspaceSurfaceBrush}" Foreground="{StaticResource InkBrush}"
+        Background="{DynamicResource WorkspaceSurfaceBrush}" Foreground="{DynamicResource WorkspaceTextBrush}"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         ResizeMode="CanResize" ShowActivated="False" ShowInTaskbar="False" Topmost="True"
         WindowStartupLocation="Manual"
         controls:AppWindowChrome.IsEnabled="True"
         controls:AppWindowChrome.CaptionHeight="40">
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/Receipts;component/Themes/WorkspacePalette.xaml" />
+        </ResourceDictionary.MergedDictionaries>
         <local:CaptureGalleryThumbnailConverter x:Key="ThumbnailConverter" />
         <Style x:Key="GalleryButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -54,6 +58,7 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
     <Border BorderBrush="{StaticResource WorkspaceBorderBrush}" BorderThickness="1">
         <DockPanel>
@@ -63,7 +68,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Receipts · Captures" Foreground="{StaticResource InkBrush}" FontSize="13"
+                <TextBlock Text="Receipts · Captures" Foreground="{StaticResource WorkspaceTextBrush}" FontSize="13"
                            FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Button Grid.Column="1" Content="Open library" Style="{StaticResource GalleryButton}"
                         Margin="0,0,8,0" VerticalAlignment="Center" Click="OpenLibrary_Click"

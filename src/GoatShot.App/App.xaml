@@ -3,6 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:GoatShot.App">
     <Application.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <!-- Workspace palette, shared by the library window and its capture popups. -->
+            <ResourceDictionary Source="Themes/WorkspacePalette.xaml" />
+        </ResourceDictionary.MergedDictionaries>
+
         <Color x:Key="InkColor">#F4FAFF</Color>
         <Color x:Key="MutedInkColor">#94A9B8</Color>
         <Color x:Key="PanelColor">#111A22</Color>
@@ -18,20 +24,6 @@
         <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
         <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
         <SolidColorBrush x:Key="WarnBrush" Color="{StaticResource WarnColor}" />
-
-        <!-- Workspace palette, shared by the library window and its capture popups. -->
-        <SolidColorBrush x:Key="WorkspaceShellBrush" Color="#0D1215" />
-        <SolidColorBrush x:Key="WorkspaceHeaderBrush" Color="#12191C" />
-        <SolidColorBrush x:Key="WorkspaceSidebarBrush" Color="#10171A" />
-        <SolidColorBrush x:Key="WorkspaceSurfaceBrush" Color="#151E22" />
-        <SolidColorBrush x:Key="WorkspaceElevatedBrush" Color="#19252A" />
-        <SolidColorBrush x:Key="WorkspaceCanvasBrush" Color="#090E11" />
-        <SolidColorBrush x:Key="WorkspaceBorderBrush" Color="#2B3A40" />
-        <SolidColorBrush x:Key="WorkspaceAccentBrush" Color="#31D2C4" />
-        <SolidColorBrush x:Key="WorkspaceAccentDarkBrush" Color="#082A27" />
-        <SolidColorBrush x:Key="WorkspaceSecondaryTextBrush" Color="#A9B7BC" />
-        <SolidColorBrush x:Key="WorkspaceMutedTextBrush" Color="#899A9F" />
-        <SolidColorBrush x:Key="WorkspaceDangerBrush" Color="#E48686" />
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
@@ -260,5 +252,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
