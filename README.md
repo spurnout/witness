@@ -39,10 +39,11 @@ The release is self-contained. A separate .NET, FFmpeg, or segmentation installa
 
 ### Capture and recording
 
-- Region, window, monitor, all-monitor, fixed-size, last-region, delayed, and scrolling screenshots
+- Region, window, monitor, full-screen (every monitor), fixed-size, last-region, delayed, and scrolling screenshots. Receipts hides its own workspace before screen-sized captures so it never appears in them.
+- Region captures are cut from the frame frozen when the overlay opened, so the image is exactly what was on screen when you pressed the key.
 - Print Screen hotkeys that work while Receipts is in the tray
 - Auto-copy after capture by default
-- New installations show a simple screenshot gallery after capture: a resizable thumbnail grid with the newest image selected and no image controls on arrival. Click to select; double-click an image (or press Enter on it) for actions. Hovering keeps the gallery open, leaving restarts the fade countdown, and keyboard use keeps it open until you switch away. The gallery opens near the pointer's monitor without taking focus, and closes before the next screenshot so it is not captured itself. Private captures show only the current temporary image.
+- New installations show a simple screenshot gallery after capture: a resizable thumbnail grid with the newest image selected and no image controls on arrival. Click to select; double-click an image (or press Enter on it) for actions. Hovering keeps the gallery open, leaving restarts the fade countdown, and keyboard use keeps it open until you switch away. The gallery opens near the pointer's monitor without taking focus, shows the latest 100 screenshots (the library has the rest), keeps the size you resize it to for the session, and closes before the next screenshot so it is not captured itself. Capture action popups close before the next screenshot too. Private captures show only the current temporary image.
 - Settings → General → **After capture** offers **Show capture gallery**, **Copy quietly**, **Show capture actions**, and **Open the editor**. Existing saved choices are preserved on upgrade; select **Show capture gallery** to enable the new behavior. Images still copy to the clipboard when auto-copy is enabled. Quiet mode shows a tray confirmation while the workspace is hidden or minimized; clicking it opens actions for that capture.
 - The gallery's fade delay defaults to 8 seconds and is configurable under Settings → General → **Advanced capture options** → **Capture popup auto-dismiss seconds**. Use `0` to keep it open.
 - When the capture actions window is enabled it fades out on its own after 8 seconds, configurable in Settings → General. A thin bar along the bottom drains to show the remaining time. Moving the pointer onto it, pressing a key, or clicking an action cancels the countdown; `0` keeps it open until you close it.
@@ -68,7 +69,7 @@ Recording offers **Record now** and **Replay** modes. Replay is opt-in; while ar
 
 ### Library and editing
 
-- Local searchable capture library with thumbnails. Favorites, collections, and trash are not available in `0.3.0`; Delete asks for confirmation and removes the local file.
+- Local searchable capture library with thumbnails. Favorites, collections, and an in-app trash are not available in `0.3.0`; Delete (the button or the Delete key, with one or several captures selected) asks for confirmation and moves the files to the Windows Recycle Bin. Private captures are deleted permanently.
 - Background OCR indexing, on by default: every new image capture is OCR'd locally shortly after it is saved, and existing captures are indexed gradually, so library search finds words that only appear inside a screenshot. Settings → General toggles it; everything runs on-device with Windows OCR.
 - Live Text on the preview: drag over the selected capture's preview to select the text under the cursor — it is copied on release and the matched words flash. Captures without stored OCR are recognized on first use.
 - Select exactly two image captures and press **Compare** (also in the command palette) for a side-by-side view: a *possible addition / edit / deletion* verdict, added and removed words highlighted on each image, and a coarse pixel-difference readout.

@@ -31,6 +31,20 @@ public sealed class CaptureGalleryTests
     }
 
     [TestMethod]
+    public void LimitKeepsTheNewestEntriesWhileCountReportsTheWholeHistory()
+    {
+        var captures = Enumerable.Range(0, 250).Select(CreateCapture).ToList();
+        var latest = captures[^1];
+
+        var entries = CaptureGalleryModels.BuildItems(captures, latest, limit: 100);
+
+        Assert.AreEqual(100, entries.Count);
+        Assert.AreSame(latest, entries[0].Item);
+        Assert.AreEqual("capture-150", entries[^1].Item.Id);
+        Assert.AreEqual(250, CaptureGalleryModels.Count(captures, latest));
+    }
+
+    [TestMethod]
     public void PrivateCaptureShowsOnlyTheCurrentTemporaryImage()
     {
         var latest = CreateCapture(3);
@@ -59,7 +73,10 @@ public sealed class CaptureGalleryTests
             CaptureItem? requested = null;
             window.CaptureRequested += (_, item) => requested = item;
             var rows = (ListBox)window.FindName("CaptureRows");
-            Assert.IsTrue(rows.Items.Count > 100);
+            // The popup shows only the newest entries, still far more rows than fit on screen.
+            var columns = window.GalleryColumns;
+            Assert.AreEqual((CaptureGalleryWindow.MaxEntries + columns - 1) / columns, rows.Items.Count);
+            Assert.IsTrue(rows.Items.Count > 10);
             Assert.IsNull(rows.ItemContainerGenerator.ContainerFromIndex(rows.Items.Count - 1), "Off-screen history should not create thumbnails.");
             Assert.IsFalse(window.ShowActivated, "Capture feedback must not steal focus.");
             var buttons = Descendants<Button>(window).ToArray();

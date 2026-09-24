@@ -26,6 +26,7 @@ public sealed class AppPaths
         SecretsRoot = Path.Combine(localRoot, "secrets");
         AiActionHistoryPath = Path.Combine(localRoot, "ai-action-history.json");
         IndexPath = Path.Combine(localRoot, "workspace-index.json");
+        OcrWordsRoot = Path.Combine(localRoot, "ocr-words");
         MetadataDatabasePath = Path.Combine(localRoot, "workspace.sqlite");
         SettingsPath = Path.Combine(localRoot, "settings.json");
         ShareHistoryPath = Path.Combine(localRoot, "share-history.json");
@@ -52,6 +53,7 @@ public sealed class AppPaths
     public string SecretsRoot { get; }
     public string AiActionHistoryPath { get; }
     public string IndexPath { get; }
+    public string OcrWordsRoot { get; }
     public string MetadataDatabasePath { get; }
     public string SettingsPath { get; }
     public string ShareHistoryPath { get; }

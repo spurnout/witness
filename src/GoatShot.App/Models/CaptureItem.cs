@@ -31,6 +31,20 @@ public sealed class CaptureItem
     public bool SourceAvailable { get; set; } = true;
     public string? IntegrityStatus { get; set; }
 
+    /// <summary>
+    /// Independent copy for callers that must not share mutable state with the store's cache.
+    /// Recognized words are treated as immutable, so the list is copied but the words are shared.
+    /// </summary>
+    public CaptureItem Clone()
+    {
+        var copy = (CaptureItem)MemberwiseClone();
+        copy.Bounds = Bounds is null
+            ? null
+            : new CaptureBounds { X = Bounds.X, Y = Bounds.Y, Width = Bounds.Width, Height = Bounds.Height };
+        copy.OcrWords = [.. OcrWords];
+        return copy;
+    }
+
     [JsonIgnore]
     public string Title => $"{Kind} - {CreatedAt:MMM d, h:mm tt}";
 

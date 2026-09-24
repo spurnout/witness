@@ -4,19 +4,23 @@
         xmlns:controls="clr-namespace:GoatShot.App.Controls"
         xmlns:local="clr-namespace:GoatShot.App.Windows"
         Title="Receipts capture gallery"
-        Width="1000" Height="680" MinWidth="480" MinHeight="320"
-        Background="#151A1E" Foreground="#F4FAFF"
+        Width="820" Height="540" MinWidth="480" MinHeight="320"
+        Background="{DynamicResource WorkspaceSurfaceBrush}" Foreground="{DynamicResource WorkspaceTextBrush}"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         ResizeMode="CanResize" ShowActivated="False" ShowInTaskbar="False" Topmost="True"
         WindowStartupLocation="Manual"
         controls:AppWindowChrome.IsEnabled="True"
         controls:AppWindowChrome.CaptionHeight="40">
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/Receipts;component/Themes/WorkspacePalette.xaml" />
+        </ResourceDictionary.MergedDictionaries>
         <local:CaptureGalleryThumbnailConverter x:Key="ThumbnailConverter" />
         <Style x:Key="GalleryButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#A9B7BC" />
-            <Setter Property="BorderBrush" Value="#2B3A40" />
+            <Setter Property="Foreground" Value="{StaticResource WorkspaceSecondaryTextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource WorkspaceBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="Cursor" Value="Hand" />
@@ -30,11 +34,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#19252A" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#31D2C4" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource WorkspaceElevatedBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#31D2C4" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
                                 <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -49,13 +53,14 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                    <Setter Property="BorderBrush" Value="#31D2C4" />
+                    <Setter Property="BorderBrush" Value="{StaticResource WorkspaceAccentBrush}" />
                     <Setter Property="Background" Value="#1B302F" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
-    <Border BorderBrush="#2B3A40" BorderThickness="1">
+    <Border BorderBrush="{StaticResource WorkspaceBorderBrush}" BorderThickness="1">
         <DockPanel>
             <Grid DockPanel.Dock="Top" Height="40" Margin="16,0,12,0">
                 <Grid.ColumnDefinitions>
@@ -63,7 +68,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Receipts · Captures" Foreground="#F4FAFF" FontSize="13"
+                <TextBlock Text="Receipts · Captures" Foreground="{StaticResource WorkspaceTextBrush}" FontSize="13"
                            FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Button Grid.Column="1" Content="Open library" Style="{StaticResource GalleryButton}"
                         Margin="0,0,8,0" VerticalAlignment="Center" Click="OpenLibrary_Click"
@@ -74,8 +79,8 @@
                         WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="Close capture gallery" />
             </Grid>
             <DockPanel DockPanel.Dock="Bottom" Margin="16,10,16,12">
-                <TextBlock x:Name="CaptureCountText" Foreground="#A9B7BC" FontSize="11" Margin="0,0,20,0" />
-                <TextBlock x:Name="DismissHintText" Foreground="#A9B7BC" FontSize="11" TextAlignment="Right"
+                <TextBlock x:Name="CaptureCountText" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" FontSize="11" Margin="0,0,20,0" />
+                <TextBlock x:Name="DismissHintText" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" FontSize="11" TextAlignment="Right"
                            TextWrapping="Wrap" Text="Hover to keep open · Double-click an image for actions" />
             </DockPanel>
             <!-- Virtualize rows so opening a large history only decodes the visible thumbnails. -->
@@ -116,7 +121,7 @@
                                             ToolTip="{Binding Item.FileName}">
                                         <StackPanel>
                                             <Grid Height="100" Width="130">
-                                                <TextBlock Text="Preview unavailable" Foreground="#899A9F" FontSize="10"
+                                                <TextBlock Text="Preview unavailable" Foreground="{StaticResource WorkspaceMutedTextBrush}" FontSize="10"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
@@ -132,7 +137,7 @@
                                                 <Image x:Name="ThumbnailImage" Source="{Binding Item, Converter={StaticResource ThumbnailConverter}}"
                                                        Stretch="Uniform" HorizontalAlignment="Stretch" />
                                             </Grid>
-                                            <TextBlock Text="{Binding Item.FileName}" Foreground="#A9B7BC" FontSize="10"
+                                            <TextBlock Text="{Binding Item.FileName}" Foreground="{StaticResource WorkspaceSecondaryTextBrush}" FontSize="10"
                                                        Margin="0,5,0,0" TextTrimming="CharacterEllipsis" Width="130" />
                                         </StackPanel>
                                     </Button>

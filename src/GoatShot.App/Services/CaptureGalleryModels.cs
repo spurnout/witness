@@ -25,7 +25,17 @@ public static class CaptureGalleryModels
 {
     public static IReadOnlyList<CaptureGalleryEntry> BuildItems(
         IEnumerable<CaptureItem> captures,
-        CaptureItem latest)
+        CaptureItem latest,
+        int limit = int.MaxValue) =>
+        History(captures, latest)
+            .Take(limit)
+            .Select(item => new CaptureGalleryEntry(item, item.Id.Equals(latest.Id, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+    /// <summary>How many screenshots the gallery could show, without building an entry for each.</summary>
+    public static int Count(IEnumerable<CaptureItem> captures, CaptureItem latest) => History(captures, latest).Count();
+
+    private static IEnumerable<CaptureItem> History(IEnumerable<CaptureItem> captures, CaptureItem latest)
     {
         // Private captures are temporary and must never become history in this surface either.
         var history = latest.IsPrivate
@@ -35,8 +45,6 @@ public static class CaptureGalleryModels
         return history.Prepend(latest)
             .Where(item => Path.GetExtension(item.FilePath).ToLowerInvariant()
                 is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".webp")
-            .DistinctBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
-            .Select(item => new CaptureGalleryEntry(item, item.Id.Equals(latest.Id, StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
+            .DistinctBy(item => item.Id, StringComparer.OrdinalIgnoreCase);
     }
 }

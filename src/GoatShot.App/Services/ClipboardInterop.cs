@@ -65,6 +65,42 @@ public static class ClipboardInterop
         });
     }
 
+    /// <summary>
+    /// Publishes a packed CF_DIB (see <see cref="ClipboardImageData"/>) and nothing else, so the
+    /// flush is one memory copy. It runs on its own STA thread: WPF's clipboard calls sleep
+    /// between their internal retries while another process holds the clipboard, and neither
+    /// that nor our own retry backoff may stall the UI thread. Flushed data outlives the thread.
+    /// </summary>
+    public static Task SetDibAsync(byte[] dib)
+    {
+        ArgumentNullException.ThrowIfNull(dib);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                RunClipboardWrite(() =>
+                {
+                    var data = new System.Windows.DataObject();
+                    data.SetData(System.Windows.DataFormats.Dib, new MemoryStream(dib, writable: false), autoConvert: false);
+                    System.Windows.Clipboard.SetDataObject(data, copy: true);
+                });
+                completion.SetResult();
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Receipts clipboard write"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
+    }
+
     private static void RunClipboardWrite(Action action)
     {
         lock (ClipboardWriteLock)

@@ -136,9 +136,6 @@ public sealed class TrayService : IDisposable
                 case TrayMenuActionKind.CaptureFullscreen:
                     window.CaptureFullscreenCommand();
                     break;
-                case TrayMenuActionKind.CaptureAllMonitors:
-                    window.CaptureAllMonitorsCommand();
-                    break;
                 case TrayMenuActionKind.CaptureActiveMonitor:
                     window.CaptureMonitorCommand();
                     break;

@@ -3,6 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:GoatShot.App">
     <Application.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <!-- Workspace palette, shared by the library window and its capture popups. -->
+            <ResourceDictionary Source="Themes/WorkspacePalette.xaml" />
+        </ResourceDictionary.MergedDictionaries>
+
         <Color x:Key="InkColor">#F4FAFF</Color>
         <Color x:Key="MutedInkColor">#94A9B8</Color>
         <Color x:Key="PanelColor">#111A22</Color>
@@ -246,5 +252,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

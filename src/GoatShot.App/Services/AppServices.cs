@@ -7,6 +7,7 @@ public sealed class AppServices : IDisposable
 {
     private readonly Func<IReplayRecordingService> _replayFactory;
     private readonly SemaphoreSlim _replayReconfigurationGate = new(1, 1);
+    private Task _workspaceMaintenance = Task.CompletedTask;
     private string _replayConfigurationFingerprint;
 
     private AppServices(
@@ -222,7 +223,20 @@ public sealed class AppServices : IDisposable
         var workspaceIndex = new WorkspaceMetadataIndex(paths);
         var workspaceStore = new WorkspaceStore(paths, settings);
         workspaceStore.AttachMetadataIndex(workspaceIndex);
-        workspaceIndex.Rebuild(workspaceStore.Load());
+        // Both passes walk the whole library; neither is needed before the first window appears,
+        // and the rebuild refuses to overwrite writes that land while it runs.
+        var workspaceMaintenance = Task.Run(() =>
+        {
+            try
+            {
+                workspaceStore.CompactLegacyIndex();
+                workspaceStore.RebuildMetadataIndex();
+            }
+            catch (Exception ex)
+            {
+                StartupTrace.Write($"Workspace search index rebuild failed: {ex.Message}");
+            }
+        });
         var workflowProfiles = new WorkflowProfileService(settings, settingsStore);
         var workflowRunLogs = new WorkflowRunLogService(paths);
         var workflowDryRuns = new WorkflowActionDryRunService(settings, paths);
@@ -323,7 +337,7 @@ public sealed class AppServices : IDisposable
         var hotkeys = new HotkeyService(settings.Keybinds);
 
         StartupTrace.Write("AppServices graph ready");
-        return new AppServices(
+        var services = new AppServices(
             settings,
             paths,
             bundledTools,
@@ -380,6 +394,8 @@ public sealed class AppServices : IDisposable
             documentationPackets,
             stepRecorder,
             hotkeys);
+        services._workspaceMaintenance = workspaceMaintenance;
+        return services;
     }
 
     internal static bool ShouldUseLegacyStateFallback(LocalStateMigrationResult migration)
@@ -583,6 +599,17 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        // The startup index compaction and search rebuild hold the index files open; let them
+        // finish (bounded) so shutdown never leaves a half-written search database behind.
+        try
+        {
+            _workspaceMaintenance.Wait(TimeSpan.FromSeconds(30));
+        }
+        catch (AggregateException)
+        {
+            // Failures are already traced inside the task.
+        }
+
         Tray?.Dispose();
         UploadQueueWorker.Dispose();
         OcrIndexWorker.Dispose();

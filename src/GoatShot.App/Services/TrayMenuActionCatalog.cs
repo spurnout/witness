@@ -9,7 +9,6 @@ public enum TrayMenuActionKind
     CaptureScrollingWindow,
     CaptureHorizontalScrollingWindow,
     CaptureFullscreen,
-    CaptureAllMonitors,
     CaptureActiveMonitor,
     CaptureFixedRegion1280x720,
     ToggleRecording,
@@ -52,8 +51,8 @@ public static class TrayMenuActionCatalog
         TrayMenuActionDefinition.Action("Capture window", TrayMenuActionKind.CaptureWindow, "Capture"),
         TrayMenuActionDefinition.Action("Capture scrolling window", TrayMenuActionKind.CaptureScrollingWindow, "Capture"),
         TrayMenuActionDefinition.Action("Capture horizontal scrolling window", TrayMenuActionKind.CaptureHorizontalScrollingWindow, "Capture"),
-        TrayMenuActionDefinition.Action("Capture fullscreen", TrayMenuActionKind.CaptureFullscreen, "Capture"),
-        TrayMenuActionDefinition.Action("Capture all monitors", TrayMenuActionKind.CaptureAllMonitors, "Capture"),
+        // Full screen already spans every monitor; a separate "all monitors" entry did the same thing.
+        TrayMenuActionDefinition.Action("Capture full screen (all monitors)", TrayMenuActionKind.CaptureFullscreen, "Capture"),
         TrayMenuActionDefinition.Action("Capture active monitor", TrayMenuActionKind.CaptureActiveMonitor, "Capture"),
         TrayMenuActionDefinition.Action("Capture 1280 x 720 at cursor", TrayMenuActionKind.CaptureFixedRegion1280x720, "Capture"),
         TrayMenuActionDefinition.Separator(),
