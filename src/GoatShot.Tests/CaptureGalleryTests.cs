@@ -73,7 +73,10 @@ public sealed class CaptureGalleryTests
             CaptureItem? requested = null;
             window.CaptureRequested += (_, item) => requested = item;
             var rows = (ListBox)window.FindName("CaptureRows");
-            Assert.IsTrue(rows.Items.Count > 100);
+            // The popup shows only the newest entries, still far more rows than fit on screen.
+            var columns = window.GalleryColumns;
+            Assert.AreEqual((CaptureGalleryWindow.MaxEntries + columns - 1) / columns, rows.Items.Count);
+            Assert.IsTrue(rows.Items.Count > 10);
             Assert.IsNull(rows.ItemContainerGenerator.ContainerFromIndex(rows.Items.Count - 1), "Off-screen history should not create thumbnails.");
             Assert.IsFalse(window.ShowActivated, "Capture feedback must not steal focus.");
             var buttons = Descendants<Button>(window).ToArray();
