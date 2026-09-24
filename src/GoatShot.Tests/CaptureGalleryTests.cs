@@ -31,6 +31,20 @@ public sealed class CaptureGalleryTests
     }
 
     [TestMethod]
+    public void LimitKeepsTheNewestEntriesWhileCountReportsTheWholeHistory()
+    {
+        var captures = Enumerable.Range(0, 250).Select(CreateCapture).ToList();
+        var latest = captures[^1];
+
+        var entries = CaptureGalleryModels.BuildItems(captures, latest, limit: 100);
+
+        Assert.AreEqual(100, entries.Count);
+        Assert.AreSame(latest, entries[0].Item);
+        Assert.AreEqual("capture-150", entries[^1].Item.Id);
+        Assert.AreEqual(250, CaptureGalleryModels.Count(captures, latest));
+    }
+
+    [TestMethod]
     public void PrivateCaptureShowsOnlyTheCurrentTemporaryImage()
     {
         var latest = CreateCapture(3);

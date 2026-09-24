@@ -135,13 +135,18 @@ public sealed class WorkspaceStore
         {
             List<CaptureItem> snapshot;
             long generation;
+            IndexFileStamp stamp;
             lock (_gate)
             {
                 snapshot = LoadCoreOrEmpty();
                 generation = index.Generation;
+                stamp = IndexFileStamp.Read(_paths.IndexPath);
             }
 
-            if (index.TryRebuild(snapshot, generation))
+            // The generation only sees this process's writes. The CLI or browser host publishes
+            // the index file before touching the search database, so an unchanged file stamp,
+            // checked under the search lock, rules out their writes too.
+            if (index.TryRebuild(snapshot, generation, () => IndexFileStamp.Read(_paths.IndexPath) == stamp))
             {
                 return;
             }
@@ -214,34 +219,40 @@ public sealed class WorkspaceStore
         var previous = _cache?.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase)
             ?? new Dictionary<string, CaptureItem>(StringComparer.OrdinalIgnoreCase);
 
-        // Words first: a failure here leaves the previous index untouched, and a crash between the
-        // two writes leaves an index that still points at (or still inlines) valid words.
-        var clearedWords = WriteOcrSidecars(persisted, previous);
+        // Words first, into files named by recognition time, so a new recognition never overwrites
+        // the file the current index still points at. If the index write below fails (or the app
+        // dies before it), the previous index and its words stay intact; superseded word files
+        // are deleted only once the new index is published.
+        var superseded = WriteOcrSidecars(persisted, previous);
         AtomicJsonFile.Write(_paths.IndexPath, persisted, IndexJsonOptions);
         _cache = persisted;
         _cacheStamp = IndexFileStamp.Read(_paths.IndexPath);
         _pendingOcrSidecars.Clear();
 
         var keptIds = persisted.Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var id in clearedWords.Concat(previous.Keys.Where(id => !keptIds.Contains(id))))
+        superseded.AddRange(previous.Values.Where(item => !keptIds.Contains(item.Id) && item.OcrWords.Count > 0));
+        foreach (var item in superseded)
         {
-            TryDeleteOcrSidecar(id);
+            TryDeleteOcrSidecar(item.Id, item.OcrRecognizedAt);
         }
     }
 
-    private List<string> WriteOcrSidecars(
+    /// <summary>Writes changed word files and returns the persisted versions they replace.</summary>
+    private List<CaptureItem> WriteOcrSidecars(
         IReadOnlyList<CaptureItem> items,
         IReadOnlyDictionary<string, CaptureItem> previous)
     {
-        var cleared = new List<string>();
+        var superseded = new List<CaptureItem>();
         foreach (var item in items)
         {
             previous.TryGetValue(item.Id, out var before);
+            var replacesOlderFile = before is { OcrWords.Count: > 0 } &&
+                before.OcrRecognizedAt != item.OcrRecognizedAt;
             if (item.OcrWords.Count == 0)
             {
                 if (before is { OcrWords.Count: > 0 })
                 {
-                    cleared.Add(item.Id);
+                    superseded.Add(before);
                 }
 
                 continue;
@@ -256,8 +267,13 @@ public sealed class WorkspaceStore
                 continue;
             }
 
+            if (replacesOlderFile)
+            {
+                superseded.Add(before!);
+            }
+
             AtomicJsonFile.Write(
-                GetOcrSidecarPath(item.Id),
+                GetOcrSidecarPath(item.Id, item.OcrRecognizedAt),
                 new OcrWordsSidecar
                 {
                     Id = item.Id,
@@ -268,7 +284,7 @@ public sealed class WorkspaceStore
                 flushToDisk: false);
         }
 
-        return cleared;
+        return superseded;
     }
 
     /// <summary>
@@ -304,7 +320,7 @@ public sealed class WorkspaceStore
             }
 
             sidecarNames ??= ListOcrSidecarNames();
-            var path = GetOcrSidecarPath(item.Id);
+            var path = GetOcrSidecarPath(item.Id, item.OcrRecognizedAt);
             if (!sidecarNames.Contains(Path.GetFileName(path)))
             {
                 continue;
@@ -351,11 +367,11 @@ public sealed class WorkspaceStore
         }
     }
 
-    private void TryDeleteOcrSidecar(string id)
+    private void TryDeleteOcrSidecar(string id, DateTimeOffset? recognizedAt)
     {
         try
         {
-            File.Delete(GetOcrSidecarPath(id));
+            File.Delete(GetOcrSidecarPath(id, recognizedAt));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -363,10 +379,11 @@ public sealed class WorkspaceStore
         }
     }
 
-    private string GetOcrSidecarPath(string id)
+    private string GetOcrSidecarPath(string id, DateTimeOffset? recognizedAt)
     {
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id.ToUpperInvariant())));
-        return Path.Combine(_paths.OcrWordsRoot, $"{hash}.json");
+        var version = recognizedAt?.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0";
+        return Path.Combine(_paths.OcrWordsRoot, $"{hash}-{version}.json");
     }
 
     private static void OmitOcrWordsFromIndex(JsonTypeInfo typeInfo)

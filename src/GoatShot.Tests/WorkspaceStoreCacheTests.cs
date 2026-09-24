@@ -125,6 +125,45 @@ public sealed class WorkspaceStoreCacheTests
     }
 
     [TestMethod]
+    public void Rerecognition_WritesANewWordFileAndRetiresTheOldOneAfterPublishing()
+    {
+        WithTempPaths(paths =>
+        {
+            var store = new WorkspaceStore(paths, new AppSettings());
+            var item = NewItem(paths, "rerecognized.png");
+            item.OcrRecognizedAt = DateTimeOffset.Now.AddMinutes(-1);
+            item.OcrWords = [Word("before", 0)];
+            store.UpdateItemsAsync([item]).GetAwaiter().GetResult();
+            var firstFile = Directory.GetFiles(paths.OcrWordsRoot).Single();
+
+            item.OcrRecognizedAt = DateTimeOffset.Now;
+            item.OcrWords = [Word("after", 0)];
+            store.UpdateItemsAsync([item]).GetAwaiter().GetResult();
+
+            var remaining = Directory.GetFiles(paths.OcrWordsRoot).Single();
+            Assert.AreNotEqual(firstFile, remaining, "A new recognition must not overwrite the published word file.");
+            Assert.AreEqual("after", new WorkspaceStore(paths, new AppSettings()).Load().Single().OcrWords.Single().Text);
+        });
+    }
+
+    [TestMethod]
+    public void RebuildMetadataIndex_RefusesASnapshotAnotherProcessHasSuperseded()
+    {
+        WithTempPaths(paths =>
+        {
+            var index = new WorkspaceMetadataIndex(paths);
+            var store = new WorkspaceStore(paths, new AppSettings());
+            store.AttachMetadataIndex(index);
+            store.UpdateItemsAsync([NewItem(paths, "mine.png")]).GetAwaiter().GetResult();
+
+            Assert.IsFalse(
+                index.TryRebuild([], index.Generation, () => false),
+                "A stale cross-process snapshot must not replace the search rows.");
+            Assert.IsTrue(index.TryRebuild([], index.Generation, () => true));
+        });
+    }
+
+    [TestMethod]
     public void DeleteItemAsync_RemovesTheWordFile()
     {
         WithTempPaths(paths =>

@@ -115,15 +115,15 @@ public partial class CaptureGalleryWindow : Window
 
     public void UpdateCaptures(IEnumerable<CaptureItem> captures, CaptureItem latest)
     {
-        var all = CaptureGalleryModels.BuildItems(captures, latest);
-        _entries = all.Count > MaxEntries ? all.Take(MaxEntries).ToArray() : all;
+        var total = CaptureGalleryModels.Count(captures, latest);
+        _entries = CaptureGalleryModels.BuildItems(captures, latest, MaxEntries);
         _selectedEntry = _entries.FirstOrDefault(entry => entry.IsSelected);
         ReflowRows(force: true);
         CaptureCountText.Text = latest.IsPrivate
             ? "Private capture · Temporary"
-            : all.Count > MaxEntries
-                ? $"Latest {MaxEntries} of {all.Count} screenshots · Open library for the rest"
-                : $"{all.Count} screenshots · Newest first";
+            : total > MaxEntries
+                ? $"Latest {MaxEntries} of {total} screenshots · Open library for the rest"
+                : $"{total} screenshots · Newest first";
         if (CaptureRows.Items.Count > 0)
         {
             CaptureRows.ScrollIntoView(CaptureRows.Items[0]);

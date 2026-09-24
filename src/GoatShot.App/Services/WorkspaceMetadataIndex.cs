@@ -92,11 +92,12 @@ public sealed partial class WorkspaceMetadataIndex
     /// </summary>
     public long Generation => Interlocked.Read(ref _generation);
 
-    public bool TryRebuild(IEnumerable<CaptureItem> items, long expectedGeneration)
+    public bool TryRebuild(IEnumerable<CaptureItem> items, long expectedGeneration, Func<bool>? snapshotStillCurrent = null)
     {
         lock (_gate)
         {
-            if (Interlocked.Read(ref _generation) != expectedGeneration)
+            if (Interlocked.Read(ref _generation) != expectedGeneration ||
+                snapshotStillCurrent?.Invoke() == false)
             {
                 return false;
             }
