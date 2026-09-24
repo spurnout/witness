@@ -14,6 +14,13 @@ namespace GoatShot.App.Windows;
 
 public partial class CaptureGalleryWindow : Window
 {
+    /// <summary>The popup is for the latest captures; the library holds the full history.</summary>
+    internal const int MaxEntries = 100;
+
+    // A new gallery is created for each capture, so a size the user picked is carried over here
+    // for the rest of the session instead of snapping back to the default every time.
+    private static System.Windows.Size? _rememberedSize;
+
     private readonly DispatcherTimer _dismissTimer;
     private int _dismissRevision;
     private bool _keyboardInteraction;
@@ -56,8 +63,19 @@ public partial class CaptureGalleryWindow : Window
             _keyboardInteraction = false;
             RestartAutoDismiss();
         };
+        if (_rememberedSize is { } remembered)
+        {
+            Width = remembered.Width;
+            Height = remembered.Height;
+        }
+
         Closed += (_, _) =>
         {
+            if (ActualWidth > 0 && ActualHeight > 0)
+            {
+                _rememberedSize = new System.Windows.Size(ActualWidth, ActualHeight);
+            }
+
             _closed = true;
             PauseAutoDismiss();
             _dismissTimer.Tick -= DismissTimer_Tick;
@@ -97,12 +115,15 @@ public partial class CaptureGalleryWindow : Window
 
     public void UpdateCaptures(IEnumerable<CaptureItem> captures, CaptureItem latest)
     {
-        _entries = CaptureGalleryModels.BuildItems(captures, latest);
+        var all = CaptureGalleryModels.BuildItems(captures, latest);
+        _entries = all.Count > MaxEntries ? all.Take(MaxEntries).ToArray() : all;
         _selectedEntry = _entries.FirstOrDefault(entry => entry.IsSelected);
         ReflowRows(force: true);
         CaptureCountText.Text = latest.IsPrivate
             ? "Private capture · Temporary"
-            : $"{_entries.Count} screenshots · Newest first";
+            : all.Count > MaxEntries
+                ? $"Latest {MaxEntries} of {all.Count} screenshots · Open library for the rest"
+                : $"{all.Count} screenshots · Newest first";
         if (CaptureRows.Items.Count > 0)
         {
             CaptureRows.ScrollIntoView(CaptureRows.Items[0]);
@@ -216,25 +237,9 @@ public sealed class CaptureGalleryThumbnailConverter : IValueConverter
 
         foreach (var path in new[] { item.ThumbnailPath, item.FilePath }.Distinct())
         {
-            try
+            if (ThumbnailImageCache.TryLoad(path, 280) is { } image)
             {
-                if (!File.Exists(path))
-                {
-                    continue;
-                }
-
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.DecodePixelWidth = 280;
-                image.UriSource = new Uri(path, UriKind.Absolute);
-                image.EndInit();
-                image.Freeze();
                 return image;
-            }
-            catch (Exception exception) when (CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(exception))
-            {
-                // A stale or damaged thumbnail must not prevent capture feedback or history access.
             }
         }
 

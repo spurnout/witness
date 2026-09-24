@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using GoatShot.App.Models;
 
 namespace GoatShot.App.Services;
@@ -41,10 +42,32 @@ public sealed class WorkspaceStore
         WriteIndented = true
     };
 
+    /// <summary>
+    /// The index is rewritten on every capture, so it is compact and leaves per-word OCR boxes to
+    /// per-capture files under <see cref="AppPaths.OcrWordsRoot"/>. Reading still accepts inline
+    /// words written by older versions; they move out on the next save.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndexJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { OmitOcrWordsFromIndex }
+        }
+    };
+
+    private static readonly JsonSerializerOptions OcrWordsJsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly AppPaths _paths;
     private readonly AppSettings _settings;
     private readonly object _gate = new();
     private WorkspaceMetadataIndex? _metadataIndex;
+
+    // Persisted state as last read or written, guarded by _gate. Items in it are never handed to
+    // callers; LoadCore clones them and SaveCore stores clones, so caller edits stay unsaved until
+    // they are passed back in. The stamp detects writes by other processes (CLI, browser host).
+    private List<CaptureItem>? _cache;
+    private IndexFileStamp _cacheStamp;
+    private readonly HashSet<string> _pendingOcrSidecars = new(StringComparer.OrdinalIgnoreCase);
 
     public WorkspaceStore(AppPaths paths, AppSettings settings)
     {
@@ -73,7 +96,98 @@ public sealed class WorkspaceStore
         }
     }
 
+    /// <summary>
+    /// Rewrites an index that still carries inline OCR words from an older version, so the
+    /// one-time move to per-capture word files happens at startup rather than on a capture.
+    /// </summary>
+    public void CompactLegacyIndex()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                var items = LoadCore();
+                if (_pendingOcrSidecars.Count > 0)
+                {
+                    SaveCore(items);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            {
+                StartupTrace.Write($"Workspace index could not be compacted: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Repopulates the search index from the library without holding up startup. A capture,
+    /// edit, or delete that lands while the rebuild snapshot is being written invalidates it,
+    /// and the rebuild retries so it can never erase a newer search row.
+    /// </summary>
+    public void RebuildMetadataIndex()
+    {
+        if (_metadataIndex is not { } index)
+        {
+            return;
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            List<CaptureItem> snapshot;
+            long generation;
+            lock (_gate)
+            {
+                snapshot = LoadCoreOrEmpty();
+                generation = index.Generation;
+            }
+
+            if (index.TryRebuild(snapshot, generation))
+            {
+                return;
+            }
+        }
+
+        lock (_gate)
+        {
+            index.Rebuild(LoadCoreOrEmpty());
+        }
+    }
+
+    private List<CaptureItem> LoadCoreOrEmpty()
+    {
+        try
+        {
+            return LoadCore();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            StartupTrace.Write($"Workspace index could not be read: {ex.Message}");
+            return [];
+        }
+    }
+
+    /// <summary>A working copy of the persisted items that the caller may mutate and save.</summary>
     private List<CaptureItem> LoadCore()
+    {
+        return CurrentItemsCore().Select(item => item.Clone()).ToList();
+    }
+
+    private List<CaptureItem> CurrentItemsCore()
+    {
+        var stamp = IndexFileStamp.Read(_paths.IndexPath);
+        if (_cache is not null && stamp == _cacheStamp)
+        {
+            return _cache;
+        }
+
+        var items = ReadIndexFile();
+        HydrateOcrWords(items, _cache);
+        _cache = items;
+        _cacheStamp = stamp;
+        return _cache;
+    }
+
+    private List<CaptureItem> ReadIndexFile()
     {
         if (!File.Exists(_paths.IndexPath))
         {
@@ -81,7 +195,7 @@ public sealed class WorkspaceStore
         }
 
         using var stream = new FileStream(_paths.IndexPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-        var items = JsonSerializer.Deserialize<List<CaptureItem>>(stream, JsonOptions)
+        var items = JsonSerializer.Deserialize<List<CaptureItem>>(stream, IndexJsonOptions)
             ?? throw new JsonException("The workspace index must contain a capture list.");
         if (items.Any(item => item is null || string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.FilePath)))
         {
@@ -93,7 +207,182 @@ public sealed class WorkspaceStore
 
     private void SaveCore(List<CaptureItem> items)
     {
-        AtomicJsonFile.Write(_paths.IndexPath, items.OrderByDescending(item => item.CreatedAt), JsonOptions);
+        var persisted = items
+            .OrderByDescending(item => item.CreatedAt)
+            .Select(item => item.Clone())
+            .ToList();
+        var previous = _cache?.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, CaptureItem>(StringComparer.OrdinalIgnoreCase);
+
+        // Words first: a failure here leaves the previous index untouched, and a crash between the
+        // two writes leaves an index that still points at (or still inlines) valid words.
+        var clearedWords = WriteOcrSidecars(persisted, previous);
+        AtomicJsonFile.Write(_paths.IndexPath, persisted, IndexJsonOptions);
+        _cache = persisted;
+        _cacheStamp = IndexFileStamp.Read(_paths.IndexPath);
+        _pendingOcrSidecars.Clear();
+
+        var keptIds = persisted.Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in clearedWords.Concat(previous.Keys.Where(id => !keptIds.Contains(id))))
+        {
+            TryDeleteOcrSidecar(id);
+        }
+    }
+
+    private List<string> WriteOcrSidecars(
+        IReadOnlyList<CaptureItem> items,
+        IReadOnlyDictionary<string, CaptureItem> previous)
+    {
+        var cleared = new List<string>();
+        foreach (var item in items)
+        {
+            previous.TryGetValue(item.Id, out var before);
+            if (item.OcrWords.Count == 0)
+            {
+                if (before is { OcrWords.Count: > 0 })
+                {
+                    cleared.Add(item.Id);
+                }
+
+                continue;
+            }
+
+            var unchanged = before is not null &&
+                !_pendingOcrSidecars.Contains(item.Id) &&
+                before.OcrRecognizedAt == item.OcrRecognizedAt &&
+                before.OcrWords.SequenceEqual(item.OcrWords, ReferenceEqualityComparer.Instance);
+            if (unchanged)
+            {
+                continue;
+            }
+
+            AtomicJsonFile.Write(
+                GetOcrSidecarPath(item.Id),
+                new OcrWordsSidecar
+                {
+                    Id = item.Id,
+                    RecognizedAt = item.OcrRecognizedAt,
+                    Words = item.OcrWords
+                },
+                OcrWordsJsonOptions,
+                flushToDisk: false);
+        }
+
+        return cleared;
+    }
+
+    /// <summary>
+    /// Attaches stored OCR words to freshly read items. Words already held for an unchanged
+    /// recognition are reused, so a reload after another process writes the index only reads the
+    /// word files that actually changed.
+    /// </summary>
+    private void HydrateOcrWords(List<CaptureItem> items, List<CaptureItem>? previousItems)
+    {
+        var previous = previousItems?.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+        HashSet<string>? sidecarNames = null;
+        foreach (var item in items)
+        {
+            if (item.OcrWords.Count > 0)
+            {
+                // Inline words from an older index; the next save moves them to a word file.
+                _pendingOcrSidecars.Add(item.Id);
+                continue;
+            }
+
+            if (item.OcrRecognizedAt is null)
+            {
+                continue;
+            }
+
+            if (previous is not null &&
+                previous.TryGetValue(item.Id, out var before) &&
+                before.OcrRecognizedAt == item.OcrRecognizedAt &&
+                before.OcrWords.Count > 0)
+            {
+                item.OcrWords = before.OcrWords;
+                continue;
+            }
+
+            sidecarNames ??= ListOcrSidecarNames();
+            var path = GetOcrSidecarPath(item.Id);
+            if (!sidecarNames.Contains(Path.GetFileName(path)))
+            {
+                continue;
+            }
+
+            var sidecar = TryReadOcrSidecar(path);
+            if (sidecar is not null &&
+                sidecar.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) &&
+                sidecar.RecognizedAt == item.OcrRecognizedAt)
+            {
+                item.OcrWords = sidecar.Words;
+            }
+        }
+    }
+
+    private HashSet<string> ListOcrSidecarNames()
+    {
+        try
+        {
+            return Directory.Exists(_paths.OcrWordsRoot)
+                ? Directory.EnumerateFiles(_paths.OcrWordsRoot, "*.json")
+                    .Select(Path.GetFileName)
+                    .OfType<string>()
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : [];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    private static OcrWordsSidecar? TryReadOcrSidecar(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            return JsonSerializer.Deserialize<OcrWordsSidecar>(stream, OcrWordsJsonOptions);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // Words are rebuildable: live text re-recognizes a capture that has none.
+            return null;
+        }
+    }
+
+    private void TryDeleteOcrSidecar(string id)
+    {
+        try
+        {
+            File.Delete(GetOcrSidecarPath(id));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An orphaned word file is ignored on load because its id no longer exists.
+        }
+    }
+
+    private string GetOcrSidecarPath(string id)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id.ToUpperInvariant())));
+        return Path.Combine(_paths.OcrWordsRoot, $"{hash}.json");
+    }
+
+    private static void OmitOcrWordsFromIndex(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Type != typeof(CaptureItem))
+        {
+            return;
+        }
+
+        foreach (var property in typeInfo.Properties)
+        {
+            if (property.AttributeProvider is System.Reflection.PropertyInfo { Name: nameof(CaptureItem.OcrWords) })
+            {
+                property.ShouldSerialize = static (_, _) => false;
+            }
+        }
     }
 
     public async Task<CaptureItem> SaveCaptureAsync(
@@ -114,7 +403,8 @@ public sealed class WorkspaceStore
                 captured.Bitmap.Save(output, ImageFormat.Png);
             }
 
-            var item = BuildItem(path, captured.Kind, captured.Bounds, privateCapture, captured.Source, hotkeyProfile);
+            // The pixels are still in memory; re-decoding the PNG just written would double the cost.
+            var item = BuildItem(path, captured.Kind, captured.Bounds, privateCapture, captured.Source, hotkeyProfile, captured.Bitmap);
             if (!privateCapture)
             {
                 AddToIndex(item);
@@ -351,7 +641,8 @@ public sealed class WorkspaceStore
         CaptureBounds? bounds,
         bool privateCapture,
         CaptureSource? source,
-        string? hotkeyProfile = null)
+        string? hotkeyProfile = null,
+        Image? decodedImage = null)
     {
         var info = new FileInfo(path);
         var width = 0;
@@ -360,10 +651,19 @@ public sealed class WorkspaceStore
 
         try
         {
-            using var image = Image.FromFile(path);
-            width = image.Width;
-            height = image.Height;
-            thumbnailPath = CreateThumbnail(path, image);
+            if (decodedImage is not null)
+            {
+                width = decodedImage.Width;
+                height = decodedImage.Height;
+                thumbnailPath = CreateThumbnail(path, decodedImage);
+            }
+            else
+            {
+                using var image = Image.FromFile(path);
+                width = image.Width;
+                height = image.Height;
+                thumbnailPath = CreateThumbnail(path, image);
+            }
         }
         catch
         {
@@ -580,7 +880,18 @@ public sealed class WorkspaceStore
 
     private int NextCounter()
     {
-        return Load().Count + 1;
+        lock (_gate)
+        {
+            try
+            {
+                // Count the cached items instead of cloning (or re-reading) the whole library.
+                return CurrentItemsCore().Count + 1;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                return 1;
+            }
+        }
     }
 
     private static FileStream CreateUniqueFile(string path)
@@ -604,4 +915,22 @@ public sealed class WorkspaceStore
             }
         }
     }
+}
+
+internal readonly record struct IndexFileStamp(bool Exists, long Length, DateTime LastWriteUtc)
+{
+    public static IndexFileStamp Read(string path)
+    {
+        var info = new FileInfo(path);
+        return info.Exists
+            ? new IndexFileStamp(true, info.Length, info.LastWriteTimeUtc)
+            : default;
+    }
+}
+
+internal sealed class OcrWordsSidecar
+{
+    public string Id { get; set; } = string.Empty;
+    public DateTimeOffset? RecognizedAt { get; set; }
+    public List<OcrRecognizedWord> Words { get; set; } = [];
 }

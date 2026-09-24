@@ -24,7 +24,14 @@ public sealed class ScreenshotService
         // Read the foreground BEFORE the overlay opens — the overlay steals it. When the user
         // click-captures a specific window, its live context replaces this fallback below.
         var sourceContext = GetForegroundSourceContext();
-        var (bounds, target) = SelectRegionBounds(owner);
+
+        // The screen is grabbed once. The overlay shows this frame and the capture is cut from
+        // it, so the result is exactly what was on screen when the capture started, no second
+        // full-screen grab is needed, and the closing overlay can never end up in the image.
+        using var cursor = _settings.IncludeCursor ? CursorSnapshot.TryCapture() : null;
+        var virtualBounds = GetVirtualScreenBounds();
+        using var frozen = CaptureScreenBitmap(virtualBounds);
+        var (bounds, target) = SelectRegionBounds(owner, frozen);
         if (bounds is null)
         {
             return Task.FromResult<CapturedBitmap?>(null);
@@ -36,7 +43,45 @@ public sealed class ScreenshotService
         }
 
         _lastRegion = bounds;
-        return Task.FromResult<CapturedBitmap?>(CaptureRectangle(bounds, CaptureKind.Region, sourceContext));
+        var cropped = TryCropFrozenScreen(frozen, virtualBounds, bounds);
+        if (cropped is null)
+        {
+            // The selection left the frozen frame (a display change while selecting); grab live.
+            return Task.FromResult<CapturedBitmap?>(CaptureRectangle(bounds, CaptureKind.Region, sourceContext));
+        }
+
+        if (cursor is not null)
+        {
+            using var graphics = Graphics.FromImage(cropped);
+            cursor.DrawIfInside(graphics, bounds);
+        }
+
+        return Task.FromResult<CapturedBitmap?>(new CapturedBitmap(cropped, CaptureKind.Region, bounds, sourceContext));
+    }
+
+    internal static Rectangle? ResolveFrozenCrop(CaptureBounds virtualBounds, CaptureBounds bounds)
+    {
+        var crop = new Rectangle(bounds.X - virtualBounds.X, bounds.Y - virtualBounds.Y, bounds.Width, bounds.Height);
+        return crop.Width > 0 &&
+            crop.Height > 0 &&
+            crop.X >= 0 &&
+            crop.Y >= 0 &&
+            crop.Right <= virtualBounds.Width &&
+            crop.Bottom <= virtualBounds.Height
+                ? crop
+                : null;
+    }
+
+    private static Bitmap? TryCropFrozenScreen(Bitmap frozen, CaptureBounds virtualBounds, CaptureBounds bounds)
+    {
+        if (frozen.Width != virtualBounds.Width ||
+            frozen.Height != virtualBounds.Height ||
+            ResolveFrozenCrop(virtualBounds, bounds) is not { } crop)
+        {
+            return null;
+        }
+
+        return frozen.Clone(crop, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
     }
 
     /// <summary>
@@ -68,8 +113,13 @@ public sealed class ScreenshotService
 
     private (CaptureBounds? Bounds, CaptureOverlayTarget? Target) SelectRegionBounds(Window? owner = null)
     {
-        using var background = CaptureVirtualScreenBitmap(includeCursor: false);
-        var source = ImageInterop.ToBitmapSource(background);
+        using var background = CaptureScreenBitmap(GetVirtualScreenBounds());
+        return SelectRegionBounds(owner, background);
+    }
+
+    private (CaptureBounds? Bounds, CaptureOverlayTarget? Target) SelectRegionBounds(Window? owner, Bitmap background)
+    {
+        var source = ImageInterop.ToOpaqueBitmapSource(background);
         var overlay = new RegionCaptureWindow(
             source,
             _settings.CaptureContextPadding,
@@ -275,18 +325,11 @@ public sealed class ScreenshotService
         return bitmap;
     }
 
-    private Bitmap CaptureVirtualScreenBitmap(bool includeCursor)
+    private static Bitmap CaptureScreenBitmap(CaptureBounds bounds)
     {
-        var bounds = GetVirtualScreenBounds();
         var bitmap = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(bitmap);
         graphics.CopyFromScreen(bounds.X, bounds.Y, 0, 0, new System.Drawing.Size(bounds.Width, bounds.Height));
-
-        if (includeCursor)
-        {
-            DrawCursorIfInside(graphics, bounds);
-        }
-
         return bitmap;
     }
 
@@ -411,6 +454,67 @@ public sealed class ScreenshotService
         return source;
     }
 
+    /// <summary>
+    /// The cursor as it was when a frozen capture started, kept as its own icon copy so it can be
+    /// drawn into the crop after the user finishes selecting.
+    /// </summary>
+    private sealed class CursorSnapshot : IDisposable
+    {
+        private IntPtr _icon;
+        private readonly int _x;
+        private readonly int _y;
+
+        private CursorSnapshot(IntPtr icon, int x, int y)
+        {
+            _icon = icon;
+            _x = x;
+            _y = y;
+        }
+
+        public static CursorSnapshot? TryCapture()
+        {
+            var cursorInfo = new CursorInfo { CbSize = Marshal.SizeOf<CursorInfo>() };
+            if (!GetCursorInfo(out cursorInfo) || cursorInfo.Flags != CursorShowing)
+            {
+                return null;
+            }
+
+            var icon = CopyIcon(cursorInfo.HCursor);
+            return icon == IntPtr.Zero
+                ? null
+                : new CursorSnapshot(icon, cursorInfo.PtScreenPos.X, cursorInfo.PtScreenPos.Y);
+        }
+
+        public void DrawIfInside(Graphics graphics, CaptureBounds bounds)
+        {
+            var x = _x - bounds.X;
+            var y = _y - bounds.Y;
+            if (_icon == IntPtr.Zero || x < 0 || y < 0 || x > bounds.Width || y > bounds.Height)
+            {
+                return;
+            }
+
+            var hdc = graphics.GetHdc();
+            try
+            {
+                DrawIconEx(hdc, x, y, _icon, 0, 0, 0, IntPtr.Zero, DiNormal);
+            }
+            finally
+            {
+                graphics.ReleaseHdc(hdc);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_icon != IntPtr.Zero)
+            {
+                DestroyIcon(_icon);
+                _icon = IntPtr.Zero;
+            }
+        }
+    }
+
     private const int CursorShowing = 0x00000001;
     private const int DiNormal = 0x0003;
     private const int MouseWheelDelta = 120;
@@ -447,6 +551,12 @@ public sealed class ScreenshotService
         int istepIfAniCur,
         IntPtr hbrFlickerFreeDraw,
         int diFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CopyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyIcon(IntPtr hIcon);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint cInputs, NativeInput[] pInputs, int cbSize);

@@ -222,7 +222,20 @@ public sealed class AppServices : IDisposable
         var workspaceIndex = new WorkspaceMetadataIndex(paths);
         var workspaceStore = new WorkspaceStore(paths, settings);
         workspaceStore.AttachMetadataIndex(workspaceIndex);
-        workspaceIndex.Rebuild(workspaceStore.Load());
+        // Both passes walk the whole library; neither is needed before the first window appears,
+        // and the rebuild refuses to overwrite writes that land while it runs.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                workspaceStore.CompactLegacyIndex();
+                workspaceStore.RebuildMetadataIndex();
+            }
+            catch (Exception ex)
+            {
+                StartupTrace.Write($"Workspace search index rebuild failed: {ex.Message}");
+            }
+        });
         var workflowProfiles = new WorkflowProfileService(settings, settingsStore);
         var workflowRunLogs = new WorkflowRunLogService(paths);
         var workflowDryRuns = new WorkflowActionDryRunService(settings, paths);

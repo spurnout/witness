@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using GoatShot.App.Controls;
 using GoatShot.App.Models;
 using GoatShot.App.Services;
 using GoatShot.App.Windows;
@@ -16,7 +17,7 @@ namespace GoatShot.App;
 public partial class MainWindow : Window
 {
     private readonly AppServices _services;
-    private readonly ObservableCollection<CaptureItem> _captures = new();
+    private readonly BulkObservableCollection<CaptureItem> _captures = new();
     private readonly ObservableCollection<UploadQueueItem> _uploadQueueItems = new();
     private List<CaptureItem> _allCaptures = new();
     private string _libraryFilter = "All";
@@ -28,6 +29,12 @@ public partial class MainWindow : Window
     private ShareHistoryWindow? _shareHistoryWindow;
     private AiHistoryWindow? _aiHistoryWindow;
     private CaptureGalleryWindow? _captureGalleryWindow;
+    private readonly List<CaptureTaskWindow> _captureTaskWindows = new();
+    private bool _rebuildingCaptureList;
+    private DispatcherTimer? _searchDebounceTimer;
+    private int _previewLoadVersion;
+    private string? _previewKey;
+    private CaptureItem? _pendingPreviewItem;
     private CancellationTokenSource? _webcamPreviewCts;
     private Task? _webcamPreviewTask;
     private readonly bool _auditMode;
@@ -54,6 +61,7 @@ public partial class MainWindow : Window
         WpfAccessibilityNameHelper.ApplyGeneratedNames(this);
         CaptureList.ItemsSource = _captures;
         QueueList.ItemsSource = _uploadQueueItems;
+        IsVisibleChanged += MainWindow_IsVisibleChanged;
         UpdateWorkspaceLayout();
     }
 
@@ -143,11 +151,11 @@ public partial class MainWindow : Window
     public async void CaptureWindowCommand(string? hotkeyProfile = null) => await CaptureActiveWindowAsync(hotkeyProfile);
     public async void CaptureScrollingWindowCommand() => await CaptureScrollingWindowAsync();
     public async void CaptureHorizontalScrollingWindowCommand() => await CaptureScrollingWindowAsync(ScrollingCaptureAxis.Horizontal);
-    public async void CaptureFullscreenCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureFullScreenAsync(), hotkeyProfile);
-    public async void CaptureAllMonitorsCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureAllMonitorsAsync(), hotkeyProfile);
-    public async void CaptureMonitorCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureActiveMonitorAsync(), hotkeyProfile);
-    public async void CaptureFixedRegionCommand(int width, int height, string? hotkeyProfile = null) => await CaptureAndStoreAsync(async () => await _services.Screenshots.CaptureFixedRegionAtCursorAsync(width, height), hotkeyProfile);
-    public async void CaptureLastRegionCommand(string? hotkeyProfile = null) => await CaptureAndStoreAsync(() => _services.Screenshots.CaptureLastRegionAsync(this), hotkeyProfile);
+    public async void CaptureFullscreenCommand(string? hotkeyProfile = null) => await CaptureWithWorkspaceHiddenAsync(async () => await _services.Screenshots.CaptureFullScreenAsync(), hotkeyProfile);
+    public async void CaptureAllMonitorsCommand(string? hotkeyProfile = null) => await CaptureWithWorkspaceHiddenAsync(async () => await _services.Screenshots.CaptureAllMonitorsAsync(), hotkeyProfile);
+    public async void CaptureMonitorCommand(string? hotkeyProfile = null) => await CaptureWithWorkspaceHiddenAsync(async () => await _services.Screenshots.CaptureActiveMonitorAsync(), hotkeyProfile);
+    public async void CaptureFixedRegionCommand(int width, int height, string? hotkeyProfile = null) => await CaptureWithWorkspaceHiddenAsync(async () => await _services.Screenshots.CaptureFixedRegionAtCursorAsync(width, height), hotkeyProfile);
+    public async void CaptureLastRegionCommand(string? hotkeyProfile = null) => await CaptureWithWorkspaceHiddenAsync(() => _services.Screenshots.CaptureLastRegionAsync(this), hotkeyProfile);
     public async void ToggleStepRecorderCommand() => await ToggleStepRecorderAsync();
     public async void RecordShortMp4Command() => await RecordShortMp4Async(RecordingCaptureTarget.ActiveMonitor());
     public void ToggleRecordingPauseCommand()
@@ -185,9 +193,7 @@ public partial class MainWindow : Window
                 await _services.WorkspaceStore.UpdateItemAsync(result.Item);
             }
 
-            _allCaptures.Insert(0, result.Item);
-            ApplyFilter();
-            CaptureList.SelectedItem = result.Item;
+            AddCaptureToLibrary(result.Item);
             await _services.Automation.ProcessRecordingCompletedAsync(result.Item);
         }
 
@@ -446,9 +452,7 @@ public partial class MainWindow : Window
                 Notes = "Original device-signed replay receipt. Receipts will not overwrite original segments or the signed manifest. Verification proves integrity since local signing; it does not independently attest device time, remote service state, operator identity, or legal authenticity."
             };
             await _services.WorkspaceStore.UpdateItemAsync(item);
-            _allCaptures.Insert(0, item);
-            ApplyFilter();
-            CaptureList.SelectedItem = item;
+            AddCaptureToLibrary(item);
             SetStatus($"{result.Message} {item.IntegrityStatus}. Buffer continued: {(result.BufferContinued ? "yes" : "no")}.");
 
             if (_services.Settings.Replay.EnableSceneIndexing || _services.Settings.Replay.EnableLocalOcrIndexing)
@@ -554,27 +558,74 @@ public partial class MainWindow : Window
             ? _allCaptures
             : FilterCaptures(query);
 
-        filtered = _libraryFilter switch
+        // One Reset notification instead of a Clear plus an Add per capture. Selection events
+        // raised by the swap are ignored; the selection is restored just below.
+        _rebuildingCaptureList = true;
+        try
         {
-            "Screenshots" => filtered.Where(item => !IsVideoCapture(item)),
-            "Videos" => filtered.Where(IsVideoCapture),
-            _ => filtered
-        };
-
-        _captures.Clear();
-        foreach (var capture in filtered)
+            _captures.ReplaceAll(filtered.Where(MatchesLibraryFilter));
+        }
+        finally
         {
-            _captures.Add(capture);
+            _rebuildingCaptureList = false;
         }
 
         EmptyState.Visibility = _captures.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         RefreshWorkspaceSummary();
 
-        if (CaptureList is not null && _captures.Count > 0)
+        if (CaptureList is null)
+        {
+            return;
+        }
+
+        if (_captures.Count > 0)
         {
             CaptureList.SelectedItem = _captures.FirstOrDefault(item => item.Id == selectedId) ?? _captures[0];
         }
+        else
+        {
+            ShowNoSelection();
+        }
     }
+
+    /// <summary>
+    /// Puts a new or replaced capture at the front of the library and selects it. Without an
+    /// active search this is one insert, not a rebuild of the whole list, which keeps the UI
+    /// thread free right after a capture.
+    /// </summary>
+    private void AddCaptureToLibrary(CaptureItem item)
+    {
+        var replaced = _allCaptures.RemoveAll(existing =>
+            existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
+            existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
+        _allCaptures.Insert(0, item);
+        if (replaced > 0 || !string.IsNullOrWhiteSpace(SearchBox?.Text))
+        {
+            ApplyFilter();
+        }
+        else
+        {
+            if (MatchesLibraryFilter(item))
+            {
+                _captures.Insert(0, item);
+                EmptyState.Visibility = Visibility.Collapsed;
+            }
+
+            RefreshWorkspaceSummary(refreshProviders: false);
+        }
+
+        if (_captures.Contains(item))
+        {
+            CaptureList.SelectedItem = item;
+        }
+    }
+
+    private bool MatchesLibraryFilter(CaptureItem item) => _libraryFilter switch
+    {
+        "Screenshots" => !IsVideoCapture(item),
+        "Videos" => IsVideoCapture(item),
+        _ => true
+    };
 
     private static bool IsVideoCapture(CaptureItem item)
     {
@@ -600,7 +651,7 @@ public partial class MainWindow : Window
             or CaptureKind.AndroidRecording;
     }
 
-    private void RefreshWorkspaceSummary()
+    private void RefreshWorkspaceSummary(bool refreshProviders = true)
     {
         if (AllCountText is null || ScreenshotCountText is null || VideoCountText is null || FooterSummaryText is null)
         {
@@ -629,7 +680,8 @@ public partial class MainWindow : Window
             AiStateText.Text = _services.Settings.AiEnabled ? "On · consent required" : "Off";
         }
 
-        if (ImgurStatusText is not null && S3StatusText is not null)
+        // Provider readiness never changes because of a capture, so the capture path skips it.
+        if (refreshProviders && ImgurStatusText is not null && S3StatusText is not null)
         {
             var providers = _services.ProviderDiagnostics.GetDiagnostics();
             ImgurStatusText.Text = ProviderStatusLabel(providers.FirstOrDefault(record => record.ProviderName == "Imgur"));
@@ -675,26 +727,48 @@ public partial class MainWindow : Window
             .ToList();
     }
 
-    private async Task<CaptureItem?> CaptureRegionAsync(string? hotkeyProfile = null)
+    private Task<CaptureItem?> CaptureRegionAsync(string? hotkeyProfile = null) =>
+        CaptureWithWorkspaceHiddenAsync(() => _services.Screenshots.CaptureRegionAsync(this), hotkeyProfile);
+
+    /// <summary>
+    /// Hides the workspace before a capture so Receipts never photographs itself, then brings it
+    /// back (in the same minimized/normal state) unless the capture gallery is taking over.
+    /// </summary>
+    private async Task<CaptureItem?> CaptureWithWorkspaceHiddenAsync(
+        Func<Task<CapturedBitmap?>> capture,
+        string? hotkeyProfile)
     {
         var wasVisible = IsVisible;
+        var wasMinimized = WindowState == WindowState.Minimized;
         CaptureItem? item = null;
         if (wasVisible)
         {
             Hide();
-            await Task.Delay(120);
+            if (!wasMinimized)
+            {
+                // Give the compositor a frame or two to take the window off screen.
+                await Task.Delay(120);
+            }
         }
 
         try
         {
-            item = await CaptureAndStoreAsync(() => _services.Screenshots.CaptureRegionAsync(this), hotkeyProfile);
+            item = await CaptureAndStoreAsync(capture, hotkeyProfile);
             return item;
         }
         finally
         {
             if (wasVisible && ShouldRestoreWorkspaceAfterCapture(item))
             {
-                ShowWorkspaceCommand();
+                if (wasMinimized)
+                {
+                    Show();
+                    WindowState = WindowState.Minimized;
+                }
+                else
+                {
+                    ShowWorkspaceCommand();
+                }
             }
         }
     }
@@ -731,32 +805,39 @@ public partial class MainWindow : Window
         string? hotkeyProfile = null)
     {
         SetStatus("Capturing...");
-        if (_captureGalleryWindow is not null)
-        {
-            // Remove the previous popup before even the region overlay takes its background image.
-            _captureGalleryWindow.Close();
-            await Task.Delay(120);
-        }
+        await ClosePostCapturePopupsAsync();
 
-        using var captured = await capture();
-        if (captured is null)
+        CaptureItem item;
+        bool copiedToClipboard;
+        try
         {
-            SetStatus("Capture canceled.");
+            using var captured = await capture();
+            if (captured is null)
+            {
+                SetStatus("Capture canceled.");
+                return null;
+            }
+
+            // The clipboard gets its own pixel copy before the save takes the bitmap to a worker
+            // thread, so the image can be pasted without waiting for PNG encoding and indexing.
+            var clipboardDib = _services.Settings.AutoCopyImageAfterCapture ? TryCreateClipboardDib(captured) : null;
+            var save = _services.WorkspaceStore.SaveCaptureAsync(
+                captured,
+                _services.Settings.PrivateCaptureMode,
+                hotkeyProfile);
+            copiedToClipboard = clipboardDib is not null && await TrySetClipboardDibAsync(clipboardDib);
+            item = await save;
+        }
+        catch (Exception ex)
+        {
+            ReportCaptureFailure(ex);
             return null;
         }
 
-        var item = await _services.WorkspaceStore.SaveCaptureAsync(
-            captured,
-            _services.Settings.PrivateCaptureMode,
-            hotkeyProfile);
         if (!item.IsPrivate)
         {
-            _allCaptures.Insert(0, item);
-            ApplyFilter();
-            CaptureList.SelectedItem = item;
+            AddCaptureToLibrary(item);
         }
-
-        var copiedToClipboard = _services.Settings.AutoCopyImageAfterCapture && TryCopyImageToClipboard(item);
 
         await _services.Automation.ProcessCaptureCreatedAsync(item);
         if (!item.IsPrivate)
@@ -765,7 +846,7 @@ public partial class MainWindow : Window
         }
 
         var status = item.IsPrivate
-            ? $"Private capture saved temporarily: {item.FilePath}"
+            ? $"Private capture saved temporarily and kept out of the library: {item.FileName}"
             : $"Captured {item.Kind}: {item.FileName}";
         if (_services.Settings.AutoCopyImageAfterCapture && !copiedToClipboard)
         {
@@ -775,6 +856,77 @@ public partial class MainWindow : Window
         SetStatus(status);
         RunPostCaptureAction(item, copiedToClipboard);
         return item;
+    }
+
+    /// <summary>
+    /// Removes the previous capture's popups before the next capture, including before the
+    /// region overlay freezes the screen, so they never end up in the image.
+    /// </summary>
+    private async Task ClosePostCapturePopupsAsync()
+    {
+        var closedAny = false;
+        if (_captureGalleryWindow is not null)
+        {
+            _captureGalleryWindow.Close();
+            closedAny = true;
+        }
+
+        foreach (var window in _captureTaskWindows.ToList())
+        {
+            window.Close();
+            closedAny = true;
+        }
+
+        if (closedAny)
+        {
+            await Task.Delay(120);
+        }
+    }
+
+    private static byte[]? TryCreateClipboardDib(CapturedBitmap captured)
+    {
+        try
+        {
+            return ClipboardImageData.CreateDib(captured.Bitmap);
+        }
+        catch (Exception ex)
+        {
+            StartupTrace.Write($"Capture clipboard image could not be prepared: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Best effort by design: the capture is still saved when the clipboard cannot be written,
+    /// and this must never throw while the save is using the bitmap on another thread.
+    /// </summary>
+    private static async Task<bool> TrySetClipboardDibAsync(byte[] dib)
+    {
+        try
+        {
+            await ClipboardInterop.SetDibAsync(dib);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (!CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(ex))
+            {
+                StartupTrace.Write($"Capture clipboard copy failed: {ex}");
+            }
+
+            return false;
+        }
+    }
+
+    private void ReportCaptureFailure(Exception exception)
+    {
+        StartupTrace.Write($"Capture failed: {exception}");
+        var message = $"Capture failed: {exception.Message}";
+        SetStatus(message);
+        if (CaptureFeedbackPolicy.ShouldShowTrayNotification(IsVisible, WindowState == WindowState.Minimized))
+        {
+            _services.Tray?.ShowCaptureNotification(message);
+        }
     }
 
     private void CaptureRegion_Click(object sender, RoutedEventArgs e) => CaptureRegionCommand();
@@ -793,7 +945,6 @@ public partial class MainWindow : Window
     private async void CaptureScrollingWindow_Click(object sender, RoutedEventArgs e) => await CaptureScrollingWindowAsync();
     private async void CaptureHorizontalScrollingWindow_Click(object sender, RoutedEventArgs e) => await CaptureScrollingWindowAsync(ScrollingCaptureAxis.Horizontal);
     private void CaptureFullscreen_Click(object sender, RoutedEventArgs e) => CaptureFullscreenCommand();
-    private void CaptureAllMonitors_Click(object sender, RoutedEventArgs e) => CaptureAllMonitorsCommand();
     private void CaptureMonitor_Click(object sender, RoutedEventArgs e) => CaptureMonitorCommand();
     private void CapturePreset1280x720_Click(object sender, RoutedEventArgs e) => CaptureFixedRegionCommand(1280, 720);
     private void CapturePreset1920x1080_Click(object sender, RoutedEventArgs e) => CaptureFixedRegionCommand(1920, 1080);
@@ -1141,9 +1292,7 @@ public partial class MainWindow : Window
 
             if (result.Item is not null)
             {
-                _allCaptures.Insert(0, result.Item);
-                ApplyFilter();
-                CaptureList.SelectedItem = result.Item;
+                AddCaptureToLibrary(result.Item);
                 await _services.Automation.ProcessRecordingCompletedAsync(result.Item);
             }
 
@@ -1472,9 +1621,7 @@ public partial class MainWindow : Window
 
         if (result.Item is not null)
         {
-            _allCaptures.Insert(0, result.Item);
-            ApplyFilter();
-            CaptureList.SelectedItem = result.Item;
+            AddCaptureToLibrary(result.Item);
             await _services.Automation.ProcessCaptureEditedAsync(result.Item);
         }
 
@@ -1585,9 +1732,7 @@ public partial class MainWindow : Window
         }
         editor.CaptureSaved += async (_, saved) =>
         {
-            _allCaptures.Insert(0, saved);
-            ApplyFilter();
-            CaptureList.SelectedItem = saved;
+            AddCaptureToLibrary(saved);
             SetStatus($"Edited copy saved: {saved.FileName}");
             await _services.Automation.ProcessCaptureEditedAsync(saved);
         };
@@ -1710,10 +1855,26 @@ public partial class MainWindow : Window
 
     private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
     {
+        var selected = CaptureList.SelectedItems.OfType<CaptureItem>().ToList();
+        if (selected.Count > 1)
+        {
+            await DeleteLocalCapturesWithConfirmationAsync(selected);
+            return;
+        }
+
         var item = SelectedCapture();
         if (item is not null)
         {
             await DeleteLocalCaptureWithConfirmationAsync(item);
+        }
+    }
+
+    private void CaptureList_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Delete && CaptureList.SelectedItems.Count > 0)
+        {
+            e.Handled = true;
+            DeleteSelected_Click(sender, e);
         }
     }
 
@@ -1981,8 +2142,7 @@ public partial class MainWindow : Window
             E("Capture active window", "Capture", () => CaptureWindow_Click(this, empty)),
             E("Capture scrolling window", "Capture", () => CaptureScrollingWindow_Click(this, empty)),
             E("Capture horizontal scrolling window", "Capture", () => CaptureHorizontalScrollingWindow_Click(this, empty)),
-            E("Capture fullscreen", "Capture", () => CaptureFullscreen_Click(this, empty)),
-            E("Capture all monitors", "Capture", () => CaptureAllMonitors_Click(this, empty)),
+            E("Capture full screen (all monitors)", "Capture", () => CaptureFullscreen_Click(this, empty)),
             E("Capture active monitor", "Capture", () => CaptureMonitor_Click(this, empty)),
             E("Capture last region", "Capture", () => CaptureLastRegion_Click(this, empty)),
             E("Capture delayed region", "Capture", () => CaptureDelayed_Click(this, empty)),
@@ -2429,9 +2589,7 @@ public partial class MainWindow : Window
 
         if (result.Item is not null)
         {
-            _allCaptures.Insert(0, result.Item);
-            ApplyFilter();
-            CaptureList.SelectedItem = result.Item;
+            AddCaptureToLibrary(result.Item);
         }
 
         if (!string.IsNullOrWhiteSpace(result.OutputPath))
@@ -2481,9 +2639,7 @@ public partial class MainWindow : Window
 
         SetStatus("Stripping image metadata...");
         var saved = await _services.Metadata.StripImageMetadataAsync(item, _services.WorkspaceStore);
-        _allCaptures.Insert(0, saved);
-        ApplyFilter();
-        CaptureList.SelectedItem = saved;
+        AddCaptureToLibrary(saved);
         SetStatus($"Metadata-stripped copy saved: {saved.FileName}");
     }
 
@@ -2782,10 +2938,29 @@ public partial class MainWindow : Window
                 : Visibility.Collapsed;
         }
 
-        if (IsInitialized)
+        if (!IsInitialized)
+        {
+            return;
+        }
+
+        _searchDebounceTimer?.Stop();
+        if (string.IsNullOrWhiteSpace(SearchBox.Text))
         {
             ApplyFilter();
+            return;
         }
+
+        // Each search rebuilds the list and queries the index, so wait for a pause in typing.
+        _searchDebounceTimer ??= new DispatcherTimer(
+            TimeSpan.FromMilliseconds(180),
+            DispatcherPriority.Input,
+            (_, _) =>
+            {
+                _searchDebounceTimer?.Stop();
+                ApplyFilter();
+            },
+            Dispatcher);
+        _searchDebounceTimer.Start();
     }
 
     private void LibraryFilter_Checked(object sender, RoutedEventArgs e)
@@ -2813,27 +2988,36 @@ public partial class MainWindow : Window
 
     private void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var item = SelectedCapture();
-        if (item is null)
+        if (_rebuildingCaptureList)
         {
-            SetSelectionActionsEnabled(false);
-            PreviewImage.Source = null;
-            PreviewSurface.Width = double.NaN;
-            PreviewSurface.Height = double.NaN;
-            ClearPreviewTextOverlay();
-            _previewLiveTextEnabled = false;
-            DetailsText.Text = "No capture selected.";
-            PreviewHint.Text = "Select a capture";
-            SelectedFileNameText.Text = "No capture selected";
-            SelectedCreatedText.Text = "—";
-            SelectedBytesText.Text = "—";
-            SelectedDimensionsText.Text = "—";
-            EmptyState.Visibility = Visibility.Visible;
-            OpenReceiptButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (CaptureList.SelectedItem is not CaptureItem item)
+        {
+            ShowNoSelection();
             return;
         }
 
         UpdateCaptureDetails(item);
+    }
+
+    private void ShowNoSelection()
+    {
+        SetSelectionActionsEnabled(false);
+        ClearPreview();
+        PreviewSurface.Width = double.NaN;
+        PreviewSurface.Height = double.NaN;
+        ClearPreviewTextOverlay();
+        _previewLiveTextEnabled = false;
+        DetailsText.Text = "No capture selected.";
+        PreviewHint.Text = "Select a capture";
+        SelectedFileNameText.Text = "No capture selected";
+        SelectedCreatedText.Text = "—";
+        SelectedBytesText.Text = "—";
+        SelectedDimensionsText.Text = "—";
+        EmptyState.Visibility = Visibility.Visible;
+        OpenReceiptButton.Visibility = Visibility.Collapsed;
     }
 
     private void CaptureList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -2848,8 +3032,7 @@ public partial class MainWindow : Window
     private void UpdateCaptureDetails(CaptureItem item)
     {
         SetSelectionActionsEnabled(true, item);
-        PreviewImage.Source = LoadPreviewImage(item);
-        ConfigurePreviewLiveText(item);
+        ShowPreview(item);
         PreviewHint.Text = item.FileName;
         EmptyState.Visibility = Visibility.Collapsed;
         SelectedFileNameText.Text = item.FileName;
@@ -3042,24 +3225,6 @@ public partial class MainWindow : Window
         ClipboardInterop.SetImage(ImageInterop.LoadBitmapImage(item.FilePath));
     }
 
-    /// <summary>
-    /// The capture file is already saved by the time the copy runs, so a clipboard another process
-    /// is holding open (or an unreadable file) must downgrade the feedback rather than abort the
-    /// automation rules and post-capture action behind it.
-    /// </summary>
-    private bool TryCopyImageToClipboard(CaptureItem item)
-    {
-        try
-        {
-            CopyImageToClipboard(item);
-            return true;
-        }
-        catch (Exception ex) when (CaptureFeedbackPolicy.IsRecoverableClipboardCopyFailure(ex))
-        {
-            return false;
-        }
-    }
-
     private async Task ShareSelectedAsync(ShareDestination destination)
     {
         var item = SelectedCapture();
@@ -3197,6 +3362,8 @@ public partial class MainWindow : Window
             Owner = this
         };
         window.ActionRequested += async (_, action) => await HandleCaptureTaskActionAsync(item, action);
+        _captureTaskWindows.Add(window);
+        window.Closed += (_, _) => _captureTaskWindows.Remove(window);
         window.Show();
         SetStatus($"Capture actions available: {item.FileName}");
     }
@@ -3268,8 +3435,13 @@ public partial class MainWindow : Window
         var derivativeWarning = derivatives.Length > 0
             ? $"{Environment.NewLine}{Environment.NewLine}{derivatives.Length} derivative(s) depend on this original. They will remain, but will be marked source unavailable."
             : string.Empty;
+        var noun = item.Kind == CaptureKind.ReplayReceipt ? "original signed receipt" : "capture";
+        // Private captures are meant to leave no trace, so they are not kept in the Recycle Bin.
+        var question = item.IsPrivate
+            ? $"Permanently delete this private {noun}?"
+            : $"Move this {noun} to the Recycle Bin and remove it from the library?";
         var confirm = System.Windows.MessageBox.Show(
-            $"Delete this local {(item.Kind == CaptureKind.ReplayReceipt ? "original signed receipt" : "capture")} from disk and the workspace?{derivativeWarning}{Environment.NewLine}{Environment.NewLine}{item.FilePath}",
+            $"{question}{derivativeWarning}{Environment.NewLine}{Environment.NewLine}{item.FilePath}",
             item.Kind == CaptureKind.ReplayReceipt ? "Delete original receipt" : "Delete local capture",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -3289,15 +3461,11 @@ public partial class MainWindow : Window
                 return;
             }
 
-            try
+            // Remove the owned package first. If Windows refuses, the library entry remains
+            // available for a later retry.
+            if (!FileRecycler.TryRecycle(packagePath, out var recycleError))
             {
-                // Delete the owned package first. If Windows denies the filesystem
-                // operation, the library entry remains available for a later retry.
-                Directory.Delete(packagePath, recursive: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                SetStatus($"Receipt deletion failed; the original remains indexed: {ex.Message}");
+                SetStatus($"Receipt deletion failed; the original remains indexed: {recycleError}");
                 return;
             }
 
@@ -3307,29 +3475,74 @@ public partial class MainWindow : Window
                 derivative.SourceAvailable = false;
                 await _services.WorkspaceStore.UpdateItemAsync(derivative);
             }
+
+            RemoveFromLibrary([item]);
+            SetStatus($"Moved the original receipt package to the Recycle Bin. {derivatives.Length} derivative(s) were retained and marked source unavailable.");
+            return;
         }
-        else
+
+        var leftOnDisk = await RemoveCaptureAsync(item);
+        RemoveFromLibrary([item]);
+        SetStatus(leftOnDisk is null
+            ? item.IsPrivate
+                ? $"Deleted private capture: {item.FileName}"
+                : $"Moved to the Recycle Bin: {item.FileName}"
+            : $"Removed {item.FileName} from the library, but the file stays on disk: {leftOnDisk}");
+    }
+
+    private async Task DeleteLocalCapturesWithConfirmationAsync(IReadOnlyList<CaptureItem> items)
+    {
+        if (items.Any(item => item.Kind == CaptureKind.ReplayReceipt))
         {
-            await _services.WorkspaceStore.DeleteItemAsync(item, deleteFile: true);
+            SetStatus("Replay receipts are deleted one at a time. Select only the receipt to delete it.");
+            return;
         }
-        _allCaptures.RemoveAll(existing =>
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Move {items.Count} captures to the Recycle Bin and remove them from the library?",
+            "Delete local captures",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            SetStatus("Delete canceled.");
+            return;
+        }
+
+        var leftOnDisk = 0;
+        foreach (var item in items)
+        {
+            if (await RemoveCaptureAsync(item) is not null)
+            {
+                leftOnDisk++;
+            }
+        }
+
+        RemoveFromLibrary(items);
+        SetStatus(leftOnDisk == 0
+            ? $"Moved {items.Count} captures to the Recycle Bin."
+            : $"Removed {items.Count} captures from the library; {leftOnDisk} file(s) could not be moved to the Recycle Bin and stay on disk.");
+    }
+
+    /// <summary>
+    /// Takes the capture out of the index first, so an unreadable index never loses a file, then
+    /// moves the file to the Recycle Bin (private captures are deleted outright). Returns why the
+    /// file stayed on disk, or null when it is gone.
+    /// </summary>
+    private async Task<string?> RemoveCaptureAsync(CaptureItem item)
+    {
+        await _services.WorkspaceStore.DeleteItemAsync(item, deleteFile: item.IsPrivate);
+        return item.IsPrivate || FileRecycler.TryRecycle(item.FilePath, out var error)
+            ? null
+            : error;
+    }
+
+    private void RemoveFromLibrary(IReadOnlyCollection<CaptureItem> removed)
+    {
+        _allCaptures.RemoveAll(existing => removed.Any(item =>
             existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase) ||
-            existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
+            existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase)));
         ApplyFilter();
-        if (_captures.Count == 0)
-        {
-            PreviewImage.Source = null;
-            PreviewHint.Text = "Select a capture";
-            DetailsText.Text = string.Empty;
-            SelectedFileNameText.Text = "No capture selected";
-            SelectedCreatedText.Text = "—";
-            SelectedBytesText.Text = "—";
-            SelectedDimensionsText.Text = "—";
-            EmptyState.Visibility = Visibility.Visible;
-        }
-        SetStatus(item.Kind == CaptureKind.ReplayReceipt
-            ? $"Deleted original receipt package. {derivatives.Length} derivative(s) were retained and marked source unavailable."
-            : $"Deleted local capture: {item.FileName}");
     }
 
     private static bool ShouldShowShareResultWindow(ShareDestination destination, ShareResult result)
@@ -3573,6 +3786,101 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Shows the capture in the preview. Decoding a full-resolution image happens on a worker
+    /// thread, is skipped while the workspace is hidden in the tray (it runs when the window is
+    /// shown), and is skipped entirely when the same unchanged file is already on screen, so
+    /// detail refreshes such as a finished OCR pass do not decode the image again.
+    /// </summary>
+    private void ShowPreview(CaptureItem item)
+    {
+        var key = PreviewKey(item);
+        if (key is not null && key == _previewKey)
+        {
+            ConfigurePreviewLiveText(item);
+            return;
+        }
+
+        var version = ++_previewLoadVersion;
+        _previewKey = null;
+        PreviewImage.Source = null;
+        ConfigurePreviewLiveText(item);
+        if (!IsVisible)
+        {
+            _pendingPreviewItem = item;
+            return;
+        }
+
+        _pendingPreviewItem = null;
+        _previewKey = key;
+        _ = LoadPreviewAsync(item, version);
+    }
+
+    private async Task LoadPreviewAsync(CaptureItem item, int version)
+    {
+        BitmapSource? image = null;
+        try
+        {
+            image = await Task.Run(() => LoadPreviewImage(item));
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this load, so any decode failure just leaves the preview empty.
+            StartupTrace.Write($"Preview could not be loaded for {item.FileName}: {ex.Message}");
+        }
+
+        if (version != _previewLoadVersion)
+        {
+            return;
+        }
+
+        if (image is null)
+        {
+            // Retry on the next selection instead of remembering a failed load as current.
+            _previewKey = null;
+        }
+
+        PreviewImage.Source = image;
+        ConfigurePreviewLiveText(item);
+    }
+
+    private void ClearPreview()
+    {
+        _previewLoadVersion++;
+        _previewKey = null;
+        _pendingPreviewItem = null;
+        PreviewImage.Source = null;
+    }
+
+    private static string? PreviewKey(CaptureItem item)
+    {
+        try
+        {
+            var info = new FileInfo(item.FilePath);
+            return info.Exists
+                ? $"{item.Id}|{info.FullName}|{info.LastWriteTimeUtc.Ticks}|{info.Length}"
+                : null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private void MainWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!IsVisible || _pendingPreviewItem is not { } pending)
+        {
+            return;
+        }
+
+        _pendingPreviewItem = null;
+        if (ReferenceEquals(CaptureList.SelectedItem, pending))
+        {
+            ShowPreview(pending);
+        }
+    }
+
+    /// <summary>
     /// Sizes the preview surface to the displayed bitmap's pixels and decides whether live text
     /// is safe. LoadPreviewImage can silently fall back to the thumbnail, whose pixels no longer
     /// line up with the stored OCR word boxes — the dimension check catches exactly that.
@@ -3800,13 +4108,7 @@ public partial class MainWindow : Window
 
     private void Automation_CaptureImported(object? sender, CaptureItem item)
     {
-        Dispatcher.Invoke(() =>
-        {
-            _allCaptures.RemoveAll(existing => existing.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase));
-            _allCaptures.Insert(0, item);
-            ApplyFilter();
-            CaptureList.SelectedItem = item;
-        });
+        Dispatcher.Invoke(() => AddCaptureToLibrary(item));
     }
 
     /// <summary>
@@ -3847,10 +4149,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _allCaptures.RemoveAll(existing => existing.Id.Equals(item.Id, StringComparison.OrdinalIgnoreCase));
-            _allCaptures.Insert(0, item);
-            ApplyFilter();
-            CaptureList.SelectedItem = item;
+            AddCaptureToLibrary(item);
         });
     }
 }

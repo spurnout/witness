@@ -9,6 +9,7 @@ public sealed partial class WorkspaceMetadataIndex
     private readonly AppPaths _paths;
     private readonly object _gate = new();
     private bool _schemaInitialized;
+    private long _generation;
 
     public WorkspaceMetadataIndex(AppPaths paths)
     {
@@ -84,22 +85,48 @@ public sealed partial class WorkspaceMetadataIndex
         }
     }
 
+    /// <summary>
+    /// Counts incremental writes (upserts and deletes). A caller that snapshots the library
+    /// together with this value can rebuild later with <see cref="TryRebuild"/>, which refuses
+    /// when any write landed in between and would otherwise be erased by the rebuild.
+    /// </summary>
+    public long Generation => Interlocked.Read(ref _generation);
+
+    public bool TryRebuild(IEnumerable<CaptureItem> items, long expectedGeneration)
+    {
+        lock (_gate)
+        {
+            if (Interlocked.Read(ref _generation) != expectedGeneration)
+            {
+                return false;
+            }
+
+            RebuildCore(items);
+            return true;
+        }
+    }
+
     public void Rebuild(IEnumerable<CaptureItem> items)
     {
         lock (_gate)
         {
-            EnsureCreated();
-            using var connection = OpenConnection();
-            using var transaction = connection.BeginTransaction();
-            ExecuteNonQuery(connection, transaction, "DELETE FROM captures;");
-            ExecuteNonQuery(connection, transaction, "DELETE FROM captures_fts;");
-            foreach (var item in items.Where(item => !item.IsPrivate))
-            {
-                UpsertCore(connection, transaction, item);
-            }
-
-            transaction.Commit();
+            RebuildCore(items);
         }
+    }
+
+    private void RebuildCore(IEnumerable<CaptureItem> items)
+    {
+        EnsureCreated();
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        ExecuteNonQuery(connection, transaction, "DELETE FROM captures;");
+        ExecuteNonQuery(connection, transaction, "DELETE FROM captures_fts;");
+        foreach (var item in items.Where(item => !item.IsPrivate))
+        {
+            UpsertCore(connection, transaction, item);
+        }
+
+        transaction.Commit();
     }
 
     public void Upsert(CaptureItem item) => UpsertBatch([item]);
@@ -124,6 +151,7 @@ public sealed partial class WorkspaceMetadataIndex
                 }
             }
             transaction.Commit();
+            Interlocked.Increment(ref _generation);
         }
     }
 
@@ -148,6 +176,7 @@ public sealed partial class WorkspaceMetadataIndex
             deleteFts.Parameters.AddWithValue("$file_path", item.FilePath);
             deleteFts.ExecuteNonQuery();
             transaction.Commit();
+            Interlocked.Increment(ref _generation);
         }
     }
 

@@ -18,7 +18,9 @@ public static class CaptureOverlayColorReader
             return null;
         }
 
-        BitmapSource probe = source.Format == PixelFormats.Bgra32
+        // Bgr32 shares Bgra32's byte order, so the overlay's frozen frame is read in place
+        // instead of being wrapped in a converter on every mouse move.
+        BitmapSource probe = source.Format == PixelFormats.Bgra32 || source.Format == PixelFormats.Bgr32
             ? source
             : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
         var pixel = new byte[4];

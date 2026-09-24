@@ -21,18 +21,7 @@
     </Window.CommandBindings>
 
     <Window.Resources>
-        <SolidColorBrush x:Key="WorkspaceShellBrush" Color="#0D1215" />
-        <SolidColorBrush x:Key="WorkspaceHeaderBrush" Color="#12191C" />
-        <SolidColorBrush x:Key="WorkspaceSidebarBrush" Color="#10171A" />
-        <SolidColorBrush x:Key="WorkspaceSurfaceBrush" Color="#151E22" />
-        <SolidColorBrush x:Key="WorkspaceElevatedBrush" Color="#19252A" />
-        <SolidColorBrush x:Key="WorkspaceCanvasBrush" Color="#090E11" />
-        <SolidColorBrush x:Key="WorkspaceBorderBrush" Color="#2B3A40" />
-        <SolidColorBrush x:Key="WorkspaceAccentBrush" Color="#31D2C4" />
-        <SolidColorBrush x:Key="WorkspaceAccentDarkBrush" Color="#082A27" />
-        <SolidColorBrush x:Key="WorkspaceSecondaryTextBrush" Color="#A9B7BC" />
-        <SolidColorBrush x:Key="WorkspaceMutedTextBrush" Color="#899A9F" />
-        <SolidColorBrush x:Key="WorkspaceDangerBrush" Color="#E48686" />
+        <controls:ThumbnailPathConverter x:Key="LibraryThumbnailConverter" />
 
         <Style x:Key="WorkspaceButton" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource WorkspaceSecondaryTextBrush}" />
@@ -381,6 +370,7 @@
                             <Button Content="Full screen"
                                     Click="CaptureFullscreen_Click"
                                     Style="{StaticResource CaptureModeButton}"
+                                    ToolTip="Capture every monitor. Receipts hides itself first."
                                     AutomationProperties.Name="Capture the full screen" />
                             <Button Click="VideoAction_Click"
                                     Style="{StaticResource CaptureModeButton}"
@@ -526,7 +516,7 @@
                             <Button Style="{StaticResource UnavailableNavButton}"
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="Trash unavailable"
-                                    AutomationProperties.HelpText="Trash is not available. Delete asks for confirmation and removes the local file.">
+                                    AutomationProperties.HelpText="Trash is not available. Delete asks for confirmation and moves the file to the Windows Recycle Bin.">
                                 <DockPanel>
                                     <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Width="28" />
                                     <TextBlock Text="Trash" />
@@ -723,6 +713,7 @@
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="Open selected replay receipt in Frame Explorer" />
                             <Button x:Name="DeleteCaptureButton" Grid.Column="6" Content="Delete" Click="DeleteSelected_Click" Style="{StaticResource DangerTextButton}" Margin="8,0,0,6"
+                                    ToolTip="Move the selected captures to the Recycle Bin (Delete)"
                                     AutomationProperties.Name="Delete selected local capture" />
                         </WrapPanel>
                         </StackPanel>
@@ -742,18 +733,24 @@
                                      SelectionMode="Extended"
                                      SelectionChanged="CaptureList_SelectionChanged"
                                      MouseDoubleClick="CaptureList_MouseDoubleClick"
+                                     KeyDown="CaptureList_KeyDown"
                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Recycling"
+                                     VirtualizingPanel.ScrollUnit="Pixel"
                                      ItemContainerStyle="{StaticResource FilmstripItem}">
+                                <!-- Virtualized so a large library only creates and decodes the visible thumbnails. -->
                                 <ListBox.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" />
+                                        <VirtualizingStackPanel Orientation="Horizontal" />
                                     </ItemsPanelTemplate>
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid>
-                                            <Image Source="{Binding ThumbnailPath}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <Image Source="{Binding ThumbnailPath, Converter={StaticResource LibraryThumbnailConverter}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                                             <Border VerticalAlignment="Bottom" Background="#C9090E11" Padding="6,3">
                                                 <TextBlock Text="{Binding FileName}"
                                                            FontSize="10"
