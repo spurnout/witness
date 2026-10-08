@@ -228,25 +228,102 @@ public sealed class BundledToolResolver
         return manifest;
     }
 
-    private static Stream OpenAssetPayload(FileStream executable)
+    internal static Stream OpenAssetPayload(Stream executable)
     {
-        if (executable.Length < PayloadFooterLength)
+        // Signing appends the Authenticode certificate table after the payload, so the footer sits
+        // just before that table rather than at the end of the file.
+        var payloadEnd = ResolvePayloadEnd(executable);
+        if (payloadEnd < PayloadFooterLength)
         {
             throw new InvalidOperationException("The executable does not contain an embedded asset payload footer.");
         }
 
-        executable.Position = executable.Length - PayloadFooterLength;
+        executable.Position = payloadEnd - PayloadFooterLength;
         Span<byte> footer = stackalloc byte[PayloadFooterLength];
         executable.ReadExactly(footer);
         var payloadLength = BitConverter.ToInt64(footer[..sizeof(long)]);
         var magic = System.Text.Encoding.ASCII.GetString(footer[sizeof(long)..]);
-        var payloadOffset = executable.Length - PayloadFooterLength - payloadLength;
+        var payloadOffset = payloadEnd - PayloadFooterLength - payloadLength;
         if (!magic.Equals(PayloadMagic, StringComparison.Ordinal) || payloadLength <= 0 || payloadOffset < 0)
         {
             throw new InvalidOperationException("The executable embedded asset payload footer is invalid.");
         }
 
         return new BoundedReadStream(executable, payloadOffset, payloadLength);
+    }
+
+    /// <summary>
+    /// End of the appended payload: the start of a trailing Authenticode certificate table when the
+    /// executable is signed (minus the zero padding signing adds to reach 8-byte alignment), otherwise
+    /// the end of the file.
+    /// </summary>
+    internal static long ResolvePayloadEnd(Stream executable)
+    {
+        const int PeHeaderPointerOffset = 0x3C;
+        const int SecurityDirectoryIndex = 4;
+        const int MaxSignaturePadding = 7;
+        var length = executable.Length;
+        if (length < PeHeaderPointerOffset + sizeof(int))
+        {
+            return length;
+        }
+
+        Span<byte> buffer = stackalloc byte[8];
+        executable.Position = PeHeaderPointerOffset;
+        executable.ReadExactly(buffer[..4]);
+        long peOffset = BitConverter.ToInt32(buffer[..4]);
+        // PE signature (4) + COFF file header (20), then the optional header magic.
+        var optionalHeader = peOffset + 24;
+        if (peOffset <= 0 || optionalHeader + 2 > length)
+        {
+            return length;
+        }
+
+        executable.Position = peOffset;
+        executable.ReadExactly(buffer[..4]);
+        if (buffer[0] != 'P' || buffer[1] != 'E' || buffer[2] != 0 || buffer[3] != 0)
+        {
+            return length;
+        }
+
+        executable.Position = optionalHeader;
+        executable.ReadExactly(buffer[..2]);
+        var dataDirectories = BitConverter.ToUInt16(buffer[..2]) switch
+        {
+            0x10b => optionalHeader + 96,
+            0x20b => optionalHeader + 112,
+            _ => -1L
+        };
+        var securityEntry = dataDirectories + (SecurityDirectoryIndex * 8);
+        if (dataDirectories < 0 || securityEntry + 8 > length)
+        {
+            return length;
+        }
+
+        executable.Position = securityEntry;
+        executable.ReadExactly(buffer);
+        // Unlike every other data directory, the security entry holds a file offset, not an RVA.
+        long certificateOffset = BitConverter.ToUInt32(buffer[..4]);
+        long certificateSize = BitConverter.ToUInt32(buffer[4..]);
+        if (certificateSize == 0 || certificateOffset <= 0 || certificateOffset + certificateSize != length)
+        {
+            return length;
+        }
+
+        var end = certificateOffset;
+        var minimumEnd = Math.Max(0, end - MaxSignaturePadding);
+        while (end > minimumEnd)
+        {
+            executable.Position = end - 1;
+            if (executable.ReadByte() != 0)
+            {
+                break;
+            }
+
+            end--;
+        }
+
+        return end;
     }
 
     private static string SafeAssetPath(string root, string relativePath)

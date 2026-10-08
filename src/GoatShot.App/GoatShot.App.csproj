@@ -17,12 +17,21 @@
     <FileVersion>0.3.0.0</FileVersion>
   </PropertyGroup>
 
+  <!-- Machine-wide installs only: see app.uiaccess.manifest for why the other builds cannot use it. -->
+  <PropertyGroup Condition="'$(ReceiptsMachineWide)' == 'true'">
+    <ApplicationManifest>app.uiaccess.manifest</ApplicationManifest>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(ReceiptsDistribution)' == 'true' or '$(GoatShotDistribution)' == 'true'">
     <AssemblyMetadata Include="ReceiptsDistribution" Value="true" />
     <AssemblyMetadata Include="GoatShotDistribution" Value="true" />
     <AssemblyMetadata Include="ReceiptsBuildId" Value="$(ReceiptsBuildId)" Condition="'$(ReceiptsBuildId)' != ''" />
     <AssemblyMetadata Include="GoatShotBuildId" Value="$(ReceiptsBuildId)" Condition="'$(ReceiptsBuildId)' != ''" />
     <AssemblyMetadata Include="GoatShotBuildId" Value="$(GoatShotBuildId)" Condition="'$(ReceiptsBuildId)' == ''" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReceiptsMachineWide)' == 'true'">
+    <AssemblyMetadata Include="ReceiptsMachineWide" Value="true" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,22 +10,45 @@
 #define OutputDir "..\artifacts\dist"
 #endif
 
+; /DMachineWide=1 builds the all-users installer for the signed uiAccess build. Windows only starts a
+; uiAccess executable from a protected folder such as Program Files, so it needs admin rights and its
+; own AppId instead of upgrading the per-user install in place.
+
 [Setup]
+#ifdef MachineWide
+AppId={{034D1C53-A634-4AAE-A61F-62E61B709B3A}
+#else
 AppId={{4E86AB11-3D28-4D42-BD31-05C48CF751D6}
+#endif
 AppName=Receipts
 AppVersion={#AppVersion}
 AppPublisher=Receipts
 AppPublisherURL=https://github.com/spurnout/witness
+#ifdef MachineWide
+DefaultDirName={autopf}\Receipts
+#else
 DefaultDirName={localappdata}\Programs\Receipts
+#endif
 DefaultGroupName=Receipts
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
+#ifdef MachineWide
+OutputBaseFilename=Receipts-{#AppVersion}-win-x64-machine
+#else
 OutputBaseFilename=Receipts-{#AppVersion}-win-x64
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+#ifdef MachineWide
+PrivilegesRequired=admin
+; The startup value, native-host cleanup, and legacy shortcut cleanup below are deliberately
+; per-user: they belong to the user who runs setup, as they do in the per-user installer.
+UsedUserAreasWarning=no
+#else
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+#endif
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\Receipts.exe
@@ -70,9 +93,27 @@ Type: files; Name: "{userappdata}\Mozilla\NativeMessagingHosts\com.receipts.brid
 Type: files; Name: "{userappdata}\Mozilla\NativeMessagingHosts\com.goatshot.bridge.json"
 
 [Run]
+#ifdef MachineWide
+; A uiAccess executable cannot be started with CreateProcess; it has to go through the shell.
+Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent shellexec
+#else
 Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent
+#endif
 
 [Code]
+#ifdef MachineWide
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  { A running or startup-registered per-user copy would keep the hotkeys and hand new launches to
+    itself, so the uiAccess build would never get them. }
+  if FileExists(ExpandConstant('{localappdata}\Programs\Receipts\Receipts.exe')) and not WizardSilent() then
+    Result := MsgBox('Receipts is also installed just for you. That copy does not work over administrator windows and will keep handling the capture hotkeys while it runs.' + #13#10#13#10 +
+      'Uninstall the per-user copy first, from Settings > Apps > Installed apps or from Uninstall in its own Settings (captures and settings are kept), then run this installer again. Continue anyway?',
+      mbConfirmation, MB_YESNO) = IDYES;
+end;
+
+#endif
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then

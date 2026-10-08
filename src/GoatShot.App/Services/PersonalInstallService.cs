@@ -14,18 +14,35 @@ public sealed class PersonalInstallService
     private readonly StartupRegistrationService _startup;
     private readonly string _localAppData;
     private readonly string _currentExecutable;
+    private readonly bool _machineWide;
 
     public PersonalInstallService(
         StartupRegistrationService? startup = null,
         string? localAppData = null,
-        string? currentExecutable = null)
+        string? currentExecutable = null,
+        bool? machineWide = null)
     {
         _startup = startup ?? new StartupRegistrationService();
         _localAppData = localAppData ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         _currentExecutable = Path.GetFullPath(currentExecutable ?? Environment.ProcessPath ?? throw new InvalidOperationException("The current executable path is unavailable."));
+        _machineWide = machineWide ?? IsMachineWideBuild;
     }
 
-    public string InstalledExecutablePath => Path.Combine(_localAppData, InstalledRelativePath);
+    /// <summary>
+    /// The signed uiAccess build the machine-wide installer puts under Program Files. That installer
+    /// owns its location, updates, and removal, so the running copy is the installed copy: never
+    /// copy it into the per-user folder (Windows would refuse to start a uiAccess copy there) or hand
+    /// off to a per-user install that lacks uiAccess.
+    /// </summary>
+    public static bool IsMachineWideBuild => Assembly.GetEntryAssembly()?
+        .GetCustomAttributes<AssemblyMetadataAttribute>()
+        .Any(attribute => attribute.Key == "ReceiptsMachineWide" && attribute.Value == "true") == true;
+
+    public bool IsMachineWide => _machineWide;
+
+    public string InstalledExecutablePath => _machineWide
+        ? _currentExecutable
+        : Path.Combine(_localAppData, InstalledRelativePath);
     public string LegacyInstalledExecutablePath => Path.Combine(_localAppData, LegacyInstalledRelativePath);
     public string InstallDirectory => Path.GetDirectoryName(InstalledExecutablePath)!;
     public string PreviousExecutablePath => InstalledExecutablePath + ".previous";
@@ -109,6 +126,15 @@ public sealed class PersonalInstallService
 
     public PersonalInstallResult BeginUninstall()
     {
+        if (_machineWide)
+        {
+            return new PersonalInstallResult(
+                false,
+                InstalledExecutablePath,
+                "Receipts was installed for all users. Remove it from Windows Settings > Apps > Installed apps. Captures and settings will be preserved.",
+                false);
+        }
+
         try
         {
             _startup.SetEnabled(false, InstalledExecutablePath);

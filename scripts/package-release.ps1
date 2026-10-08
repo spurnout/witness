@@ -4,7 +4,16 @@ param(
     [string] $Version = "0.3.0",
     [string] $BuildId = "",
     [switch] $SkipInstaller,
-    [switch] $SkipSingleExe
+    [switch] $SkipSingleExe,
+    # Authenticode signing. Use a certificate from the Windows certificate store by thumbprint, or a
+    # PFX file whose password is read from RECEIPTS_SIGNING_PASSWORD. Without either, nothing is signed.
+    [string] $SigningCertificateThumbprint = "",
+    [string] $SigningCertificatePath = "",
+    [string] $TimestampUrl = "http://timestamp.digicert.com",
+    # Also build the all-users uiAccess installer, which lets the capture hotkeys work over
+    # administrator windows. Windows will not start an unsigned uiAccess executable, so this requires
+    # signing and Inno Setup.
+    [switch] $MachineWide
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,6 +57,53 @@ function Remove-ReleaseFile([string] $PathValue, [string] $ExpectedParent) {
     Remove-Item -LiteralPath $resolved -Force
 }
 
+function Resolve-SignTool {
+    $candidates = @()
+    if ($env:SIGNTOOL_PATH) { $candidates += $env:SIGNTOOL_PATH }
+    $fromPath = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
+    if ($fromPath) { $candidates += $fromPath.Source }
+    $kitsBin = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+    if (Test-Path -LiteralPath $kitsBin -PathType Container) {
+        $candidates += Get-ChildItem -LiteralPath $kitsBin -Directory |
+            Sort-Object { try { [version]$_.Name } catch { [version]"0.0" } } -Descending |
+            ForEach-Object { Join-Path $_.FullName "x64\signtool.exe" }
+    }
+    $signTool = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+    if (-not $signTool) {
+        throw "Code signing was requested but signtool.exe was not found. Install the Windows SDK or set SIGNTOOL_PATH."
+    }
+    return $signTool
+}
+
+function Invoke-CodeSigning([string[]] $Paths) {
+    if (-not $signingEnabled) { return }
+    $arguments = @("sign", "/fd", "SHA256", "/td", "SHA256", "/tr", $TimestampUrl)
+    if ($SigningCertificateThumbprint) {
+        $arguments += @("/sha1", $SigningCertificateThumbprint)
+    }
+    else {
+        $arguments += @("/f", $SigningCertificatePath)
+        if ($env:RECEIPTS_SIGNING_PASSWORD) { $arguments += @("/p", $env:RECEIPTS_SIGNING_PASSWORD) }
+    }
+    & $signTool @arguments @Paths
+    Assert-LastExitCode "Code signing"
+    # /pa checks the chain against this machine's trusted roots, which is what Windows requires
+    # before it will start a uiAccess executable.
+    & $signTool verify /pa /q @Paths
+    Assert-LastExitCode "Code signature verification"
+}
+
+function Assert-UiAccessManifest([string] $ExecutablePath, [bool] $Expected) {
+    # The portable and machine-wide publishes share obj\, so prove each apphost carries the manifest
+    # its flavor needs instead of trusting incremental build state. Check before the payload is
+    # appended, while the executable is still small; the manifest is stored as plain text.
+    $text = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($ExecutablePath))
+    $hasUiAccess = $text -match 'uiAccess\s*=\s*"true"'
+    if ($hasUiAccess -ne $Expected) {
+        throw "$ExecutablePath has uiAccess=$hasUiAccess but this build requires uiAccess=$Expected. Delete src\GoatShot.App\obj and package again."
+    }
+}
+
 function Add-EmbeddedAssetPayload([string] $ExecutablePath, [string] $AssetArchivePath) {
     if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
         throw "Published executable is missing: $ExecutablePath"
@@ -86,6 +142,23 @@ $portableZipPath = Join-Path $distRoot "Receipts-$Version-$Runtime-portable.zip"
 $singleExeName = "Receipts-$Version-$Runtime-single-exe.exe"
 $singleExePath = Join-Path $distRoot $singleExeName
 $installerScript = Join-Path $repoRoot "packaging\GoatShot.iss"
+$machinePublishDir = Join-Path $publishRoot "Receipts-$Runtime-machine"
+$machineInstallerPath = Join-Path $distRoot "Receipts-$Version-$Runtime-machine.exe"
+
+if ($SigningCertificateThumbprint -and $SigningCertificatePath) {
+    throw "Pass either -SigningCertificateThumbprint or -SigningCertificatePath, not both."
+}
+if ($SigningCertificatePath -and -not (Test-Path -LiteralPath $SigningCertificatePath -PathType Leaf)) {
+    throw "Signing certificate was not found: $SigningCertificatePath"
+}
+$signingEnabled = [bool]($SigningCertificateThumbprint -or $SigningCertificatePath)
+if ($MachineWide -and -not $signingEnabled) {
+    throw "-MachineWide requires code signing: Windows refuses to start an unsigned uiAccess executable. Pass -SigningCertificateThumbprint or -SigningCertificatePath."
+}
+if ($MachineWide -and $SkipInstaller) {
+    throw "-MachineWide builds an installer and cannot be combined with -SkipInstaller."
+}
+$signTool = if ($signingEnabled) { Resolve-SignTool } else { $null }
 
 if ($Runtime -ne "win-x64") { throw "Receipts 0.3 supports only win-x64 distribution builds." }
 foreach ($requiredProject in @($appProject, $cliProject)) {
@@ -101,6 +174,7 @@ if ([string]::IsNullOrWhiteSpace($BuildId)) {
 New-Item -ItemType Directory -Force -Path $publishRoot, $distRoot | Out-Null
 Remove-ValidatedDirectory $portablePublishDir $publishRoot
 Remove-ValidatedDirectory $singleExePublishDir $publishRoot
+Remove-ValidatedDirectory $machinePublishDir $publishRoot
 $releaseFiles = @($portableZipPath)
 if (-not $SkipSingleExe) {
     $releaseFiles += @(
@@ -114,6 +188,9 @@ if (-not $SkipInstaller) {
     $releaseFiles += @(
         (Join-Path $distRoot "Receipts-$Version-win-x64.exe"),
         (Join-Path $distRoot "Receipts-$Version-win-x64.exe.sha256"))
+}
+if ($MachineWide) {
+    $releaseFiles += @($machineInstallerPath, "$machineInstallerPath.sha256")
 }
 foreach ($releaseFile in $releaseFiles) {
     Remove-ReleaseFile $releaseFile $distRoot
@@ -160,8 +237,12 @@ foreach ($requiredExecutable in @($portableExe, $portableCli)) {
         throw "Portable publish did not create $requiredExecutable"
     }
 }
+Assert-UiAccessManifest $portableExe $false
 Add-EmbeddedAssetPayload $portableExe $assetArchive
 Add-EmbeddedAssetPayload $portableCli $assetArchive
+# Sign after appending the payload: the signature has to cover it, and the runtime reader looks for the
+# payload footer just before the certificate table.
+Invoke-CodeSigning @($portableExe, $portableCli)
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $portablePublishDir "README.md") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "spec.md") -Destination (Join-Path $portablePublishDir "spec.md") -Force
@@ -200,8 +281,10 @@ if (-not $SkipSingleExe) {
     if (-not (Test-Path -LiteralPath $publishedSingleExe -PathType Leaf)) {
         throw "Single-exe publish did not create $publishedSingleExe"
     }
+    Assert-UiAccessManifest $publishedSingleExe $false
     Copy-Item -LiteralPath $publishedSingleExe -Destination $singleExePath
     Add-EmbeddedAssetPayload $singleExePath $assetArchive
+    Invoke-CodeSigning @($singleExePath)
     $singleExeArtifact = $singleExePath
 
     $hash = Get-Sha256Hex $singleExePath
@@ -221,8 +304,8 @@ if (-not $SkipSingleExe) {
         executable = $singleExeName
         executableSha256 = $hash
         embeddedAssetManifestSha256 = $manifestHash
-        signed = $false
-        distribution = "unsigned per-user self-installing executable"
+        signed = $signingEnabled
+        distribution = if ($signingEnabled) { "signed per-user self-installing executable" } else { "unsigned per-user self-installing executable" }
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataPath -Encoding UTF8
 
     $noticesPath = Join-Path $distRoot "Receipts-$Version-THIRD-PARTY-NOTICES.txt"
@@ -263,12 +346,71 @@ if (-not $SkipInstaller -and $iscc) {
     if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
         throw "Inno Setup reported success but the installer was not created: $installerPath"
     }
+    Invoke-CodeSigning @($installerPath)
     $installerHash = Get-Sha256Hex $installerPath
     $installerHashPath = "$installerPath.sha256"
     Set-Content -LiteralPath $installerHashPath -Value "$installerHash  $([IO.Path]::GetFileName($installerPath))" -Encoding ASCII
 }
 elseif (-not $SkipInstaller) {
     Write-Warning "Inno Setup compiler was not found. The portable and single-exe artifacts were created; install Inno Setup 6 or set INNO_SETUP_ISCC to build the installer."
+}
+
+$machineInstallerHash = $null
+$machineInstallerHashPath = $null
+if ($MachineWide) {
+    if (-not $iscc) {
+        throw "-MachineWide requires Inno Setup 6. Install it or set INNO_SETUP_ISCC."
+    }
+
+    foreach ($machineProject in @($appProject, $cliProject)) {
+        dotnet publish $machineProject `
+            -c $Configuration `
+            -r $Runtime `
+            --self-contained true `
+            -o $machinePublishDir `
+            /p:PublishSingleFile=false `
+            /p:PublishReadyToRun=true `
+            /p:PublishTrimmed=false `
+            /p:Version=$Version `
+            /p:SourceRevisionId=$BuildId `
+            /p:ReceiptsDistribution=true `
+            /p:ReceiptsMachineWide=true `
+            /p:ReceiptsBuildId=$BuildId `
+            /p:EmbeddedAssetsRoot=$embeddedRoot
+        Assert-LastExitCode "Receipts machine-wide publish of $([IO.Path]::GetFileName($machineProject))"
+    }
+
+    $machineExe = Join-Path $machinePublishDir "Receipts.exe"
+    $machineCli = Join-Path $machinePublishDir "Receipts.Cli.exe"
+    foreach ($requiredExecutable in @($machineExe, $machineCli)) {
+        if (-not (Test-Path -LiteralPath $requiredExecutable -PathType Leaf)) {
+            throw "Machine-wide publish did not create $requiredExecutable"
+        }
+    }
+    Assert-UiAccessManifest $machineExe $true
+    Assert-UiAccessManifest $machineCli $false
+    Add-EmbeddedAssetPayload $machineExe $assetArchive
+    Add-EmbeddedAssetPayload $machineCli $assetArchive
+    Invoke-CodeSigning @($machineExe, $machineCli)
+    Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $machinePublishDir "README.md") -Force
+    if (Test-Path -LiteralPath $browserExtensionSource -PathType Container) {
+        Copy-Item -LiteralPath $browserExtensionSource -Destination (Join-Path $machinePublishDir "browser-extension") -Recurse -Force
+    }
+
+    & $iscc `
+        "/DAppVersion=$Version" `
+        "/DPublishDir=$machinePublishDir" `
+        "/DOutputDir=$distRoot" `
+        "/DMachineWide=1" `
+        $installerScript
+    Assert-LastExitCode "Inno Setup machine-wide compile"
+    if (-not (Test-Path -LiteralPath $machineInstallerPath -PathType Leaf)) {
+        throw "Inno Setup reported success but the machine-wide installer was not created: $machineInstallerPath"
+    }
+    Invoke-CodeSigning @($machineInstallerPath)
+    $machineInstallerHash = Get-Sha256Hex $machineInstallerPath
+    $machineInstallerHashPath = "$machineInstallerPath.sha256"
+    Set-Content -LiteralPath $machineInstallerHashPath -Value "$machineInstallerHash  $([IO.Path]::GetFileName($machineInstallerPath))" -Encoding ASCII
 }
 
 [pscustomobject]@{
@@ -290,4 +432,8 @@ elseif (-not $SkipInstaller) {
     InstallerSha256 = $installerHash
     InstallerChecksumFile = $installerHashPath
     InnoSetupCompiler = $iscc
+    Signed = $signingEnabled
+    MachineInstaller = if ($MachineWide) { $machineInstallerPath } else { $null }
+    MachineInstallerSha256 = $machineInstallerHash
+    MachineInstallerChecksumFile = $machineInstallerHashPath
 }

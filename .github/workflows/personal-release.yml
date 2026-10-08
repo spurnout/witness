@@ -48,7 +48,25 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
           BUILD_ID: ${{ github.sha }}
-        run: .\scripts\package-release.ps1 -Version $env:RELEASE_VERSION -BuildId $env:BUILD_ID
+          # Optional. With a code-signing certificate (base64 PFX) configured, every executable is
+          # signed and the all-users uiAccess installer is built as well; without it the release
+          # stays unsigned and per-user only.
+          RECEIPTS_SIGNING_PFX_BASE64: ${{ secrets.RECEIPTS_SIGNING_PFX_BASE64 }}
+          RECEIPTS_SIGNING_PASSWORD: ${{ secrets.RECEIPTS_SIGNING_PASSWORD }}
+        run: |
+          $packageArguments = @{ Version = $env:RELEASE_VERSION; BuildId = $env:BUILD_ID }
+          if ($env:RECEIPTS_SIGNING_PFX_BASE64) {
+            $pfxPath = Join-Path $env:RUNNER_TEMP 'receipts-signing.pfx'
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:RECEIPTS_SIGNING_PFX_BASE64))
+            $packageArguments.SigningCertificatePath = $pfxPath
+            $packageArguments.MachineWide = $true
+          }
+          try {
+            .\scripts\package-release.ps1 @packageArguments
+          }
+          finally {
+            if ($pfxPath) { Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue }
+          }
       - name: Verify portable package
         shell: powershell
         env:
@@ -96,6 +114,8 @@ jobs:
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-single-exe.exe.sha256
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.exe
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.exe.sha256
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-machine.exe
+            artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64-machine.exe.sha256
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.build.json
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-win-x64.spdx.json
             artifacts/dist/Receipts-${{ steps.version.outputs.value }}-THIRD-PARTY-NOTICES.txt
@@ -120,4 +140,10 @@ jobs:
           if ($releaseAssets.Count -eq 0) {
             throw 'No Receipts release assets were found.'
           }
-          gh release create $env:RELEASE_TAG @releaseAssets --prerelease --title "Receipts $env:RELEASE_TAG" --notes 'Unsigned Windows x64 Receipts preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'
+          $signed = Test-Path -LiteralPath ".\artifacts\dist\Receipts-$version-win-x64-machine.exe" -PathType Leaf
+          $notes = if ($signed) {
+            'Signed Windows x64 Receipts preview. Install Receipts-*-win-x64-machine.exe (all users, requires admin) for capture hotkeys that also work over administrator windows. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'
+          } else {
+            'Unsigned Windows x64 Receipts preview. Windows SmartScreen may warn. Verify the published SHA-256 before running. Clean-profile, sign-in startup, long-run hardware, full accessibility, and live capture-device proof remain open.'
+          }
+          gh release create $env:RELEASE_TAG @releaseAssets --prerelease --title "Receipts $env:RELEASE_TAG" --notes $notes

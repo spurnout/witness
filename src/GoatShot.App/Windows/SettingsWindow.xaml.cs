@@ -794,6 +794,16 @@ public partial class SettingsWindow : Window
 
     private void Uninstall_Click(object sender, RoutedEventArgs e)
     {
+        if (_services.PersonalInstall.IsMachineWide)
+        {
+            System.Windows.MessageBox.Show(
+                _services.PersonalInstall.BeginUninstall().Message,
+                "Uninstall Receipts",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
         var confirmation = System.Windows.MessageBox.Show(
             "Remove the installed Receipts program, startup registration, extracted runtime tools, and browser native-host registrations? Captures and settings will be preserved.",
             "Uninstall Receipts",

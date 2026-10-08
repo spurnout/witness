@@ -43,6 +43,11 @@ public sealed class AppRuntimeVerbExecutor
 
     private int BeginUninstall()
     {
+        if (_install.IsMachineWide)
+        {
+            return Print(_install.BeginUninstall());
+        }
+
         _services.BrowserNativeHosts.Uninstall();
         return Print(_install.BeginUninstall());
     }
