@@ -26,6 +26,8 @@ AppPublisher=Receipts
 AppPublisherURL=https://github.com/spurnout/witness
 #ifdef MachineWide
 DefaultDirName={autopf}\Receipts
+; Windows only starts a uiAccess executable from a protected folder, so the location is not a choice.
+DisableDirPage=yes
 #else
 DefaultDirName={localappdata}\Programs\Receipts
 #endif
@@ -42,8 +44,9 @@ SolidCompression=yes
 WizardStyle=modern
 #ifdef MachineWide
 PrivilegesRequired=admin
-; The startup value, native-host cleanup, and legacy shortcut cleanup below are deliberately
-; per-user: they belong to the user who runs setup, as they do in the per-user installer.
+; Setup may run as a different administrator account than the signed-in user, so per-user state
+; (startup, the per-user copy check) is handled by the app running as that user. What remains below
+; is best-effort uninstall cleanup of values the app writes.
 UsedUserAreasWarning=no
 #else
 PrivilegesRequired=lowest
@@ -74,7 +77,12 @@ Name: "{autodesktop}\Receipts"; Filename: "{app}\Receipts.exe"; Tasks: desktopic
 ; Must stay byte-for-byte identical to StartupRegistrationService.BuildStartupCommand, which writes
 ; "<exe>" --background. Without the argument the app starts with a visible window instead of going to
 ; the tray, and StartupRegistrationService.GetState reports the command as stale on every upgrade.
+#ifdef MachineWide
+; Registered by the --install step under [Run] as the signed-in user; only removed here.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Receipts"; Flags: uninsdeletevalue
+#else
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Receipts"; ValueData: """{app}\Receipts.exe"" --background"; Flags: uninsdeletevalue; Tasks: startup
+#endif
 ; The app registers browser native-messaging hosts at runtime; dontcreatekey +
 ; uninsdeletekey schedules their removal at uninstall without creating them here,
 ; so browsers don't keep a host pointing at the deleted Receipts.exe. The legacy
@@ -95,25 +103,14 @@ Type: files; Name: "{userappdata}\Mozilla\NativeMessagingHosts\com.goatshot.brid
 [Run]
 #ifdef MachineWide
 ; A uiAccess executable cannot be started with CreateProcess; it has to go through the shell.
+; --install registers sign-in startup for the user who started setup, not the elevated account.
+Filename: "{app}\Receipts.exe"; Parameters: "--install"; Flags: runasoriginaluser shellexec waituntilterminated; Tasks: startup
 Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent shellexec
 #else
 Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent
 #endif
 
 [Code]
-#ifdef MachineWide
-function InitializeSetup(): Boolean;
-begin
-  Result := True;
-  { A running or startup-registered per-user copy would keep the hotkeys and hand new launches to
-    itself, so the uiAccess build would never get them. }
-  if FileExists(ExpandConstant('{localappdata}\Programs\Receipts\Receipts.exe')) and not WizardSilent() then
-    Result := MsgBox('Receipts is also installed just for you. That copy does not work over administrator windows and will keep handling the capture hotkeys while it runs.' + #13#10#13#10 +
-      'Uninstall the per-user copy first, from Settings > Apps > Installed apps or from Uninstall in its own Settings (captures and settings are kept), then run this installer again. Continue anyway?',
-      mbConfirmation, MB_YESNO) = IDYES;
-end;
-
-#endif
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then

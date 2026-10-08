@@ -44,6 +44,14 @@ public sealed class PersonalInstallService
         ? _currentExecutable
         : Path.Combine(_localAppData, InstalledRelativePath);
     public string LegacyInstalledExecutablePath => Path.Combine(_localAppData, LegacyInstalledRelativePath);
+
+    /// <summary>
+    /// A machine-wide build running next to this user's own per-user install. That copy lacks
+    /// uiAccess and keeps the hotkeys whenever it runs. Checked here rather than by the installer,
+    /// which may run as a different administrator account and see the wrong profile.
+    /// </summary>
+    public bool HasConflictingPerUserCopy => _machineWide &&
+        (File.Exists(Path.Combine(_localAppData, InstalledRelativePath)) || File.Exists(LegacyInstalledExecutablePath));
     public string InstallDirectory => Path.GetDirectoryName(InstalledExecutablePath)!;
     public string PreviousExecutablePath => InstalledExecutablePath + ".previous";
     public string RuntimeRoot => Path.Combine(_localAppData, BrandIdentity.LocalDataDirectoryName, "runtime");

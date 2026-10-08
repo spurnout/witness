@@ -59,6 +59,33 @@ public sealed class PersonalInstallServiceTests
     }
 
     [TestMethod]
+    public void MachineWideBuild_ReportsConflictingPerUserCopyOnlyWhenOneExists()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"goatshot-install-test-{Guid.NewGuid():N}");
+        var current = Path.Combine(root, "Program Files", "Receipts", "Receipts.exe");
+        var perUser = Path.Combine(root, "Programs", "Receipts", "Receipts.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(current)!);
+        File.WriteAllBytes(current, [0x47, 0x53]);
+
+        try
+        {
+            var machine = new PersonalInstallService(localAppData: root, currentExecutable: current, machineWide: true);
+            Assert.IsFalse(machine.HasConflictingPerUserCopy);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(perUser)!);
+            File.WriteAllBytes(perUser, [0x47, 0x53]);
+            Assert.IsTrue(machine.HasConflictingPerUserCopy);
+
+            var perUserBuild = new PersonalInstallService(localAppData: root, currentExecutable: perUser, machineWide: false);
+            Assert.IsFalse(perUserBuild.HasConflictingPerUserCopy);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void MachineWideBuild_LeavesUninstallToWindowsInstalledApps()
     {
         var root = Path.Combine(Path.GetTempPath(), $"goatshot-install-test-{Guid.NewGuid():N}");

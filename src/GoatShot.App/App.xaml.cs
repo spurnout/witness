@@ -390,6 +390,15 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (startupOptions.Mode == AppStartupMode.Interactive && _personalInstall.HasConflictingPerUserCopy)
+        {
+            System.Windows.MessageBox.Show(
+                "Receipts is also installed just for you. That copy does not work over administrator windows and keeps the capture hotkeys while it runs. Uninstall it from Settings > Apps > Installed apps, or with Uninstall in its own Settings; captures and settings are kept.",
+                "Receipts",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         if (startupOptions.Mode == AppStartupMode.Interactive &&
             _personalInstall.IsDistributionBuild &&
             !_personalInstall.IsRunningInstalledCopy)
