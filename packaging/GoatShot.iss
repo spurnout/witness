@@ -10,22 +10,48 @@
 #define OutputDir "..\artifacts\dist"
 #endif
 
+; /DMachineWide=1 builds the all-users installer for the signed uiAccess build. Windows only starts a
+; uiAccess executable from a protected folder such as Program Files, so it needs admin rights and its
+; own AppId instead of upgrading the per-user install in place.
+
 [Setup]
+#ifdef MachineWide
+AppId={{034D1C53-A634-4AAE-A61F-62E61B709B3A}
+#else
 AppId={{4E86AB11-3D28-4D42-BD31-05C48CF751D6}
+#endif
 AppName=Receipts
 AppVersion={#AppVersion}
 AppPublisher=Receipts
 AppPublisherURL=https://github.com/spurnout/witness
+#ifdef MachineWide
+DefaultDirName={autopf}\Receipts
+; Windows only starts a uiAccess executable from a protected folder, so the location is not a choice.
+DisableDirPage=yes
+#else
 DefaultDirName={localappdata}\Programs\Receipts
+#endif
 DefaultGroupName=Receipts
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
+#ifdef MachineWide
+OutputBaseFilename=Receipts-{#AppVersion}-win-x64-machine
+#else
 OutputBaseFilename=Receipts-{#AppVersion}-win-x64
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+#ifdef MachineWide
+PrivilegesRequired=admin
+; Setup may run as a different administrator account than the signed-in user, so per-user state
+; (startup, the per-user copy check) is handled by the app running as that user. What remains below
+; is best-effort uninstall cleanup of values the app writes.
+UsedUserAreasWarning=no
+#else
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+#endif
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\Receipts.exe
@@ -51,7 +77,12 @@ Name: "{autodesktop}\Receipts"; Filename: "{app}\Receipts.exe"; Tasks: desktopic
 ; Must stay byte-for-byte identical to StartupRegistrationService.BuildStartupCommand, which writes
 ; "<exe>" --background. Without the argument the app starts with a visible window instead of going to
 ; the tray, and StartupRegistrationService.GetState reports the command as stale on every upgrade.
+#ifdef MachineWide
+; Registered by the --install step under [Run] as the signed-in user; only removed here.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Receipts"; Flags: uninsdeletevalue
+#else
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Receipts"; ValueData: """{app}\Receipts.exe"" --background"; Flags: uninsdeletevalue; Tasks: startup
+#endif
 ; The app registers browser native-messaging hosts at runtime; dontcreatekey +
 ; uninsdeletekey schedules their removal at uninstall without creating them here,
 ; so browsers don't keep a host pointing at the deleted Receipts.exe. The legacy
@@ -70,7 +101,14 @@ Type: files; Name: "{userappdata}\Mozilla\NativeMessagingHosts\com.receipts.brid
 Type: files; Name: "{userappdata}\Mozilla\NativeMessagingHosts\com.goatshot.bridge.json"
 
 [Run]
+#ifdef MachineWide
+; A uiAccess executable cannot be started with CreateProcess; it has to go through the shell.
+; --install registers sign-in startup for the user who started setup, not the elevated account.
+Filename: "{app}\Receipts.exe"; Parameters: "--install"; Flags: runasoriginaluser shellexec waituntilterminated; Tasks: startup
+Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent shellexec
+#else
 Filename: "{app}\Receipts.exe"; Description: "Launch Receipts"; Flags: nowait postinstall skipifsilent
+#endif
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);

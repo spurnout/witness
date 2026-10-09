@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Machine-wide Receipts only. uiAccess lets the capture hotkeys and overlay work while an elevated
+  window (for example an admin PowerShell) has focus, without running Receipts as administrator.
+  Windows refuses to start a uiAccess executable unless it carries a trusted Authenticode signature
+  and is installed under a protected folder such as Program Files, so the portable, standalone, and
+  per-user builds keep app.manifest.
+-->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="Receipts.App"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="true" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

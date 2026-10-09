@@ -31,7 +31,11 @@ public sealed class InstallerStartupCommandTests
         throw new FileNotFoundException("Could not locate packaging/GoatShot.iss from the test output directory.");
     }
 
-    /// <summary>Pulls the ValueData for the Receipts Run entry out of the [Registry] section.</summary>
+    /// <summary>
+    /// Pulls the ValueData for the Receipts Run entry out of the [Registry] section. The machine-wide
+    /// variant only removes the value at uninstall (the app registers it as the signed-in user), so
+    /// the entry that writes the value is the one with ValueData.
+    /// </summary>
     private static string ReadInstallerStartupValueData()
     {
         var line = ReadInstallerScript()
@@ -40,7 +44,8 @@ public sealed class InstallerStartupCommandTests
             .FirstOrDefault(value =>
                 !value.StartsWith(';') &&
                 value.Contains(RunKeyMarker, StringComparison.Ordinal) &&
-                value.Contains("\"Receipts\"", StringComparison.Ordinal));
+                value.Contains("\"Receipts\"", StringComparison.Ordinal) &&
+                value.Contains("ValueData:", StringComparison.Ordinal));
 
         Assert.IsNotNull(line, "The installer no longer writes a Receipts Run value.");
 

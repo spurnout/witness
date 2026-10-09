@@ -28,6 +28,12 @@ Run the downloaded executable:
 
 Installation does not require administrator rights. Repair, startup, and uninstall controls are available in Settings. Uninstall preserves captures and settings unless those are removed separately.
 
+### Capturing administrator windows
+
+Windows keeps normal apps from interacting with windows that run as administrator, such as an elevated PowerShell. With the per-user, standalone, or portable build, the capture hotkeys do nothing while such a window has focus. Start the capture from the tray icon or with a delay instead, or install the all-users build:
+
+- **All-users installer** (`Receipts-<version>-win-x64-machine.exe`, built only when releases are code-signed): requires administrator rights to install into `Program Files`. It runs without administrator rights but with Windows UI Access, so the hotkeys and capture overlay also work over elevated windows. Windows refuses to start a UI Access app that is unsigned or outside a protected folder, so this build cannot be run portably and never copies itself into your profile. Remove it from **Settings > Apps > Installed apps**; captures and settings are preserved. Uninstall any per-user copy first, or it keeps handling the hotkeys while it runs.
+
 ### Requirements
 
 - Windows 10 version 2004 or newer, or Windows 11
@@ -182,6 +188,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-portable-pa
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-single-exe-package.ps1 -Version 0.3.0
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-installer-package.ps1 -Version 0.3.0
 ```
+
+To sign the executables and installers, pass `-SigningCertificateThumbprint <sha1>` for a certificate in the Windows certificate store, or `-SigningCertificatePath <file.pfx>` with its password in `RECEIPTS_SIGNING_PASSWORD`. `signtool.exe` is discovered from the Windows SDK or `SIGNTOOL_PATH`. Add `-MachineWide` to also build the all-users UI Access installer; it requires signing with a certificate that chains to a root the target machines trust, and Inno Setup. The `personal-release` workflow does both when the `RECEIPTS_SIGNING_PFX_BASE64` and `RECEIPTS_SIGNING_PASSWORD` repository secrets are set.
 
 Without Inno Setup, add `-SkipInstaller` to `package-release.ps1` and omit `verify-installer-package.ps1`; the portable ZIP and standalone executable still build. The portable package also carries the optional browser companion. Use `Receipts.Cli.exe browser-extension publication-plan` to create a read-only checklist for manual browser-store submission; it does not contact a store, upload an extension, or claim publication.
 
